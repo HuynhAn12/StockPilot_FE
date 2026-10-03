@@ -5,13 +5,15 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 export interface RequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
   params?: Record<string, string | number | boolean | undefined | null>;
+  idempotencyKey?: string;
+  tenantSlug?: string;
 }
 
 export async function request<T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { params, body, headers: customHeaders, ...customConfig } = options;
+  const { params, body, headers: customHeaders, idempotencyKey, tenantSlug, ...customConfig } = options;
 
   let url = endpoint.startsWith("http") ? endpoint : `${BASE_URL}${endpoint}`;
   if (params) {
@@ -28,6 +30,7 @@ export async function request<T>(
   }
 
   const token = localStorage.getItem("sp_access_token");
+  const storedTenant = tenantSlug || localStorage.getItem("sp_tenant_slug") || localStorage.getItem("sp_store_code");
   const headers = new Headers(customHeaders);
 
   if (!headers.has("Content-Type") && !(body instanceof FormData)) {
@@ -36,6 +39,28 @@ export async function request<T>(
 
   if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  if (storedTenant && !headers.has("X-Tenant-Slug")) {
+    headers.set("X-Tenant-Slug", storedTenant);
+  }
+
+  // Auto-generate or set Idempotency-Key for sensitive transactional mutations
+  const method = (customConfig.method || "GET").toUpperCase();
+  if (["POST", "PUT", "PATCH"].includes(method)) {
+    if (idempotencyKey) {
+      headers.set("Idempotency-Key", idempotencyKey);
+    } else if (
+      url.includes("/pos/sales") ||
+      url.includes("/orders") ||
+      url.includes("/stock-takes") ||
+      url.includes("/inventory/") ||
+      url.includes("/import/")
+    ) {
+      if (!headers.has("Idempotency-Key") && typeof crypto !== "undefined" && crypto.randomUUID) {
+        headers.set("Idempotency-Key", crypto.randomUUID());
+      }
+    }
   }
 
   const config: RequestInit = {
