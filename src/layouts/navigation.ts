@@ -72,18 +72,18 @@ export const roleConfig: Record<
     label: "Store Owner",
     scope: "An Phát Mini Mart",
     nav: ownerNavigation,
-    accent: "bg-[var(--sp-primary)]",
+    accent: "bg-(--sp-primary)",
   },
   warehouse: {
     label: "Warehouse Staff",
     scope: "Kho chính",
     nav: warehouseNavigation,
-    accent: "bg-[var(--sp-success)]",
+    accent: "bg-(--sp-success)",
   },
   admin: {
     label: "System Administration",
     scope: "System Administration",
     nav: adminNavigation,
-    accent: "bg-[var(--sp-purple)]",
+    accent: "bg-(--sp-purple)",
   },
 };

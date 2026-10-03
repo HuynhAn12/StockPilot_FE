@@ -1,0 +1,2 @@
+// Inventory feature components
+export {};

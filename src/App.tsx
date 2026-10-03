@@ -1,13 +1,10 @@
-import { Navigate, Route, Routes } from "react-router-dom";
-
-import { ShowcasePage } from "./pages/ShowcasePage";
+import { AppProvider } from "./app/providers";
+import { AppRouter } from "./app/router";
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/internal/showcase" replace />} />
-      <Route path="/internal/showcase" element={<ShowcasePage />} />
-      <Route path="*" element={<Navigate to="/internal/showcase" replace />} />
-    </Routes>
+    <AppProvider>
+      <AppRouter />
+    </AppProvider>
   );
 }

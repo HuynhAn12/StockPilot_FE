@@ -1,0 +1,2 @@
+// Catalog feature components
+export {};
