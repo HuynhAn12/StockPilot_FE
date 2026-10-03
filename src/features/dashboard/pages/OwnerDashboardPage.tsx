@@ -14,7 +14,7 @@ import { MetricCard } from "../../../components/data-display/MetricCard";
 import { Badge } from "../../../components/ui/Badge";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
-import { Skeleton } from "../../../components/ui/Skeleton";
+import { Skeleton } from "../../../components/ui";
 import { useCurrentUser } from "../../auth/hooks/useAuth";
 import { OwnerLayout } from "../../../layouts/OwnerLayout";
 import { useDashboardMetrics } from "../hooks/useDashboard";
@@ -35,7 +35,7 @@ export function OwnerDashboardPage() {
     <OwnerLayout title="Tổng quan cửa hàng" onRefresh={() => refetch()}>
       <div className="grid gap-6">
         {/* Welcome Banner */}
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-(--sp-border) bg-gradient-to-r from-blue-50/80 via-indigo-50/50 to-white p-5 sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-(--sp-border) bg-linear-to-r from-blue-50/80 via-indigo-50/50 to-white p-5 sm:p-6">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Badge tone="info">Chủ cửa hàng (SHOP_OWNER)</Badge>

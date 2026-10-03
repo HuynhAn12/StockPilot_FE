@@ -18,3 +18,13 @@ export function useAcceptRecommendation() {
     },
   });
 }
+
+export function useRejectRecommendation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => pricingApi.rejectRecommendation(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pricing"] });
+    },
+  });
+}

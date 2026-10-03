@@ -17,7 +17,16 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
+export interface AuthStore {
+  id: number;
+  name: string;
+  code: string;
+  phone?: string | null;
+  address?: string | null;
+}
+
 export interface AuthResponse {
   user: AuthUser;
+  store?: AuthStore | null;
   tokens?: AuthTokens;
 }

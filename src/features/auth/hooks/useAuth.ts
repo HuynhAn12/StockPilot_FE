@@ -29,8 +29,15 @@ export function useLogin() {
       if (data?.user) {
         localStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify(data.user));
       }
-      if (data?.user?.store?.code) {
-        localStorage.setItem("sp_tenant_slug", data.user.store.code);
+      const storeObj = data?.store || data?.user?.store;
+      if (storeObj) {
+        localStorage.setItem("sp_store", JSON.stringify(storeObj));
+        if (storeObj.name) {
+          localStorage.setItem("sp_store_name", storeObj.name);
+        }
+        if (storeObj.code) {
+          localStorage.setItem("sp_tenant_slug", storeObj.code);
+        }
       }
       queryClient.invalidateQueries({ queryKey: ["auth"] });
     },
