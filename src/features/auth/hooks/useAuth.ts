@@ -19,13 +19,38 @@ export function useLogin() {
   return useMutation({
     mutationFn: (credentials: LoginInput) => authApi.login(credentials),
     onSuccess: (response) => {
-      if (response?.data?.tokens?.accessToken) {
-        localStorage.setItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN, response.data.tokens.accessToken);
+      const data = response?.data;
+      if (data?.tokens?.accessToken) {
+        localStorage.setItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN, data.tokens.accessToken);
       }
-      if (response?.data?.tokens?.refreshToken) {
-        localStorage.setItem(AUTH_STORAGE_KEYS.REFRESH_TOKEN, response.data.tokens.refreshToken);
+      if (data?.tokens?.refreshToken) {
+        localStorage.setItem(AUTH_STORAGE_KEYS.REFRESH_TOKEN, data.tokens.refreshToken);
+      }
+      if (data?.user) {
+        localStorage.setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify(data.user));
+      }
+      if (data?.user?.store?.code) {
+        localStorage.setItem("sp_tenant_slug", data.user.store.code);
       }
       queryClient.invalidateQueries({ queryKey: ["auth"] });
+    },
+  });
+}
+
+export function useLogout() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => {
+      const refreshToken = localStorage.getItem(AUTH_STORAGE_KEYS.REFRESH_TOKEN) || undefined;
+      return authApi.logout(refreshToken);
+    },
+    onSettled: () => {
+      localStorage.removeItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN);
+      localStorage.removeItem(AUTH_STORAGE_KEYS.REFRESH_TOKEN);
+      localStorage.removeItem(AUTH_STORAGE_KEYS.USER);
+      localStorage.removeItem("sp_tenant_slug");
+      queryClient.clear();
     },
   });
 }

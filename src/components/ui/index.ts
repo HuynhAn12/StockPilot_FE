@@ -14,3 +14,4 @@ export * from "./Tabs";
 export * from "./Modal";
 export * from "./Drawer";
 export * from "./ConfirmDialog";
+export * from "./Skeleton";
