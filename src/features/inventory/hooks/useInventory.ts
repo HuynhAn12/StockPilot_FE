@@ -5,6 +5,9 @@ import type {
   CreateInflowPayload,
   CreateOutflowPayload,
   AuditAdjustmentPayload,
+  StockTakeStatus,
+  CreateStockTakePayload,
+  UpdateStockTakeCountsPayload,
 } from "../types";
 
 export function useInventoryBalances(params?: { page?: number; limit?: number; warehouseId?: number }) {
@@ -47,6 +50,73 @@ export function useAdjustStock() {
     mutationFn: (payload: AuditAdjustmentPayload) => inventoryApi.adjustStock(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inventory"] });
+    },
+  });
+}
+
+export function useStockTakes(params?: { page?: number; limit?: number; status?: StockTakeStatus }) {
+  return useQuery({
+    queryKey: ["stock-takes", "list", params],
+    queryFn: () => inventoryApi.getStockTakes(params),
+  });
+}
+
+export function useStockTake(id: number) {
+  return useQuery({
+    queryKey: ["stock-takes", "detail", id],
+    queryFn: () => inventoryApi.getStockTake(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateStockTake() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateStockTakePayload) => inventoryApi.createStockTake(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["stock-takes"] }),
+  });
+}
+
+export function useStartStockTake() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => inventoryApi.startStockTake(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ["stock-takes"] });
+      qc.invalidateQueries({ queryKey: ["stock-takes", "detail", id] });
+    },
+  });
+}
+
+export function useUpdateStockTakeCounts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: UpdateStockTakeCountsPayload }) =>
+      inventoryApi.updateStockTakeCounts(id, payload),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ["stock-takes", "detail", id] });
+    },
+  });
+}
+
+export function useCompleteStockTake() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => inventoryApi.completeStockTake(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ["stock-takes"] });
+      qc.invalidateQueries({ queryKey: ["stock-takes", "detail", id] });
+    },
+  });
+}
+
+export function useCancelStockTake() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => inventoryApi.cancelStockTake(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ["stock-takes"] });
+      qc.invalidateQueries({ queryKey: ["stock-takes", "detail", id] });
     },
   });
 }

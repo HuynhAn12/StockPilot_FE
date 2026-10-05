@@ -81,7 +81,14 @@ export function zodResolver<T extends FieldValues>(
   };
 }
 
+export const createStockTakeSchema = z.object({
+  title: z.string().min(1, "Vui lòng nhập tên đợt kiểm").max(200, "Tối đa 200 ký tự"),
+  scope: z.enum(["ALL", "CATEGORY"]),
+  categoryId: z.number().int().positive().nullable().optional(),
+  note: z.string().max(500, "Tối đa 500 ký tự").optional(),
+}).refine((data) => {
+  if (data.scope === "CATEGORY" && !data.categoryId) return false;
+  return true;
+}, { message: "Vui lòng chọn danh mục", path: ["categoryId"] });
 
-
-
-
+export type CreateStockTakeFormValues = z.infer<typeof createStockTakeSchema>;

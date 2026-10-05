@@ -9,6 +9,11 @@ import type {
   StockInflowResponse,
   StockOutflowResponse,
   AuditAdjustmentResponse,
+  StockTakeStatus,
+  StockTake,
+  StockTakeDetail,
+  CreateStockTakePayload,
+  UpdateStockTakeCountsPayload,
 } from "../types";
 
 export const inventoryApi = {
@@ -29,5 +34,33 @@ export const inventoryApi = {
   // TODO API-CONTRACT: Confirm với Sang về field name chính xác
   adjustStock: (payload: AuditAdjustmentPayload) =>
     httpClient.post<AuditAdjustmentResponse>("/inventory/audit", payload),
+
+  // TODO API-CONTRACT: Confirm với Sang về field name chính xác
+  getStockTakes: (params?: { page?: number; limit?: number; status?: StockTakeStatus }) =>
+    httpClient.get<PaginatedResponse<StockTake>>("/stock-takes", { params }),
+
+  // TODO API-CONTRACT: Confirm với Sang về field name chính xác
+  getStockTake: (id: number) =>
+    httpClient.get<StockTakeDetail>(`/stock-takes/${id}`),
+
+  // TODO API-CONTRACT: Confirm với Sang về field name chính xác
+  createStockTake: (payload: CreateStockTakePayload) =>
+    httpClient.post<StockTake>("/stock-takes", payload),
+
+  // TODO API-CONTRACT: Confirm với Sang về field name chính xác
+  startStockTake: (id: number) =>
+    httpClient.post<StockTake>(`/stock-takes/${id}/start`),
+
+  // TODO API-CONTRACT: Confirm với Sang về field name chính xác
+  updateStockTakeCounts: (id: number, payload: UpdateStockTakeCountsPayload) =>
+    httpClient.put<StockTakeDetail>(`/stock-takes/${id}/counts`, payload),
+
+  // TODO API-CONTRACT: Confirm với Sang về field name chính xác
+  completeStockTake: (id: number) =>
+    httpClient.post<StockTake>(`/stock-takes/${id}/complete`),
+
+  // TODO API-CONTRACT: Confirm với Sang về field name chính xác
+  cancelStockTake: (id: number) =>
+    httpClient.post<StockTake>(`/stock-takes/${id}/cancel`),
 };
 

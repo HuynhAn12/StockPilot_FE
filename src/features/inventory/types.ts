@@ -74,3 +74,59 @@ export interface AuditAdjustmentResponse {
 
 // TODO API-CONTRACT: Confirm với Sang về field name chính xác
 
+export type StockTakeStatus = "DRAFT" | "IN_PROGRESS" | "COMPLETED" | "CANCELED";
+
+export interface StockTake {
+  id: number;
+  code: string;
+  title: string;
+  scope: "ALL" | "CATEGORY";
+  categoryId?: number | null;
+  categoryName?: string | null;
+  note?: string | null;
+  status: StockTakeStatus;
+  createdBy: string;
+  createdAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  canceledAt?: string | null;
+  totalItems?: number;
+  countedItems?: number;
+}
+
+export interface StockTakeCount {
+  id: number;
+  stockTakeId: number;
+  stockItemId: number;
+  stockItem?: {
+    id: number;
+    sku: string;
+    name: string;
+    costPrice: number;
+  };
+  systemQuantity: number;
+  actualQuantity: number | null;
+  variance: number | null;
+  note?: string | null;
+}
+
+export interface StockTakeDetail extends StockTake {
+  counts: StockTakeCount[];
+}
+
+export interface CreateStockTakePayload {
+  title: string;
+  scope: "ALL" | "CATEGORY";
+  categoryId?: number | null;
+  note?: string;
+}
+
+export interface UpdateStockTakeCountsPayload {
+  counts: Array<{
+    stockItemId: number;
+    actualQuantity: number;
+    note?: string;
+  }>;
+}
+
+// TODO API-CONTRACT: Confirm với Sang về field name chính xác

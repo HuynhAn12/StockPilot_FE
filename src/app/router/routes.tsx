@@ -8,6 +8,9 @@ import { InventoryPage } from "../../features/inventory/pages/InventoryPage";
 import { MovementsPage } from "../../features/inventory/pages/MovementsPage";
 import { StockInflowPage } from "../../features/inventory/pages/StockInflowPage";
 import { StockOutflowPage } from "../../features/inventory/pages/StockOutflowPage";
+import { StockTakesListPage } from "../../features/inventory/pages/StockTakesListPage";
+import { StockTakeNewPage } from "../../features/inventory/pages/StockTakeNewPage";
+import { StockTakeDetailPage } from "../../features/inventory/pages/StockTakeDetailPage";
 import { OrdersPage } from "../../features/orders/pages/OrdersPage";
 import { PricingPage } from "../../features/pricing/pages/PricingPage";
 import { AlertsPage } from "../../features/alerts/pages/AlertsPage";
@@ -81,6 +84,30 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <StockOutflowPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/stock-takes"
+        element={
+          <ProtectedRoute>
+            <StockTakesListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/stock-takes/new"
+        element={
+          <ProtectedRoute>
+            <StockTakeNewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/stock-takes/:id"
+        element={
+          <ProtectedRoute>
+            <StockTakeDetailPage />
           </ProtectedRoute>
         }
       />
