@@ -6,6 +6,8 @@ import { OwnerDashboardPage } from "../../features/dashboard/pages/OwnerDashboar
 import { ProductsPage } from "../../features/catalog/pages/ProductsPage";
 import { InventoryPage } from "../../features/inventory/pages/InventoryPage";
 import { MovementsPage } from "../../features/inventory/pages/MovementsPage";
+import { StockInflowPage } from "../../features/inventory/pages/StockInflowPage";
+import { StockOutflowPage } from "../../features/inventory/pages/StockOutflowPage";
 import { OrdersPage } from "../../features/orders/pages/OrdersPage";
 import { PricingPage } from "../../features/pricing/pages/PricingPage";
 import { AlertsPage } from "../../features/alerts/pages/AlertsPage";
@@ -63,6 +65,22 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <MovementsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/inventory/inflow"
+        element={
+          <ProtectedRoute>
+            <StockInflowPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/inventory/outflow"
+        element={
+          <ProtectedRoute>
+            <StockOutflowPage />
           </ProtectedRoute>
         }
       />

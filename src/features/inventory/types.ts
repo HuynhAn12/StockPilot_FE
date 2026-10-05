@@ -23,3 +23,54 @@ export interface StockMovement {
   referenceId: string;
   createdAt: string;
 }
+
+export interface CreateInflowPayload {
+  warehouseId: number;
+  supplierName?: string;
+  note?: string;
+  items: Array<{
+    stockItemId: number;
+    quantity: number;
+    unitCost: number;
+  }>;
+}
+
+export interface CreateOutflowPayload {
+  warehouseId: number;
+  reason: "SALE" | "DAMAGE" | "TRANSFER" | "RETURN_SUPPLIER" | "OTHER";
+  note?: string;
+  items: Array<{
+    stockItemId: number;
+    quantity: number;
+  }>;
+}
+
+export interface AuditAdjustmentPayload {
+  warehouseId: number;
+  stockItemId: number;
+  actualQuantity: number;
+  reason: string;
+  note?: string;
+}
+
+export interface StockInflowResponse {
+  id: number;
+  referenceCode: string;
+  createdAt: string;
+}
+
+export interface StockOutflowResponse {
+  id: number;
+  referenceCode: string;
+  createdAt: string;
+}
+
+export interface AuditAdjustmentResponse {
+  id: number;
+  beforeQuantity: number;
+  afterQuantity: number;
+  delta: number;
+}
+
+// TODO API-CONTRACT: Confirm với Sang về field name chính xác
+

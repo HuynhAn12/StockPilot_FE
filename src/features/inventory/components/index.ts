@@ -1,2 +1,3 @@
 // Inventory feature components
-export {};
+export * from "./AuditAdjustmentModal";
+
