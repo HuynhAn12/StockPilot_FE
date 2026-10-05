@@ -5,6 +5,7 @@ import { OnboardingPage } from "../../features/onboarding/pages/OnboardingPage";
 import { OwnerDashboardPage } from "../../features/dashboard/pages/OwnerDashboardPage";
 import { ProductsPage } from "../../features/catalog/pages/ProductsPage";
 import { InventoryPage } from "../../features/inventory/pages/InventoryPage";
+import { MovementsPage } from "../../features/inventory/pages/MovementsPage";
 import { OrdersPage } from "../../features/orders/pages/OrdersPage";
 import { PricingPage } from "../../features/pricing/pages/PricingPage";
 import { AlertsPage } from "../../features/alerts/pages/AlertsPage";
@@ -54,6 +55,14 @@ export function AppRouter() {
         element={
           <ProtectedRoute>
             <InventoryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/app/inventory/movements"
+        element={
+          <ProtectedRoute>
+            <MovementsPage />
           </ProtectedRoute>
         }
       />
