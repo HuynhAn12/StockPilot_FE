@@ -1,16 +1,28 @@
 import { useState } from "react";
-import { ArrowDownRight, ArrowUpRight, Boxes, History, Package, Search, ShieldAlert } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  Boxes,
+  History,
+  Package,
+  Scale,
+  Search,
+  ShieldAlert,
+} from "lucide-react";
 
 import { Badge } from "../../../components/ui/Badge";
+import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { Input } from "../../../components/ui/Input";
 import { Skeleton } from "../../../components/ui/Skeleton";
 import { OwnerLayout } from "../../../layouts/OwnerLayout";
 import { useInventoryBalances, useStockMovements } from "../hooks/useInventory";
+import { AuditAdjustmentModal } from "../components/AuditAdjustmentModal";
 
 export function InventoryPage() {
   const [activeTab, setActiveTab] = useState<"balances" | "movements">("balances");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
 
   const { data: balanceData, isLoading: isLoadingBalances, refetch: refetchBalances } =
     useInventoryBalances();
@@ -101,7 +113,7 @@ export function InventoryPage() {
           </Card>
         </div>
 
-        {/* View Tabs & Search */}
+        {/* View Tabs & Search & Action Button */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2 border-b border-(--sp-border) pb-2 sm:border-b-0 sm:pb-0">
             <button
@@ -128,17 +140,28 @@ export function InventoryPage() {
             </button>
           </div>
 
-          {activeTab === "balances" && (
-            <div className="w-full max-w-xs relative">
-              <Search className="absolute left-3 top-2.5 size-4 text-(--sp-text-muted)" />
-              <Input
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Tìm SKU hoặc tên mặt hàng..."
-                className="pl-9"
-              />
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {activeTab === "balances" && (
+              <div className="w-full sm:w-64 relative">
+                <Search className="absolute left-3 top-2.5 size-4 text-(--sp-text-muted)" />
+                <Input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Tìm SKU hoặc tên mặt hàng..."
+                  className="pl-9"
+                />
+              </div>
+            )}
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setIsAuditModalOpen(true)}
+              className="gap-1.5 whitespace-nowrap"
+            >
+              <Scale className="size-4" />
+              Cân tồn nhanh
+            </Button>
+          </div>
         </div>
 
         {/* Balances Tab Table */}
@@ -280,6 +303,13 @@ export function InventoryPage() {
             )}
           </Card>
         )}
+
+        {/* Modal Cân tồn nhanh */}
+        <AuditAdjustmentModal
+          open={isAuditModalOpen}
+          onOpenChange={setIsAuditModalOpen}
+          onSuccess={handleRefresh}
+        />
       </div>
     </OwnerLayout>
   );

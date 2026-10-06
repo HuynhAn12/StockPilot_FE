@@ -1,5 +1,5 @@
-import { LogOut, Menu, PanelLeft, RefreshCw, Store } from "lucide-react";
-import type { ReactNode } from "react";
+import { ChevronDown, LogOut, Menu, PanelLeft, RefreshCw, Store, X } from "lucide-react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -30,6 +30,7 @@ export function RoleShell({
   const { data: userResponse } = useCurrentUser();
   const user = userResponse?.data;
   const logoutMutation = useLogout();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const activeStoreName =
     user?.store?.name ||
@@ -38,6 +39,10 @@ export function RoleShell({
 
   const activeStoreCode = user?.store?.code || localStorage.getItem("sp_tenant_slug") || "";
   const activeUserName = user?.fullName || "Chủ Cửa Hàng";
+
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
 
   const handleRefresh = () => {
     if (onRefresh) {
@@ -90,10 +95,72 @@ export function RoleShell({
             </div>
           </div>
         </aside>
+
+        {/* Mobile Drawer */}
+        {mobileOpen && (
+          <div className="fixed inset-0 z-50 flex lg:hidden" role="dialog" aria-modal="true">
+            <div
+              className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs transition-opacity"
+              onClick={() => setMobileOpen(false)}
+            />
+            <div className="relative flex w-[280px] max-w-[85vw] flex-col bg-white shadow-xl">
+              <div className="relative border-b border-(--sp-border)">
+                <SidebarHeader
+                  accent={config.accent}
+                  roleLabel={config.label}
+                  storeName={activeStoreName}
+                  storeCode={activeStoreCode}
+                />
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(false)}
+                  className="absolute top-3 right-3 rounded-md p-1.5 text-(--sp-text-muted) hover:bg-(--sp-bg-subtle) hover:text-(--sp-text)"
+                  aria-label="Đóng menu"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <SidebarNav
+                  items={config.nav}
+                  currentPath={location.pathname}
+                  onItemClick={() => setMobileOpen(false)}
+                />
+              </div>
+              <div className="border-t border-(--sp-border) p-3">
+                <div className="flex items-center justify-between rounded-lg bg-(--sp-bg-subtle) px-3 py-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="grid size-7 shrink-0 place-items-center rounded-full bg-(--sp-primary) text-xs font-bold text-white">
+                      {activeUserName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-(--sp-text)">{activeUserName}</p>
+                      <p className="truncate text-[11px] text-(--sp-text-muted)">{user?.email || "owner"}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    title="Đăng xuất"
+                    className="rounded p-1 text-(--sp-text-muted) hover:bg-white hover:text-(--sp-danger) transition-colors"
+                  >
+                    <LogOut className="size-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="min-w-0 flex-1 flex flex-col">
           <header className="sticky top-0 z-10 flex h-(--sp-header-height) items-center justify-between gap-3 border-b border-(--sp-border) bg-white/95 px-4 backdrop-blur sm:px-5">
             <div className="flex min-w-0 items-center gap-3">
-              <IconButton label="Mở điều hướng" variant="ghost" className="lg:hidden">
+              <IconButton
+                label="Mở điều hướng"
+                variant="ghost"
+                className="lg:hidden"
+                onClick={() => setMobileOpen(true)}
+              >
                 <Menu className="size-4" />
               </IconButton>
               <IconButton label="Thu gọn sidebar" variant="ghost" className="hidden lg:inline-flex">
@@ -174,26 +241,168 @@ export function SidebarHeader({
   );
 }
 
-export function SidebarNav({ items, currentPath }: { items: NavigationItem[]; currentPath: string }) {
+function isChildRouteActive(
+  currentPath: string,
+  childPath: string,
+  allSiblings: NavigationItem[] = []
+): boolean {
+  if (!childPath) return false;
+  if (currentPath === childPath) return true;
+  if (currentPath.startsWith(`${childPath}/`)) {
+    const hasMoreSpecificSibling = allSiblings.some((sibling) => {
+      const siblingPath = sibling.path || sibling.href || "";
+      if (!siblingPath || siblingPath === childPath) return false;
+      return (
+        currentPath === siblingPath ||
+        (siblingPath.length > childPath.length && currentPath.startsWith(`${siblingPath}/`))
+      );
+    });
+    return !hasMoreSpecificSibling;
+  }
+  return false;
+}
+
+export function SidebarNav({
+  items,
+  currentPath,
+  onItemClick,
+}: {
+  items: NavigationItem[];
+  currentPath: string;
+  onItemClick?: () => void;
+}) {
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
+
+  // Auto-expand khi route khớp children
+  useEffect(() => {
+    const menusToExpand: string[] = [];
+    items.forEach((item) => {
+      if (
+        item.children?.some((child) => {
+          const childPath = child.path || child.href || "";
+          return childPath && (currentPath === childPath || currentPath.startsWith(`${childPath}/`));
+        })
+      ) {
+        menusToExpand.push(item.label);
+      }
+    });
+    if (menusToExpand.length > 0) {
+      setExpandedMenus((prev) => [...new Set([...prev, ...menusToExpand])]);
+    }
+  }, [currentPath, items]);
+
+  const toggleMenu = (label: string) => {
+    setExpandedMenus((prev) =>
+      prev.includes(label) ? prev.filter((l) => l !== label) : [...prev, label]
+    );
+  };
+
   return (
     <nav className="sp-scrollbar p-2 space-y-0.5" aria-label="Điều hướng chính">
       {items.map((item) => {
         const Icon = item.icon;
-        const active = currentPath === item.href || (item.href !== "/app/dashboard" && currentPath.startsWith(item.href));
+        const hasChildren = Boolean(item.children && item.children.length > 0);
+
+        if (!hasChildren) {
+          const itemHref = item.href || item.path || "";
+          const active =
+            currentPath === itemHref || (itemHref !== "/app/dashboard" && currentPath.startsWith(itemHref));
+
+          return (
+            <Link
+              key={itemHref || item.label}
+              to={itemHref}
+              onClick={onItemClick}
+              className={cn(
+                "sp-focus flex h-9 items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors",
+                active
+                  ? "bg-(--sp-primary-soft) text-(--sp-primary-hover) font-semibold shadow-xs"
+                  : "text-(--sp-text-muted) hover:bg-(--sp-bg-subtle) hover:text-(--sp-text)",
+              )}
+            >
+              <Icon
+                className={cn(
+                  "size-4 shrink-0",
+                  active ? "text-(--sp-primary)" : "text-(--sp-text-muted)",
+                )}
+              />
+              <span className="truncate">{item.label}</span>
+            </Link>
+          );
+        }
+
+        const isExpanded = expandedMenus.includes(item.label);
+        const children = item.children!;
+        const hasActiveChild = children.some((child) =>
+          isChildRouteActive(currentPath, child.path || child.href || "", children)
+        );
+
         return (
-          <Link
-            key={item.href}
-            to={item.href}
-            className={cn(
-              "sp-focus flex h-9 items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-colors",
-              active
-                ? "bg-(--sp-primary-soft) text-(--sp-primary-hover) font-semibold shadow-xs"
-                : "text-(--sp-text-muted) hover:bg-(--sp-bg-subtle) hover:text-(--sp-text)",
-            )}
-          >
-            <Icon className={cn("size-4 shrink-0", active ? "text-(--sp-primary)" : "text-(--sp-text-muted)")} />
-            <span className="truncate">{item.label}</span>
-          </Link>
+          <div key={item.label} className="space-y-0.5">
+            <button
+              type="button"
+              onClick={() => toggleMenu(item.label)}
+              className={cn(
+                "sp-focus flex h-9 w-full items-center justify-between rounded-lg px-3 text-sm font-medium transition-colors text-left",
+                hasActiveChild
+                  ? "text-(--sp-text) font-semibold"
+                  : "text-(--sp-text-muted) hover:bg-(--sp-bg-subtle) hover:text-(--sp-text)",
+              )}
+              aria-expanded={isExpanded}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Icon
+                  className={cn(
+                    "size-4 shrink-0",
+                    hasActiveChild ? "text-(--sp-primary)" : "text-(--sp-text-muted)",
+                  )}
+                />
+                <span className="truncate">{item.label}</span>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "size-4 shrink-0 text-(--sp-text-muted) transition-transform duration-200",
+                  isExpanded ? "rotate-180" : "rotate-0",
+                )}
+              />
+            </button>
+
+            {/* Submenu Children */}
+            <div
+              className={cn(
+                "overflow-hidden transition-all duration-200 ease-in-out",
+                isExpanded ? "max-h-96 opacity-100 space-y-0.5 pt-0.5" : "max-h-0 opacity-0 pointer-events-none",
+              )}
+            >
+              {children.map((child) => {
+                const ChildIcon = child.icon;
+                const childPath = child.path || child.href || "";
+                const active = isChildRouteActive(currentPath, childPath, children);
+
+                return (
+                  <Link
+                    key={childPath || child.label}
+                    to={childPath}
+                    onClick={onItemClick}
+                    className={cn(
+                      "sp-focus flex h-8 items-center gap-2 rounded-lg pl-8 pr-3 text-sm font-medium transition-colors",
+                      active
+                        ? "bg-(--sp-primary-soft) text-(--sp-primary-hover) font-semibold shadow-xs"
+                        : "text-(--sp-text-muted) hover:bg-(--sp-bg-subtle) hover:text-(--sp-text)",
+                    )}
+                  >
+                    <ChildIcon
+                      className={cn(
+                        "size-3.5 shrink-0",
+                        active ? "text-(--sp-primary)" : "text-(--sp-text-muted)",
+                      )}
+                    />
+                    <span className="truncate">{child.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         );
       })}
     </nav>
@@ -205,11 +414,16 @@ export function MobileNav({ items, currentPath }: { items: NavigationItem[]; cur
     <nav className="fixed bottom-0 left-0 right-0 z-20 grid grid-cols-5 border-t border-(--sp-border) bg-white/95 backdrop-blur lg:hidden" aria-label="Điều hướng di động">
       {items.map((item) => {
         const Icon = item.icon;
-        const active = currentPath === item.href || (item.href !== "/app/dashboard" && currentPath.startsWith(item.href));
+        const targetHref = item.href || item.path || (item.children && (item.children[0]?.path || item.children[0]?.href)) || "#";
+        const active =
+          currentPath === targetHref ||
+          (targetHref !== "/app/dashboard" && currentPath.startsWith(targetHref)) ||
+          Boolean(item.children && item.children.some((child) => currentPath.startsWith(child.path || child.href || "")));
+
         return (
           <Link
-            key={item.href}
-            to={item.href}
+            key={item.label}
+            to={targetHref}
             className={cn(
               "sp-focus flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] font-medium transition-colors",
               active ? "text-(--sp-primary) font-semibold" : "text-(--sp-text-muted)"
