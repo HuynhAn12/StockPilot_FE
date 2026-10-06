@@ -1,0 +1,249 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800;1,14..32,400&display=swap');
+@import "tailwindcss";
+
+/* Disable Tailwind v4 dark variant from triggering on system dark preference */
+@custom-variant dark (&:where(.dark-mode-disabled, .dark-mode-disabled *));
+
+/* =============================================
+   STOCKPILOT DESIGN SYSTEM - Premium Light Edition
+   Primary: Blue (#3B82F6)
+   Font: Inter — Vietnamese diacritics support
+   ============================================= */
+
+@layer base {
+  :root, .dark {
+    /* ── Color Tokens ── */
+    --background:    216 33% 97%;
+    --foreground:    222 47% 10%;
+    --card:          0   0% 100%;
+    --card-foreground: 222 47% 10%;
+    --popover:       0   0% 100%;
+    --popover-foreground: 222 47% 10%;
+    --primary:       217 91% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary:     214 30% 93%;
+    --secondary-foreground: 222 47% 20%;
+    --muted:         214 30% 93%;
+    --muted-foreground: 215 16% 50%;
+    --accent:        213 100% 96%;
+    --accent-foreground: 217 91% 40%;
+    --destructive:   0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border:        214 25% 89%;
+    --input:         214 25% 89%;
+    --ring:          217 91% 52%;
+    --radius:        0.75rem;
+    --success:       142 71% 45%;
+    --warning:       38  92% 50%;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  *:focus-visible {
+    outline: 2px solid hsl(var(--ring) / 0.7);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+
+  /* Smooth transitions on interactive elements */
+  button, a, input, select, textarea {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 0.15s;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+@layer utilities {
+  /* ─── Keyframe Animations ─── */
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in-fast {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes slide-in-right {
+    from { opacity: 0; transform: translateX(24px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes bounce-in {
+    0%   { transform: scale(0.88); opacity: 0; }
+    55%  { transform: scale(1.03); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.55; }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-3px); }
+  }
+
+  /* Animation classes */
+  .animate-in               { animation: fade-in 0.22s ease-out forwards; }
+  .fade-in-0                { animation: fade-in 0.18s ease-out forwards; }
+  .zoom-in-95               { animation: scale-in 0.18s ease-out forwards; }
+  .slide-in-from-right-full { animation: slide-in-right 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  .fade-in-50               { animation: fade-in 0.22s ease-out forwards; }
+  .duration-200             { animation-duration: 0.2s; }
+  .duration-300             { animation-duration: 0.3s; }
+  .animate-bounce-in        { animation: bounce-in 0.3s ease-out; }
+  .animate-pulse-soft       { animation: pulse-soft 2s ease-in-out infinite; }
+  .animate-float            { animation: float 3s ease-in-out infinite; }
+
+  /* ─── Skeleton ─── */
+  .skeleton {
+    background: linear-gradient(90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--muted-foreground) / 0.08) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+    border-radius: calc(var(--radius) * 0.5);
+  }
+
+  /* ─── Text Utilities ─── */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .money {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  .text-gradient-blue {
+    background: linear-gradient(135deg, hsl(217 91% 50%) 0%, hsl(224 76% 44%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ─── Premium Shadow System ─── */
+  .shadow-xs  { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.04); }
+  .shadow-sm  { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.04); }
+  .shadow-md  { box-shadow: 0 4px 8px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04); }
+  .shadow-lg  { box-shadow: 0 10px 20px -4px rgb(0 0 0 / 0.09), 0 4px 8px -4px rgb(0 0 0 / 0.04); }
+  .shadow-xl  { box-shadow: 0 20px 40px -8px rgb(0 0 0 / 0.12), 0 8px 16px -6px rgb(0 0 0 / 0.05); }
+  .shadow-2xl { box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.18); }
+  .shadow-blue-glow    { box-shadow: 0 4px 16px 0 rgb(59 130 246 / 0.30); }
+  .shadow-blue-glow-lg { box-shadow: 0 6px 24px 0 rgb(59 130 246 / 0.40); }
+  .shadow-card  { box-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 0 0 1px rgb(0 0 0 / 0.04); }
+  .shadow-panel { box-shadow: 0 4px 16px rgb(0 0 0 / 0.07), 0 0 0 1px rgb(0 0 0 / 0.04); }
+  .shadow-modal { box-shadow: 0 24px 64px rgb(0 0 0 / 0.14), 0 0 0 1px rgb(0 0 0 / 0.04); }
+
+  /* ─── Background Utilities ─── */
+  .bg-page {
+    background-color: hsl(216 33% 97%);
+    background-image:
+      radial-gradient(ellipse at 15% 10%, hsl(214 100% 97% / 0.8) 0px, transparent 50%),
+      radial-gradient(ellipse at 85% 85%, hsl(221 100% 96% / 0.6) 0px, transparent 50%);
+  }
+
+  /* ─── Glassmorphism ─── */
+  .glass {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+  }
+  .glass-subtle {
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* ─── Gradient utilities ─── */
+  .gradient-blue {
+    background: linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%);
+  }
+  .gradient-blue-soft {
+    background: linear-gradient(135deg, hsl(213 100% 96%) 0%, hsl(221 100% 94%) 100%);
+  }
+
+  /* ─── Hover Lift ─── */
+  .hover-lift {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px -4px rgb(0 0 0 / 0.10);
+  }
+
+  /* ─── Badge Variants ─── */
+  .badge-blue  { background: hsl(213 100% 93%); color: hsl(217 91% 38%); border: 1px solid hsl(213 100% 87%); }
+  .badge-green { background: hsl(142 76% 91%); color: hsl(142 71% 28%); border: 1px solid hsl(142 76% 83%); }
+  .badge-red   { background: hsl(0 86% 93%);  color: hsl(0 84% 43%);   border: 1px solid hsl(0 86% 85%); }
+  .badge-amber { background: hsl(38 100% 91%); color: hsl(38 92% 32%);  border: 1px solid hsl(38 100% 82%); }
+  .badge-gray  { background: hsl(214 25% 92%); color: hsl(215 16% 42%); border: 1px solid hsl(214 25% 84%); }
+
+  /* ─── Divider ─── */
+  .divider-fade {
+    background: linear-gradient(90deg, transparent, hsl(var(--border) / 0.8), transparent);
+    height: 1px;
+    border: none;
+  }
+}
+
+@media print {
+  body * { visibility: hidden; }
+  #receipt-print-area, #receipt-print-area * { visibility: visible; }
+  #receipt-print-area {
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%; max-width: 100%;
+    margin: 0; padding: 12px;
+    background: white !important;
+    color: black !important;
+  }
+}
+
+/* Hide number input spin arrows in POS quantity field */
+.pos-qty-input::-webkit-outer-spin-button,
+.pos-qty-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.pos-qty-input[type=number] {
+  -moz-appearance: textfield;
+}
