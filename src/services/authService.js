@@ -34,10 +34,18 @@ export async function apiLogin({ email, password }) {
   };
 }
 
+// POST /auth/send-register-otp
+export async function apiSendRegisterOtp({ fullName, email, storeCode }) {
+  const { data } = await apiClient.post('/auth/send-register-otp', {
+    fullName, email, storeCode,
+  });
+  return data;
+}
+
 // POST /auth/register
-export async function apiRegister({ fullName, email, password, storeName, storeCode, phone, address }) {
+export async function apiRegister({ fullName, email, password, storeName, storeCode, phone, address, otp }) {
   const { data } = await apiClient.post('/auth/register', {
-    fullName, email, password, storeName, storeCode, phone, address,
+    fullName, email, password, storeName, storeCode, phone, address, otp,
   });
   const raw = data.data;
   return {
@@ -59,14 +67,36 @@ export async function apiGetMe() {
 }
 
 // POST /auth/forgot-password
-export async function apiForgotPassword({ email }) {
-  const { data } = await apiClient.post('/auth/forgot-password', { email });
+export async function apiForgotPassword({ email, phone }) {
+  const payload = {};
+  if (email) payload.email = email;
+  if (phone) payload.phone = phone;
+  const { data } = await apiClient.post('/auth/forgot-password', payload);
+  return data;
+}
+
+// POST /auth/verify-otp
+export async function apiVerifyOtp({ email, phone, otp }) {
+  const payload = { otp };
+  if (email) payload.email = email;
+  if (phone) payload.phone = phone;
+  const { data } = await apiClient.post('/auth/verify-otp', payload);
   return data;
 }
 
 // POST /auth/reset-password
-export async function apiResetPassword({ token, newPassword }) {
-  const { data } = await apiClient.post('/auth/reset-password', { token, newPassword });
+export async function apiResetPassword({ token, email, phone, otp, newPassword }) {
+  const payload = { newPassword };
+  if (token) payload.token = token;
+  if (email && otp) {
+    payload.email = email;
+    payload.otp = otp;
+  }
+  if (phone && otp) {
+    payload.phone = phone;
+    payload.otp = otp;
+  }
+  const { data } = await apiClient.post('/auth/reset-password', payload);
   return data;
 }
 

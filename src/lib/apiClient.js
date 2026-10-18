@@ -11,7 +11,7 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000,
+  timeout: 45000,
 });
 
 // ─── Request Interceptor: gắn access token vào mọi request ───
@@ -33,76 +33,85 @@ apiClient.interceptors.request.use(
 );
 
 // ─── Response Interceptor: tự động refresh khi 401 ───
-let isRefreshing = false;
-let failedQueue = [];
-
-function processQueue(error, token) {
-  failedQueue.forEach((prom) => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-}
+let refreshPromise = null;
 
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Bỏ qua refresh khi chính request auth bị lỗi (login/register sai mật khẩu)
-    const isAuthEndpoint = originalRequest.url?.includes('/auth/login') ||
+    // Không can thiệp nếu không có config hoặc request auth bị lỗi (login/register)
+    if (!originalRequest) {
+      return Promise.reject(error);
+    }
+
+    const isAuthEndpoint =
+      originalRequest.url?.includes('/auth/login') ||
       originalRequest.url?.includes('/auth/register') ||
       originalRequest.url?.includes('/auth/refresh');
 
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return apiClient(originalRequest);
+      originalRequest._retry = true;
+
+      if (!refreshPromise) {
+        refreshPromise = (async () => {
+          const stored = localStorage.getItem('stockpilot-auth');
+          const parsed = stored ? JSON.parse(stored) : null;
+          const refreshToken = parsed?.state?.refreshToken;
+
+          if (!refreshToken) {
+            throw new Error('NO_REFRESH_TOKEN');
+          }
+
+          const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken }, { timeout: 20000 });
+          const newAccessToken = data.data.accessToken;
+          const newRefreshToken = data.data.refreshToken;
+
+          // Cập nhật token trong localStorage
+          if (parsed?.state) {
+            parsed.state.token = newAccessToken;
+            parsed.state.refreshToken = newRefreshToken;
+            localStorage.setItem('stockpilot-auth', JSON.stringify(parsed));
+          }
+
+          // Bắn sự kiện cập nhật authStore trong bộ nhớ
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(
+              new CustomEvent('stockpilot-auth-refresh', {
+                detail: { token: newAccessToken, refreshToken: newRefreshToken },
+              })
+            );
+          }
+
+          apiClient.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
+          return newAccessToken;
+        })()
+          .catch((refreshError) => {
+            const status = refreshError.response?.status;
+            // Chỉ xóa phiên và chuyển về login khi refreshToken thực sự không hợp lệ hoặc hết hạn (401 / 403)
+            // Tuyệt đối không đăng xuất khi gặp lỗi mạng, timeout, hoặc lỗi 500 / 429 tạm thời!
+            if (status === 401 || status === 403 || refreshError.message === 'NO_REFRESH_TOKEN') {
+              console.warn('[StockPilot Auth] Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Điều hướng về /login.');
+              localStorage.removeItem('stockpilot-auth');
+              if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+                window.location.href = '/login';
+              }
+            } else {
+              console.warn('[StockPilot Auth] Refresh token gặp lỗi tạm thời (mạng/timeout/server):', refreshError.message);
+            }
+            throw refreshError;
           })
-          .catch((err) => Promise.reject(err));
+          .finally(() => {
+            refreshPromise = null;
+          });
       }
 
-      originalRequest._retry = true;
-      isRefreshing = true;
-
       try {
-        const stored = localStorage.getItem('stockpilot-auth');
-        const parsed = stored ? JSON.parse(stored) : null;
-        const refreshToken = parsed?.state?.refreshToken;
-
-        if (!refreshToken) throw new Error('No refresh token');
-
-        const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
-        const newAccessToken = data.data.accessToken;
-        const newRefreshToken = data.data.refreshToken;
-
-        // Cập nhật token trong localStorage
-        if (parsed?.state) {
-          parsed.state.token = newAccessToken;
-          parsed.state.refreshToken = newRefreshToken;
-          localStorage.setItem('stockpilot-auth', JSON.stringify(parsed));
-        }
-
-        apiClient.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`;
-        processQueue(null, newAccessToken);
-
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        const token = await refreshPromise;
+        originalRequest.headers.Authorization = `Bearer ${token}`;
         return apiClient(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        // Clear auth và redirect về login
-        localStorage.removeItem('stockpilot-auth');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
+      } catch (err) {
+        return Promise.reject(err);
       }
     }
 

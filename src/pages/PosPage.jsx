@@ -1,24 +1,59 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Search, Plus, Trash2, Printer, CheckCircle, CreditCard,
   Banknote, QrCode, User, Phone, X, ShoppingBag, ArrowRight,
   RotateCcw, Sparkles, Tag, ChevronRight, ChevronLeft, Check, AlertCircle,
   FileText, Percent, Minus, SlidersHorizontal, Package, RefreshCw,
-  Receipt, Zap
+  Receipt, Zap, Scan, Wifi, WifiOff, Link2, Loader2, Copy, ExternalLink,
+  Smartphone, Settings
 } from 'lucide-react';
 import { useToast } from '../components/common/Toast';
 import { useAuthStore } from '../components/store/authStore';
-import { apiGetPosProducts, apiCreatePosSale } from '../services/posService';
+import { useTranslation } from '../i18n/useTranslation';
+import {
+  apiGetPosProducts,
+  apiCreatePosSale,
+  apiCreatePayosLink,
+  apiCheckPayosStatus,
+  apiCreateMomoPayment,
+  apiCheckMomoStatus,
+  apiConfirmMomoSuccess,
+  apiGetMomoConfig,
+  apiSaveMomoConfig
+} from '../services/posService';
+import { apiClient } from '../lib/apiClient';
 import { docSoThanhChu } from '../utils/numberToWordsVN';
 
+function safeNum(val) {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  if (typeof val === 'object') {
+    if (typeof val.toNumber === 'function') return val.toNumber();
+    if (Array.isArray(val.d) && val.d.length > 0) {
+      return Number(val.d[0]) * (val.s < 0 ? -1 : 1);
+    }
+    return 0;
+  }
+  const n = Number(val);
+  return isNaN(n) ? 0 : n;
+}
+
 function formatVND(n) {
-  return Number(n || 0).toLocaleString('vi-VN') + ' đ';
+  return safeNum(n).toLocaleString('vi-VN') + ' đ';
 }
 
 function getPosProductImage(p) {
   if (p?.imageUrl) return p.imageUrl;
-  const name = (p?.name || '').toLowerCase();
-  const sku = (p?.sku || p?.code || '').toLowerCase();
+  const name = (p?.name || p?.productName || '').toLowerCase();
+  const sku = (p?.sku || p?.code || p?.productCode || '').toLowerCase();
+
+  // Beverages / Beer / Drinks
+  if (name.includes('bia') || name.includes('heineken') || name.includes('tiger') || name.includes('saigon') || name.includes('rượu') || name.includes('ruou') || name.includes('nước ngọt') || name.includes('nuoc ngot') || name.includes('nước') || name.includes('pepsi') || name.includes('coca') || name.includes('redbull') || name.includes('sting')) {
+    if (name.includes('heineken')) {
+      return 'https://images.unsplash.com/photo-1608270114032-4720935574dc?w=240&h=240&fit=crop';
+    }
+    return 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=240&h=240&fit=crop';
+  }
 
   // Fashion / Apparel (matching screenshot)
   if (name.includes('vest') || name.includes('suit')) {
@@ -77,38 +112,18 @@ function getPosProductImage(p) {
   if (name.includes('dầu gội') || name.includes('dau goi') || name.includes('kem đánh răng') || name.includes('sữa tắm')) {
     return 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=240&h=240&fit=crop';
   }
-  return 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=240&h=240&fit=crop';
+  return 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=240&h=240&fit=crop';
 }
 
-// Read the same localStorage overrides that ProductsPage edit modal writes
 function applyPosOverrides(products) {
-  try {
-    const raw = localStorage.getItem('stockpilot_overrides');
-    if (!raw) return products;
-    const overrides = JSON.parse(raw); // { [productId]: { name, salePrice, imageUrl } }
-    return products.map((p) => {
-      const ov = overrides[String(p.id)];
-      if (!ov) return p;
-      return {
-        ...p,
-        name: ov.name ?? p.name,
-        imageUrl: ov.imageUrl ?? p.imageUrl,
-        sellingPrice: ov.salePrice ?? p.sellingPrice,
-        // also patch stockItems sellingPrice so cart price is correct
-        stockItems: p.stockItems?.map((si) => ({
-          ...si,
-          sellingPrice: ov.salePrice ?? si.sellingPrice,
-        })),
-      };
-    });
-  } catch {
-    return products;
-  }
+  try { localStorage.removeItem('stockpilot_overrides'); } catch (_) {}
+  return products;
 }
 
 export function PosPage() {
   const { toast } = useToast();
   const { user } = useAuthStore();
+  const { t, language } = useTranslation();
 
   const [products, setProducts] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -143,12 +158,350 @@ export function PosPage() {
   const [custNameInput, setCustNameInput] = useState('');
   const [custPhoneInput, setCustPhoneInput] = useState('');
 
+  // ── PayOS QR Payment State ─────────────────────────────────────
+  const [payosModalOpen, setPayosModalOpen] = useState(false);
+  const [payosData, setPayosData] = useState(null);
+  const [payosStatus, setPayosStatus] = useState('WAITING'); // 'WAITING' | 'SUCCESS' | 'EXPIRED'
+  const [payosCountdown, setPayosCountdown] = useState(900);
+  const [copiedField, setCopiedField] = useState(null);
+  const payosPollRef = useRef(null);
+  const payosTimerRef = useRef(null);
+
+  // ── MoMo E-Wallet Payment State ────────────────────────────────
+  const [momoModalOpen, setMomoModalOpen] = useState(false);
+  const [momoData, setMomoData] = useState(null);
+  const [momoStatus, setMomoStatus] = useState('WAITING'); // 'WAITING' | 'SUCCESS' | 'EXPIRED'
+  const [momoCountdown, setMomoCountdown] = useState(900);
+  const [momoQrTab, setMomoQrTab] = useState('p2p'); // 'p2p' | 'vietqr' | 'gateway'
+  const [isMomoSimulating, setIsMomoSimulating] = useState(false);
+  const momoPollRef = useRef(null);
+  const momoTimerRef = useRef(null);
+
+  // ── MoMo Real Account Config State ─────────────────────────────
+  const [momoConfigModalOpen, setMomoConfigModalOpen] = useState(false);
+  const [momoConfig, setMomoConfig] = useState(null);
+  const [momoPartnerCodeInput, setMomoPartnerCodeInput] = useState('MOMOVA0I20261015');
+  const [momoAccessKeyInput, setMomoAccessKeyInput] = useState('sjqZwImFcjxZBhHF');
+  const [momoSecretKeyInput, setMomoSecretKeyInput] = useState('OK6GwHc66ZBSdqyuR5RXKTx0xA718DKh');
+  const [momoBusinessNameInput, setMomoBusinessNameInput] = useState('STOCKPILOT');
+  const [isSavingMomoConfig, setIsSavingMomoConfig] = useState(false);
+
+  const loadMomoConfig = useCallback(async () => {
+    try {
+      const cfg = await apiGetMomoConfig();
+      if (cfg) {
+        setMomoConfig(cfg);
+        setMomoPartnerCodeInput(cfg.partnerCode || 'MOMOVA0I20261015');
+        setMomoAccessKeyInput(cfg.accessKey || 'sjqZwImFcjxZBhHF');
+        setMomoSecretKeyInput(cfg.secretKey || 'OK6GwHc66ZBSdqyuR5RXKTx0xA718DKh');
+        setMomoBusinessNameInput(cfg.businessName || 'STOCKPILOT');
+      }
+    } catch (e) {
+      console.warn('Lỗi tải cấu hình MoMo:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMomoConfig();
+  }, [loadMomoConfig]);
+
+  const handleSaveMomoConfig = async (e) => {
+    e?.preventDefault();
+    if (!momoPartnerCodeInput.trim() || !momoAccessKeyInput.trim() || !momoSecretKeyInput.trim()) {
+      toast({ title: 'Thiếu thông tin', description: 'Vui lòng điền đủ Partner Code, Access Key và Secret Key MoMo', type: 'error' });
+      return;
+    }
+    setIsSavingMomoConfig(true);
+    try {
+      const res = await apiSaveMomoConfig({
+        partnerCode: momoPartnerCodeInput.trim(),
+        accessKey: momoAccessKeyInput.trim(),
+        secretKey: momoSecretKeyInput.trim(),
+        businessName: momoBusinessNameInput.trim() || 'STOCKPILOT',
+      });
+      setMomoConfig(res);
+      setMomoConfigModalOpen(false);
+      toast({
+        title: 'Đã lưu cấu hình MoMo Doanh Nghiệp!',
+        description: `Mã đối tác: ${res.partnerCode} (${res.businessName})`,
+        type: 'success',
+      });
+    } catch (err) {
+      toast({
+        title: 'Lỗi lưu cấu hình',
+        description: err?.response?.data?.error?.message || err?.message || 'Không thể lưu thông tin MoMo.',
+        type: 'error',
+      });
+    } finally {
+      setIsSavingMomoConfig(false);
+    }
+  };
+
+
+
+  // ── Scanner state ──────────────────────────────────────────────
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerCode, setScannerCode] = useState(() => {
+    try {
+      return localStorage.getItem('stockpilot_pos_scanner_code') || null;
+    } catch (_) {
+      return null;
+    }
+  }); // 6-char pairing code
+  const [scannerStatus, setScannerStatus] = useState('idle'); // idle | connecting | connected | error
+  const [lastScan, setLastScan] = useState(null);           // { name, sku, price, scannedAt }
+  const sseRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+
+  // Add a scanned stock item directly into the active cart tab
+  // Add a scanned stock item directly into the active cart tab
+  const addScannedItemToCart = useCallback((payload) => {
+    // 1. Find matching product in POS products state or overrides
+    const matchedProduct = products.find((p) =>
+      p.id === payload.productId ||
+      p.stockItems?.some((si) => si.id === payload.stockItemId || (payload.barcode && si.barcode === payload.barcode) || si.sku === payload.sku)
+    );
+    const applied = matchedProduct;
+
+    // Priority for image:
+    // 1. applied override/product imageUrl
+    // 2. payload.imageUrl from backend
+    // 3. getPosProductImage(applied || payload)
+    const resolvedImageUrl = applied?.imageUrl 
+      || payload.imageUrl 
+      || (applied ? getPosProductImage(applied) : getPosProductImage(payload));
+
+    const resolvedName = applied?.name || payload.productName || payload.name;
+    const resolvedPrice = Number(applied?.stockItems?.[0]?.sellingPrice || applied?.sellingPrice || payload.sellingPrice || 0);
+    const resolvedSku = payload.sku || applied?.code || `SP-${payload.stockItemId}`;
+    const resolvedProductId = applied?.id || payload.productId || null;
+
+    setTabs((prev) => prev.map((t) => {
+      if (t.id !== activeTabId) return t;
+      const existing = t.items.findIndex((it) => it.stockItemId === payload.stockItemId);
+      if (existing >= 0) {
+        const updated = [...t.items];
+        updated[existing] = {
+          ...updated[existing],
+          quantity: updated[existing].quantity + 1,
+          subtotal: (updated[existing].quantity + 1) * updated[existing].price,
+          imageUrl: updated[existing].imageUrl || resolvedImageUrl,
+        };
+        return { ...t, items: updated };
+      }
+      return {
+        ...t,
+        items: [
+          ...t.items,
+          {
+            productId: resolvedProductId,
+            stockItemId: payload.stockItemId,
+            name: resolvedName,
+            sku: resolvedSku,
+            price: resolvedPrice,
+            quantity: 1,
+            subtotal: resolvedPrice,
+            imageUrl: resolvedImageUrl,
+          },
+        ],
+      };
+    }));
+  }, [activeTabId, products]);
+
+  const openSseStream = useCallback((code) => {
+    if (!code) return;
+    if (sseRef.current) {
+      try { sseRef.current.abort(); } catch (_) {}
+      sseRef.current = null;
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
+    const stored = localStorage.getItem('stockpilot-auth');
+    let token = '';
+    try { token = JSON.parse(stored)?.state?.token || ''; } catch (_) {}
+    if (!token) {
+      setScannerStatus('idle');
+      return;
+    }
+
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1';
+    const ctrl = new AbortController();
+    sseRef.current = ctrl;
+    setScannerStatus('connecting');
+
+    fetch(`${API_URL}/scanner/sessions/${code}/events`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: ctrl.signal,
+    }).then(async (res) => {
+      if (!res.ok) {
+        if (res.status === 404) {
+          // Session doesn't exist anymore on server
+          try { localStorage.removeItem('stockpilot_pos_scanner_code'); } catch (_) {}
+          setScannerCode(null);
+          setScannerStatus('idle');
+          return;
+        }
+        setScannerStatus('error');
+        // Schedule auto-reconnect
+        reconnectTimeoutRef.current = setTimeout(() => {
+          const currentSaved = localStorage.getItem('stockpilot_pos_scanner_code');
+          if (currentSaved) openSseStream(currentSaved);
+        }, 5000);
+        return;
+      }
+
+      setScannerStatus('connected');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop() || '';
+        for (const chunk of parts) {
+          const eventLine = chunk.split('\n').find(l => l.startsWith('event:'));
+          const dataLine = chunk.split('\n').find(l => l.startsWith('data:'));
+          const eventName = eventLine?.slice(6).trim();
+          const rawData = dataLine?.slice(5).trim();
+          if (!rawData) continue;
+          try {
+            const payload = JSON.parse(rawData);
+            if (eventName === 'scan') {
+              addScannedItemToCart(payload);
+              setLastScan(payload);
+              toast({ title: `✓ Quét: ${payload.name}`, description: `${payload.sku} — ${Number(payload.sellingPrice).toLocaleString('vi-VN')} đ`, type: 'success' });
+            } else if (eventName === 'expired' || eventName === 'closed') {
+              try { localStorage.removeItem('stockpilot_pos_scanner_code'); } catch (_) {}
+              setScannerStatus('idle');
+              setScannerCode(null);
+            }
+          } catch (_) {}
+        }
+      }
+
+      // If disconnected without error and session code still saved, reconnect
+      const savedCode = localStorage.getItem('stockpilot_pos_scanner_code');
+      if (savedCode && !ctrl.signal.aborted) {
+        setScannerStatus('connecting');
+        reconnectTimeoutRef.current = setTimeout(() => {
+          openSseStream(savedCode);
+        }, 3000);
+      } else {
+        setScannerStatus('idle');
+      }
+    }).catch((err) => {
+      if (err.name !== 'AbortError') {
+        setScannerStatus('error');
+        const savedCode = localStorage.getItem('stockpilot_pos_scanner_code');
+        if (savedCode) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            openSseStream(savedCode);
+          }, 5000);
+        }
+      }
+    });
+  }, [addScannedItemToCart]);
+
+  // Create a pairing session and open SSE stream
+  const startScannerSession = async () => {
+    setScannerStatus('connecting');
+    try {
+      const { data } = await apiClient.post('/scanner/sessions', { label: 'POS Web' });
+      const code = data.data.code;
+      setScannerCode(code);
+      try { localStorage.setItem('stockpilot_pos_scanner_code', code); } catch (_) {}
+      openSseStream(code);
+    } catch (err) {
+      setScannerStatus('error');
+      toast({ title: 'Không thể tạo phiên Scanner', description: err?.response?.data?.error?.message || err.message, type: 'error' });
+    }
+  };
+
+  const stopScannerSession = async () => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (sseRef.current) {
+      try { sseRef.current.abort(); } catch (_) {}
+      sseRef.current = null;
+    }
+    if (scannerCode) {
+      try { await apiClient.delete(`/scanner/sessions/${scannerCode}`); } catch (_) {}
+    }
+    try { localStorage.removeItem('stockpilot_pos_scanner_code'); } catch (_) {}
+    setScannerCode(null);
+    setScannerStatus('idle');
+    setLastScan(null);
+  };
+
+  // Auto-restore / Auto-connect scanner session on mount
+  useEffect(() => {
+    let isCancelled = false;
+    const restoreSession = async () => {
+      try {
+        const storedCode = localStorage.getItem('stockpilot_pos_scanner_code');
+        // Fetch active sessions from server for current store
+        const res = await apiClient.get('/scanner/sessions');
+        const sessions = res?.data?.data || [];
+        if (isCancelled) return;
+
+        if (sessions.length > 0) {
+          const activeCode = sessions[0].code;
+          setScannerCode(activeCode);
+          try { localStorage.setItem('stockpilot_pos_scanner_code', activeCode); } catch (_) {}
+          openSseStream(activeCode);
+        } else if (storedCode) {
+          setScannerCode(storedCode);
+          openSseStream(storedCode);
+        }
+      } catch (err) {
+        console.warn('Không thể tự động khôi phục scanner session:', err);
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      isCancelled = true;
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (sseRef.current) {
+        try { sseRef.current.abort(); } catch (_) {}
+      }
+    };
+  }, [openSseStream]);
+
   const loadProducts = async () => {
     setIsLoadingProducts(true);
     try {
+      try { localStorage.removeItem('stockpilot_overrides'); } catch (_) {}
       const data = await apiGetPosProducts();
       const raw = Array.isArray(data) ? data : (data?.items || []);
-      setProducts(applyPosOverrides(raw));
+      const mapped = raw.map((p) => {
+        const defaultSi = p.stockItems?.[0] || {};
+        const price = safeNum(defaultSi.sellingPrice ?? p.sellingPrice ?? p.salePrice);
+        return {
+          ...p,
+          sellingPrice: price,
+          stockItems: p.stockItems?.map((si) => ({
+            ...si,
+            sellingPrice: safeNum(si.sellingPrice ?? price),
+          })) || [],
+        };
+      });
+      // Sort products ascending from 1 onwards (SP1, SP2, SP3...)
+      mapped.sort((a, b) => {
+        const numA = parseInt(String(a.code || a.id).replace(/\D/g, ''), 10) || Number(a.id) || 0;
+        const numB = parseInt(String(b.code || b.id).replace(/\D/g, ''), 10) || Number(b.id) || 0;
+        return numA - numB;
+      });
+      setProducts(mapped);
     } catch (err) {
       console.warn('Lỗi tải sản phẩm:', err?.message);
       setProducts([]);
@@ -157,7 +510,38 @@ export function PosPage() {
     }
   };
 
-  useEffect(() => { loadProducts(); }, []);
+  useEffect(() => {
+    loadProducts();
+
+    // Tự động đồng bộ ngay khi trang Sản phẩm cập nhật (cùng cửa sổ hoặc khác tab)
+    const handleSync = () => {
+      loadProducts();
+    };
+    window.addEventListener('stockpilot_product_updated', handleSync);
+
+    let bc = null;
+    try {
+      bc = new BroadcastChannel('stockpilot_channel');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'PRODUCTS_UPDATED') {
+          loadProducts();
+        }
+      };
+    } catch (_) {}
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadProducts();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('stockpilot_product_updated', handleSync);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (bc) bc.close();
+    };
+  }, []);
 
   const categoriesList = useMemo(() => {
     const setCat = new Set();
@@ -166,7 +550,7 @@ export function PosPage() {
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
+    const list = products.filter((p) => {
       const matchCat = selectedCategory === 'ALL' || p.category?.name === selectedCategory;
       const q = searchProduct.trim().toLowerCase();
       const matchSearch = !q ||
@@ -174,6 +558,12 @@ export function PosPage() {
         p.code?.toLowerCase().includes(q) ||
         p.stockItems?.some((si) => si.sku?.toLowerCase().includes(q) || si.barcode?.includes(q));
       return matchCat && matchSearch;
+    });
+
+    return list.sort((a, b) => {
+      const numA = parseInt(String(a.code || a.id).replace(/\D/g, ''), 10) || Number(a.id) || 0;
+      const numB = parseInt(String(b.code || b.id).replace(/\D/g, ''), 10) || Number(b.id) || 0;
+      return numA - numB;
     });
   }, [products, selectedCategory, searchProduct]);
 
@@ -222,8 +612,7 @@ export function PosPage() {
 
   const addItemToCart = (product) => {
     // Apply latest overrides at the moment of adding
-    const [applied] = applyPosOverrides([product]);
-    const defaultStockItem = applied.stockItems?.[0] || {};
+    const defaultStockItem = product.stockItems?.[0] || {};
     const stockItemId = defaultStockItem.id;
     if (!stockItemId) {
       toast({ title: 'Sản phẩm lỗi', description: 'Sản phẩm chưa có mã kho', type: 'error' });
@@ -231,9 +620,9 @@ export function PosPage() {
     }
     const currentItems = activeTab.items;
     const existingIndex = currentItems.findIndex((it) => it.stockItemId === stockItemId);
-    const price = Number(defaultStockItem.sellingPrice || applied.sellingPrice || 0);
-    const sku = defaultStockItem.sku || applied.code || `SKU-${applied.id}`;
-    const imgSrc = getPosProductImage(applied);
+    const price = Number(defaultStockItem.sellingPrice ?? product.sellingPrice ?? product.salePrice ?? 0);
+    const sku = defaultStockItem.sku || product.code || `SP-${product.id}`;
+    const imgSrc = getPosProductImage(product);
     if (existingIndex >= 0) {
       const updated = [...currentItems];
       updated[existingIndex].quantity += 1;
@@ -243,7 +632,7 @@ export function PosPage() {
       updateActiveTab({
         items: [
           ...currentItems,
-          { productId: applied.id, stockItemId, name: applied.name, sku, price, quantity: 1, subtotal: price, imageUrl: imgSrc }
+          { productId: product.id, stockItemId, name: product.name, sku, price, quantity: 1, subtotal: price, imageUrl: imgSrc }
         ]
       });
     }
@@ -252,6 +641,15 @@ export function PosPage() {
   const updateItemQuantity = (stockItemId, newQty) => {
     const qty = Math.max(1, parseInt(newQty, 10) || 1);
     updateActiveTab({ items: activeTab.items.map((it) => it.stockItemId === stockItemId ? { ...it, quantity: qty, subtotal: qty * it.price } : it) });
+  };
+
+  const updateItemPrice = (stockItemId, newPrice) => {
+    const price = Math.max(0, parseFloat(newPrice) || 0);
+    updateActiveTab({
+      items: activeTab.items.map((it) =>
+        it.stockItemId === stockItemId ? { ...it, price, subtotal: it.quantity * price } : it
+      ),
+    });
   };
 
   const removeItem = (stockItemId) => {
@@ -270,15 +668,317 @@ export function PosPage() {
   const customerPayNum = Number(amountGiven || 0);
   const changeDue = customerPayNum - totalPayable;
 
+  const stopPayosPolling = useCallback(() => {
+    if (payosPollRef.current) {
+      clearInterval(payosPollRef.current);
+      payosPollRef.current = null;
+    }
+    if (payosTimerRef.current) {
+      clearInterval(payosTimerRef.current);
+      payosTimerRef.current = null;
+    }
+  }, []);
+
+  const stopMomoPolling = useCallback(() => {
+    if (momoPollRef.current) {
+      clearInterval(momoPollRef.current);
+      momoPollRef.current = null;
+    }
+    if (momoTimerRef.current) {
+      clearInterval(momoTimerRef.current);
+      momoTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopPayosPolling();
+      stopMomoPolling();
+    };
+  }, [stopPayosPolling, stopMomoPolling]);
+
+  const broadcastOrderChange = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.dispatchEvent(new CustomEvent('stockpilot_product_updated'));
+      const bc = new BroadcastChannel('stockpilot_channel');
+      bc.postMessage({ type: 'ORDERS_UPDATED' });
+      bc.close();
+    } catch (_) {}
+  };
+
+  const handleCopyText = (field, text) => {
+    navigator.clipboard.writeText(String(text));
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleSimulateMomoPaid = async () => {
+    if (!momoData?.momoOrderId || isMomoSimulating) return;
+    setIsMomoSimulating(true);
+    try {
+      await apiConfirmMomoSuccess(momoData.momoOrderId);
+      toast({
+        title: 'Mô phỏng MoMo thành công',
+        description: 'Đã gửi xác nhận MoMo thành công! Đang hoàn tất đơn hàng...',
+        type: 'success',
+      });
+      const checkRes = await apiCheckMomoStatus(momoData.momoOrderId);
+      if (checkRes?.isPaid) {
+        stopMomoPolling();
+        setMomoStatus('SUCCESS');
+
+        const receipt = {
+          orderNumber: momoData?.orderNumber || `HD-${momoData.momoOrderId}`,
+          createdAt: new Date().toLocaleString('vi-VN'),
+          customerName: activeTab.customer.name || 'Khách lẻ',
+          customerPhone: activeTab.customer.phone || '',
+          cashier: user?.fullName || user?.email || 'Thu ngân',
+          storeName: user?.store?.name || 'StockPilot Store',
+          storeAddress: user?.store?.address || 'Chi nhánh trung tâm',
+          storePhone: user?.store?.phone || '0978.387.857',
+          items: activeTab.items,
+          subtotal: subtotalAmount,
+          discount: discountAmount,
+          total: totalPayable,
+          amountGiven: totalPayable,
+          changeDue: 0,
+          totalInWords: docSoThanhChu(totalPayable),
+          paymentMethod: 'Ví điện tử MoMo',
+        };
+
+        setTimeout(() => {
+          setMomoModalOpen(false);
+          updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
+          toast({
+            title: 'Thanh toán MoMo thành công!',
+            description: `Đơn hàng #${momoData?.orderNumber} đã ghi nhận và hoàn tất.`,
+            type: 'success',
+          });
+        }, 2000);
+      }
+    } catch (err) {
+      toast({
+        title: 'Lỗi mô phỏng MoMo',
+        description: err?.response?.data?.error?.message || err?.message || 'Không thể mô phỏng.',
+        type: 'error',
+      });
+    } finally {
+      setIsMomoSimulating(false);
+    }
+  };
+
   const handleCompleteSale = async (shouldPrint = false) => {
     if (activeTab.items.length === 0) {
       toast({ title: 'Giỏ hàng trống', description: 'Vui lòng chọn ít nhất 1 mặt hàng', type: 'error' });
       return;
     }
+
+    // ── XỬ LÝ THANH TOÁN VÍ ĐIỆN TỬ MOMO TỰ ĐỘNG NHẬN DIỆN ──
+    if (paymentMethod === 'MOMO') {
+      setIsProcessing(true);
+      try {
+        const payload = {
+          customerName: activeTab.customer.name || 'Khách lẻ',
+          customerPhone: activeTab.customer.phone || undefined,
+          discountAmount,
+          taxAmount: 0,
+          note: activeTab.note || undefined,
+          totalAmount: totalPayable,
+          items: activeTab.items.map((it) => ({
+            stockItemId: it.stockItemId,
+            quantity: it.quantity,
+            price: it.price,
+            unitPrice: it.price,
+          })),
+        };
+
+        const res = await apiCreateMomoPayment(payload);
+        setIsCheckoutOpen(false);
+        setMomoData(res);
+        setMomoStatus('WAITING');
+        setMomoCountdown(900);
+        setMomoModalOpen(true);
+
+        stopMomoPolling();
+
+        // 1. Đồng hồ đếm ngược 15 phút
+        momoTimerRef.current = setInterval(() => {
+          setMomoCountdown((prev) => {
+            if (prev <= 1) {
+              stopMomoPolling();
+              setMomoStatus('EXPIRED');
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        // 2. Polling kiểm tra trạng thái thanh toán từ MoMo mỗi 2.5 giây
+        momoPollRef.current = setInterval(async () => {
+          try {
+            const checkRes = await apiCheckMomoStatus(res.momoOrderId);
+            if (checkRes?.isPaid) {
+              stopMomoPolling();
+              setMomoStatus('SUCCESS');
+              broadcastOrderChange();
+
+              const receipt = {
+                orderNumber: res?.orderNumber || `HD-${res.momoOrderId}`,
+                createdAt: new Date().toLocaleString('vi-VN'),
+                customerName: activeTab.customer.name || 'Khách lẻ',
+                customerPhone: activeTab.customer.phone || '',
+                cashier: user?.fullName || user?.email || 'Thu ngân',
+                storeName: user?.store?.name || 'StockPilot Store',
+                storeAddress: user?.store?.address || 'Chi nhánh trung tâm',
+                storePhone: user?.store?.phone || '0978.387.857',
+                items: activeTab.items,
+                subtotal: subtotalAmount,
+                discount: discountAmount,
+                total: totalPayable,
+                amountGiven: totalPayable,
+                changeDue: 0,
+                totalInWords: docSoThanhChu(totalPayable),
+                paymentMethod: 'Ví điện tử MoMo',
+              };
+
+              if (shouldPrint) {
+                setPrintReceiptData(receipt);
+                setTimeout(() => window.print(), 500);
+              }
+
+              setTimeout(() => {
+                setMomoModalOpen(false);
+                updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
+                toast({
+                  title: 'Thanh toán MoMo thành công!',
+                  description: `Đơn hàng #${res?.orderNumber} đã ghi nhận và hoàn tất.`,
+                  type: 'success',
+                });
+              }, 2200);
+            }
+          } catch (pollErr) {
+            console.warn('Lỗi kiểm tra MoMo:', pollErr);
+          }
+        }, 2500);
+      } catch (err) {
+        toast({
+          title: 'Chưa thể tạo mã QR MoMo',
+          description: err?.response?.data?.error?.message || err?.message || 'Lỗi kết nối cổng MoMo.',
+          type: 'error',
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
+    // ── XỬ LÝ THANH TOÁN CHUYỂN KHOẢN / PAYOS NHẬN DIỆN TỰ ĐỘNG ──
+    if (paymentMethod === 'PAYOS' || paymentMethod === 'BANK_TRANSFER') {
+      setIsProcessing(true);
+      try {
+        const payload = {
+          customerName: activeTab.customer.name || 'Khách lẻ',
+          customerPhone: activeTab.customer.phone || undefined,
+          discountAmount,
+          taxAmount: 0,
+          note: activeTab.note || undefined,
+          totalAmount: totalPayable,
+          items: activeTab.items.map((it) => ({
+            stockItemId: it.stockItemId,
+            quantity: it.quantity,
+            price: it.price,
+            unitPrice: it.price,
+          })),
+        };
+
+        const res = await apiCreatePayosLink(payload);
+        setIsCheckoutOpen(false);
+        setPayosData(res);
+        setPayosStatus('WAITING');
+        setPayosCountdown(900);
+        setPayosModalOpen(true);
+
+        stopPayosPolling();
+
+        // 1. Đồng hồ đếm ngược 15 phút
+        payosTimerRef.current = setInterval(() => {
+          setPayosCountdown((prev) => {
+            if (prev <= 1) {
+              stopPayosPolling();
+              setPayosStatus('EXPIRED');
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+
+        // 2. Tự động kiểm tra trạng thái chuyển khoản từ PayOS mỗi 2.5 giây
+        payosPollRef.current = setInterval(async () => {
+          try {
+            const checkRes = await apiCheckPayosStatus(res.orderCode);
+            if (checkRes?.isPaid) {
+              stopPayosPolling();
+              setPayosStatus('SUCCESS');
+              broadcastOrderChange();
+
+              const receipt = {
+                orderNumber: res?.orderNumber || `HD-${res.orderCode}`,
+                createdAt: new Date().toLocaleString('vi-VN'),
+                customerName: activeTab.customer.name || 'Khách lẻ',
+                customerPhone: activeTab.customer.phone || '',
+                cashier: user?.fullName || user?.email || 'Thu ngân',
+                storeName: user?.store?.name || 'StockPilot Store',
+                storeAddress: user?.store?.address || 'Chi nhánh trung tâm',
+                storePhone: user?.store?.phone || '0978.387.857',
+                items: activeTab.items,
+                subtotal: subtotalAmount,
+                discount: discountAmount,
+                total: totalPayable,
+                amountGiven: totalPayable,
+                changeDue: 0,
+                totalInWords: docSoThanhChu(totalPayable),
+                paymentMethod: 'VietQR PayOS',
+              };
+
+              if (shouldPrint) {
+                setPrintReceiptData(receipt);
+                setTimeout(() => window.print(), 500);
+              }
+
+              setTimeout(() => {
+                setPayosModalOpen(false);
+                updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
+                toast({
+                  title: 'Thanh toán PayOS thành công!',
+                  description: `Đơn hàng #${res?.orderNumber} đã ghi nhận và hoàn tất.`,
+                  type: 'success',
+                });
+              }, 2200);
+            }
+          } catch (pollErr) {
+            console.warn('Lỗi kiểm tra PayOS:', pollErr);
+          }
+        }, 2500);
+      } catch (err) {
+        toast({
+          title: 'Chưa thể tạo mã VietQR PayOS',
+          description: err?.response?.data?.error?.message || err?.message || 'Cửa hàng chưa cấu hình PayOS. Hãy vào Cài đặt để kết nối.',
+          type: 'error',
+        });
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
+
+    // ── XỬ LÝ THANH TOÁN TIỀN MẶT (CASH) ──
     if (customerPayNum < totalPayable && paymentMethod === 'CASH') {
       toast({ title: 'Chưa đủ tiền', description: 'Tiền khách đưa nhỏ hơn tổng cần thanh toán', type: 'error' });
       return;
     }
+
     setIsProcessing(true);
     try {
       const payload = {
@@ -287,10 +987,17 @@ export function PosPage() {
         discountAmount,
         taxAmount: 0,
         note: activeTab.note || undefined,
-        paymentMethod,
-        items: activeTab.items.map((it) => ({ stockItemId: it.stockItemId, quantity: it.quantity })),
+        paymentMethod: 'CASH',
+        totalAmount: totalPayable,
+        items: activeTab.items.map((it) => ({
+          stockItemId: it.stockItemId,
+          quantity: it.quantity,
+          price: it.price,
+          unitPrice: it.price,
+        })),
       };
       const res = await apiCreatePosSale(payload);
+      broadcastOrderChange();
       toast({ title: 'Thanh toán thành công!', description: `Đơn #${res?.order?.orderNumber || 'POS'} đã ghi nhận.`, type: 'success' });
 
       const receipt = {
@@ -309,7 +1016,7 @@ export function PosPage() {
         amountGiven: customerPayNum,
         changeDue: Math.max(0, changeDue),
         totalInWords: docSoThanhChu(totalPayable),
-        paymentMethod: paymentMethod === 'CASH' ? 'Tiền mặt' : paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : 'PayOS',
+        paymentMethod: 'Tiền mặt',
       };
 
       updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
@@ -325,6 +1032,7 @@ export function PosPage() {
       setIsProcessing(false);
     }
   };
+
 
   return (
     <div className="flex flex-col lg:flex-row gap-3 h-[calc(100vh-5rem)] max-w-[1760px] mx-auto overflow-hidden">
@@ -355,7 +1063,7 @@ export function PosPage() {
                   style={isActive ? { borderBottomColor: '#fff' } : {}}
                 >
                   <Receipt className="w-3.5 h-3.5 shrink-0" />
-                  <span className="whitespace-nowrap">{tab.name}</span>
+                  <span className="whitespace-nowrap">{tab.name.startsWith('Hóa đơn') ? `${t('orderTab', 'Hóa đơn')} ${tab.id}` : tab.name}</span>
                   {count > 0 && (
                     <span className="w-4 h-4 rounded-full bg-blue-500 text-white text-[9px] flex items-center justify-center font-bold">
                       {count}
@@ -374,7 +1082,7 @@ export function PosPage() {
             <button
               onClick={addTab}
               className="mb-0.5 p-1.5 rounded-lg border border-dashed border-slate-300 text-slate-400 hover:text-blue-600 hover:border-blue-400 hover:bg-blue-50 text-xs flex items-center gap-1 transition-all"
-              title="Thêm hóa đơn mới"
+              title={t('newOrder', 'Thêm hóa đơn mới')}
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
@@ -382,8 +1090,23 @@ export function PosPage() {
 
           <div className="flex items-center gap-2 pb-2">
             <span className="text-[11px] text-slate-400 hidden sm:inline font-medium">
-              F3 Tìm hàng · F4 Khách · F9 Thanh toán
+              {t('hotkeyHint', 'F3 Tìm hàng · F9 Thanh toán')}
             </span>
+            {/* Scanner connect button */}
+            <button
+              onClick={() => setScannerOpen(true)}
+              title={t('scannerPairingTitle', 'Kết nối máy quét mã vạch')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                scannerStatus === 'connected'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                  : scannerStatus === 'connecting'
+                  ? 'bg-amber-50 text-amber-700 border-amber-300 animate-pulse'
+                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200'
+              }`}
+            >
+              {scannerStatus === 'connected' ? <Wifi className="w-3.5 h-3.5" /> : scannerStatus === 'connecting' ? <Wifi className="w-3.5 h-3.5" /> : <Scan className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{scannerStatus === 'connected' ? t('scanner', 'Scanner') : t('scannerIdle', 'Quét mã')}</span>
+            </button>
           </div>
         </div>
 
@@ -403,12 +1126,12 @@ export function PosPage() {
             letterSpacing: '0.06em',
           }}
         >
-          <div style={{ textAlign: 'center' }}>STT</div>
-          <div style={{ textAlign: 'center' }}>Xóa</div>
-          <div style={{ whiteSpace: 'nowrap' }}>Tên hàng hóa</div>
-          <div style={{ textAlign: 'center' }}>Số lượng</div>
-          <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>Đơn giá</div>
-          <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>Thành tiền</div>
+          <div style={{ textAlign: 'center' }}>{t('stt', 'STT')}</div>
+          <div style={{ textAlign: 'center' }}>{t('delete', 'Xóa')}</div>
+          <div style={{ whiteSpace: 'nowrap' }}>{t('itemName', 'Tên hàng hóa')}</div>
+          <div style={{ textAlign: 'center' }}>{t('quantity', 'Số lượng')}</div>
+          <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{t('unitPrice', 'Đơn giá')}</div>
+          <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{t('subtotal', 'Thành tiền')}</div>
         </div>
 
         {/* Cart Items */}
@@ -421,9 +1144,9 @@ export function PosPage() {
               >
                 <ShoppingBag className="w-8 h-8 text-blue-400" />
               </div>
-              <h3 className="font-bold text-sm text-slate-700 mb-1">Hóa đơn chưa có hàng hóa</h3>
+              <h3 className="font-bold text-sm text-slate-700 mb-1">{t('emptyCartTitle', 'Hóa đơn chưa có hàng hóa')}</h3>
               <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
-                Chọn sản phẩm từ danh mục bên phải hoặc tìm kiếm theo tên / mã barcode để thêm vào hóa đơn.
+                {t('emptyCartDesc', 'Chọn sản phẩm từ danh mục bên phải hoặc tìm kiếm theo tên / mã barcode để thêm vào hóa đơn.')}
               </p>
             </div>
           ) : (
@@ -467,10 +1190,10 @@ export function PosPage() {
                 {/* Image + Name + SKU */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                   <img
-                    src={getPosProductImage(item)}
+                    src={item.imageUrl || getPosProductImage(item)}
                     alt={item.name}
                     style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 10, border: '2px solid hsl(214 25% 87%)', background: '#f1f5f9', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}
-                    onError={e => { e.target.src = 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=240&h=240&fit=crop'; }}
+                    onError={e => { e.target.src = 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?w=240&h=240&fit=crop'; }}
                   />
                   <div style={{ minWidth: 0 }}>
                     <p style={{ fontWeight: 800, color: '#1e293b', fontSize: 14, lineHeight: 1.35, marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</p>
@@ -506,8 +1229,29 @@ export function PosPage() {
                   </button>
                 </div>
 
-                {/* Unit Price */}
-                <div style={{ textAlign: 'right', color: '#475569', fontWeight: 700, fontSize: 14 }}>{formatVND(item.price)}</div>
+                {/* Unit Price (Editable) */}
+                <div style={{ textAlign: 'right' }}>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={item.price}
+                    onChange={(e) => updateItemPrice(item.stockItemId, e.target.value)}
+                    title="Nhấp để sửa đơn giá nếu cần"
+                    style={{
+                      width: '100%',
+                      textAlign: 'right',
+                      color: '#334155',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      padding: '3px 4px',
+                      border: '1px solid hsl(214 25% 88%)',
+                      borderRadius: 6,
+                      background: 'white',
+                      outline: 'none',
+                    }}
+                  />
+                </div>
 
                 {/* Subtotal */}
                 <div style={{ textAlign: 'right', fontWeight: 900, fontSize: 16, color: '#2563eb' }}>{formatVND(item.subtotal)}</div>
@@ -525,7 +1269,7 @@ export function PosPage() {
             <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <input
               type="text"
-              placeholder="Ghi chú đơn hàng (F8)..."
+              placeholder={t('orderNote', 'Ghi chú đơn hàng (F8)...')}
               value={activeTab.note}
               onChange={(e) => updateActiveTab({ note: e.target.value })}
               className="flex-1 text-xs py-1.5 px-3 rounded-lg border border-slate-200 bg-white focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 text-slate-700 placeholder:text-slate-400"
@@ -536,9 +1280,9 @@ export function PosPage() {
             {/* Sale mode pills */}
             <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs font-semibold gap-0.5">
               {[
-                { id: 'quick', label: 'Bán nhanh' },
-                { id: 'standard', label: 'Bán thường' },
-                { id: 'delivery', label: 'Giao hàng' },
+                { id: 'quick', label: language === 'vi' ? 'Bán nhanh' : 'Quick Sale' },
+                { id: 'standard', label: language === 'vi' ? 'Bán thường' : 'Standard' },
+                { id: 'delivery', label: language === 'vi' ? 'Giao hàng' : 'Delivery' },
               ].map((mode) => (
                 <button
                   key={mode.id}
@@ -557,7 +1301,7 @@ export function PosPage() {
             {/* Total */}
             <div className="flex items-center gap-3">
               <span className="text-xs text-slate-500">
-                Tổng tiền hàng <span className="text-slate-700 font-semibold">({totalItemCount} sp)</span>:
+                {t('subtotalAmount', 'Tổng tiền hàng')} <span className="text-slate-700 font-semibold">({totalItemCount} sp)</span>:
               </span>
               <span className="text-xl font-black text-slate-800 money tracking-tight">
                 {formatVND(subtotalAmount)}
@@ -572,37 +1316,13 @@ export function PosPage() {
         className="w-full lg:w-[520px] xl:w-[600px] 2xl:w-[660px] flex flex-col overflow-hidden shrink-0 rounded-2xl border border-white/80"
         style={{ background: '#fff', boxShadow: '0 2px 12px rgb(0 0 0 / 0.06), 0 0 0 1px rgb(0 0 0 / 0.04)' }}
       >
-        {/* Customer Search */}
-        <div
-          className="p-3 border-b flex items-center gap-2"
-          style={{ background: 'linear-gradient(180deg, #f8fafd 0%, #f1f5fb 100%)', borderColor: 'hsl(214 25% 89%)' }}
-        >
-          <div className="relative flex-1">
-            <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Tìm khách hàng (F4)..."
-              value={activeTab.customer.name === 'Khách lẻ' && !activeTab.customer.phone ? '' : `${activeTab.customer.name}${activeTab.customer.phone ? ' · ' + activeTab.customer.phone : ''}`}
-              onChange={(e) => updateActiveTab({ customer: { ...activeTab.customer, name: e.target.value } })}
-              className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
-          <button
-            onClick={() => setIsAddCustomerOpen(true)}
-            className="p-2 rounded-lg border border-slate-200 bg-white hover:border-blue-400 hover:bg-blue-50 text-slate-600 hover:text-blue-600 transition-all"
-            title="Thêm khách hàng"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
         {/* Product Search */}
         <div className="p-3 border-b flex items-center gap-2" style={{ borderColor: 'hsl(214 25% 89%)' }}>
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Tìm hàng hóa theo tên, SKU, barcode (F3)..."
+              placeholder={t('searchProductPlaceholder', 'Tìm hàng hóa theo tên, mã SP, barcode (F3)...')}
               value={searchProduct}
               onChange={(e) => setSearchProduct(e.target.value)}
               className="w-full pl-8 pr-8 py-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
@@ -715,7 +1435,12 @@ export function PosPage() {
 
                     {/* Product Info on the Right */}
                     <div className="flex-1 min-w-0 flex flex-col justify-center">
-                      <p className="text-xs sm:text-[13px] font-medium text-slate-800 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/60 leading-tight">
+                          {p.code || `SP${p.id}`}
+                        </span>
+                      </div>
+                      <p className="text-xs sm:text-[13px] font-medium text-slate-800 line-clamp-1 leading-tight group-hover:text-blue-600 transition-colors">
                         {p.name}
                       </p>
                       <p className="text-xs sm:text-[13px] font-bold text-blue-600 mt-1">
@@ -768,7 +1493,7 @@ export function PosPage() {
             disabled={activeTab.items.length === 0}
             className="flex-1 py-3 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm sm:text-base tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
           >
-            <span>THANH TOÁN</span>
+            <span>{t('checkoutButton', 'THANH TOÁN')}</span>
             {activeTab.items.length > 0 && (
               <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold ml-1">
                 {formatVND(totalPayable)}
@@ -917,43 +1642,32 @@ export function PosPage() {
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { id: 'CASH', label: 'Tiền mặt', icon: Banknote, color: 'emerald' },
-                    { id: 'BANK_TRANSFER', label: 'Chuyển khoản', icon: QrCode, color: 'violet' },
-                    { id: 'PAYOS', label: 'Thẻ / PayOS', icon: CreditCard, color: 'blue' },
+                    { id: 'BANK_TRANSFER', label: 'VietQR PayOS', icon: QrCode, color: 'blue' },
+                    { id: 'MOMO', label: 'Ví MoMo', icon: Smartphone, color: 'pink' },
                   ].map((m) => {
                     const Icon = m.icon;
                     const isSelected = paymentMethod === m.id;
+                    const isMomo = m.id === 'MOMO';
                     return (
                       <button
                         key={m.id}
                         onClick={() => setPaymentMethod(m.id)}
                         className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all ${
                           isSelected
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            ? isMomo
+                              ? 'border-pink-500 bg-pink-50 text-pink-700 shadow-sm'
+                              : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
                             : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                         }`}
-                        style={isSelected ? { boxShadow: '0 0 0 2px rgb(59 130 246 / 0.2)' } : {}}
+                        style={isSelected ? { boxShadow: isMomo ? '0 0 0 2px rgb(236 72 153 / 0.25)' : '0 0 0 2px rgb(59 130 246 / 0.2)' } : {}}
                       >
-                        <Icon className={`w-5 h-5 ${isSelected ? 'text-blue-600' : 'text-slate-400'}`} />
+                        <Icon className={`w-5 h-5 ${isSelected ? (isMomo ? 'text-pink-600' : 'text-blue-600') : 'text-slate-400'}`} />
                         <span className="text-center leading-tight">{m.label}</span>
-                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                        {isSelected && <div className={`w-1.5 h-1.5 rounded-full ${isMomo ? 'bg-pink-500' : 'bg-blue-500'}`} />}
                       </button>
                     );
                   })}
                 </div>
-
-                {paymentMethod === 'BANK_TRANSFER' && (
-                  <div
-                    className="p-3.5 rounded-xl text-xs space-y-1"
-                    style={{ background: 'hsl(258 100% 97%)', border: '1px solid hsl(258 100% 88%)' }}
-                  >
-                    <p className="font-bold flex items-center gap-1.5 text-violet-700">
-                      <QrCode className="w-3.5 h-3.5" /> Quét mã VietQR chuyển khoản
-                    </p>
-                    <p className="text-violet-600">STK: <strong>0978387857</strong> (MB Bank)</p>
-                    <p className="text-violet-600">Chủ TK: <strong>STOCKPILOT STORE</strong></p>
-                    <p className="text-violet-600">Số tiền: <strong className="money">{formatVND(totalPayable)}</strong></p>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1165,6 +1879,573 @@ export function PosPage() {
           </div>
         </div>
       )}
+
+      {/* ── Scanner Pairing Modal ──────────────────────────────── */}
+      {scannerOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setScannerOpen(false)}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-[360px] p-6 flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                  <Scan className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="font-bold text-slate-800 text-base">{t('scannerPairingTitle', 'StockPilot Scanner')}</h2>
+                  <p className="text-xs text-slate-500">{t('scannerPairingSub', 'Kết nối app điện thoại')}</p>
+                </div>
+              </div>
+              <button onClick={() => setScannerOpen(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium ${
+              scannerStatus === 'connected' ? 'bg-emerald-50 text-emerald-700' :
+              scannerStatus === 'connecting' ? 'bg-amber-50 text-amber-700' :
+              scannerStatus === 'error' ? 'bg-red-50 text-red-600' :
+              'bg-slate-50 text-slate-500'
+            }`}>
+              {scannerStatus === 'connected' && <><Wifi className="w-4 h-4" /><span>{language === 'vi' ? 'Đã kết nối — đang chờ quét' : 'Connected — ready to scan'}</span></>}
+              {scannerStatus === 'connecting' && <><Wifi className="w-4 h-4 animate-pulse" /><span>{t('scannerScanning', 'Đang kết nối...')}</span></>}
+              {scannerStatus === 'error' && <><WifiOff className="w-4 h-4" /><span>{language === 'vi' ? 'Lỗi kết nối' : 'Connection Error'}</span></>}
+              {scannerStatus === 'idle' && <><Link2 className="w-4 h-4" /><span>{language === 'vi' ? 'Chưa kết nối' : 'Not Connected'}</span></>}
+            </div>
+
+            {scannerCode ? (
+              <div className="border-2 border-blue-100 rounded-xl p-4 text-center space-y-3">
+                <p className="text-xs text-slate-500 font-medium">{t('scannerPairCodeLabel', 'Mã ghép nối (nhập trên app điện thoại)')}</p>
+                <div className="flex items-center justify-center gap-2">
+                  {scannerCode.split('').map((ch, i) => (
+                    <span key={i} className="w-10 h-12 flex items-center justify-center bg-blue-600 text-white text-xl font-black rounded-lg shadow">
+                      {ch}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[11px] text-emerald-600 font-medium">{t('scannerAutoSaved', '✓ Mã tự động lưu — Chỉ reset khi đăng xuất')}</p>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400 text-sm">
+                {language === 'vi' ? 'Nhấn nút bên dưới để tạo mã ghép nối' : 'Click the button below to generate a pairing code'}
+              </div>
+            )}
+
+            {lastScan && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5 text-sm">
+                <p className="text-xs text-emerald-600 font-semibold mb-0.5">{t('scannerRecentScan', 'Vừa quét:')}</p>
+                <p className="font-bold text-slate-800">{lastScan.name}</p>
+                <p className="text-xs text-slate-500">{lastScan.sku} — {Number(lastScan.sellingPrice).toLocaleString('vi-VN')} đ</p>
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              {(scannerStatus === 'idle' || scannerStatus === 'error') ? (
+                <button
+                  onClick={startScannerSession}
+                  className="flex-1 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <Scan className="w-4 h-4" />
+                  {t('scannerGenerateCode', 'Tạo mã ghép nối')}
+                </button>
+              ) : (
+                <button
+                  onClick={stopScannerSession}
+                  className="flex-1 py-2.5 bg-slate-100 text-slate-600 text-sm font-bold rounded-xl hover:bg-red-50 hover:text-red-600 transition-all flex items-center justify-center gap-2"
+                >
+                  <WifiOff className="w-4 h-4" />
+                  {t('scannerDisconnect', 'Ngắt kết nối')}
+                </button>
+              )}
+            </div>
+
+            <p className="text-[11px] text-slate-400 text-center">
+              {language === 'vi' 
+                ? <>Mở app <strong>StockPilot Scanner</strong> trên điện thoại → Đăng nhập → Nhập mã → Quét mã vạch</>
+                : <>Open <strong>StockPilot Scanner</strong> app on phone → Log in → Enter code → Scan barcode</>}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── PayOS VietQR Payment Realtime Modal ──────────────── */}
+      {payosModalOpen && payosData && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-[440px] bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200 flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs font-black text-sm">
+                  P
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-sm text-slate-900">Thanh toán VietQR PayOS</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                      Tự động nhận diện
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400">Mã đơn: #{payosData.orderNumber || payosData.orderCode}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  stopPayosPolling();
+                  setPayosModalOpen(false);
+                }}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Đóng cửa sổ"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex flex-col items-center text-center">
+              {payosStatus === 'WAITING' && (
+                <>
+                  {/* Amount Badge */}
+                  <div className="mb-4">
+                    <span className="text-xs text-slate-500 font-semibold block mb-0.5">Số tiền thanh toán</span>
+                    <span className="text-2xl sm:text-3xl font-black text-blue-600 tracking-tight money">
+                      {formatVND(payosData.amount)}
+                    </span>
+                  </div>
+
+                  {/* QR Code Container */}
+                  <div className="relative p-3 bg-white rounded-2xl border-2 border-dashed border-blue-200 shadow-md mb-4 flex items-center justify-center">
+                    <img
+                      src={payosData.qrImageUrl || `https://api.vietqr.io/image/${payosData.bin}-${payosData.accountNumber}-compact2.png?amount=${payosData.amount}&addInfo=${encodeURIComponent(payosData.description)}&accountName=${encodeURIComponent(payosData.accountName)}`}
+                      alt="Mã QR PayOS"
+                      className="w-56 h-56 object-contain rounded-xl"
+                    />
+
+                    {/* Scanning radar indicator line */}
+                    <div className="absolute inset-x-4 top-4 h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-pulse opacity-70" />
+                  </div>
+
+                  {/* Transfer Details Card */}
+                  <div className="w-full bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 text-left space-y-2 text-xs mb-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Số tài khoản:</span>
+                      <div className="flex items-center gap-1.5">
+                        <strong className="text-slate-900 font-bold font-mono">{payosData.accountNumber}</strong>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText('stk', payosData.accountNumber)}
+                          className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-700 transition-colors"
+                          title="Sao chép STK"
+                        >
+                          {copiedField === 'stk' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Chủ tài khoản:</span>
+                      <strong className="text-slate-900 font-bold uppercase">{payosData.accountName}</strong>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
+                      <span className="text-slate-500 font-medium">Nội dung CK:</span>
+                      <div className="flex items-center gap-1.5">
+                        <strong className="text-blue-700 font-bold font-mono bg-blue-100/70 px-2 py-0.5 rounded text-xs">
+                          {payosData.description}
+                        </strong>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText('desc', payosData.description)}
+                          className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-700 transition-colors"
+                          title="Sao chép nội dung"
+                        >
+                          {copiedField === 'desc' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Realtime Status Banner */}
+                  <div className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-xs text-blue-700 font-semibold mb-3">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-blue-600 shrink-0" />
+                      <span>Đang chờ khách quét và chuyển tiền...</span>
+                    </div>
+                    <span className="font-mono text-slate-500 text-[11px]">
+                      {Math.floor(payosCountdown / 60)}:{(payosCountdown % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Hệ thống sẽ <strong>tự động nhận diện ngay khi tiền vào tài khoản</strong> và hoàn tất đơn hàng mà không cần bấm xác nhận.
+                  </p>
+                </>
+              )}
+
+              {payosStatus === 'SUCCESS' && (
+                <div className="py-8 flex flex-col items-center animate-in zoom-in-90 duration-300">
+                  <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20">
+                    <CheckCircle className="w-12 h-12 stroke-[2.5]" />
+                  </div>
+                  <h4 className="text-xl font-black text-slate-900 mb-1">ĐÃ NHẬN TIỀN THÀNH CÔNG!</h4>
+                  <p className="text-xs text-slate-500 mb-3">
+                    PayOS đã xác nhận giao dịch <strong>{formatVND(payosData.amount)}</strong>
+                  </p>
+                  <div className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 flex items-center gap-2">
+                    <Printer className="w-4 h-4" />
+                    <span>Đang cập nhật tồn kho & in hóa đơn...</span>
+                  </div>
+                </div>
+              )}
+
+              {payosStatus === 'EXPIRED' && (
+                <div className="py-6 flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3">
+                    <AlertCircle className="w-9 h-9" />
+                  </div>
+                  <h4 className="text-lg font-bold text-slate-900 mb-1">Mã QR đã hết hạn</h4>
+                  <p className="text-xs text-slate-500 mb-4 max-w-xs">
+                    Phiên thanh toán quá 15 phút. Bạn vui lòng tạo lại mã QR mới để thanh toán.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPayosModalOpen(false);
+                      setIsCheckoutOpen(true);
+                    }}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all"
+                  >
+                    Tạo lại mã thanh toán
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            {payosStatus === 'WAITING' && (
+              <div className="p-3 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between text-xs">
+                {payosData.checkoutUrl && (
+                  <a
+                    href={payosData.checkoutUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 hover:text-blue-700 font-semibold inline-flex items-center gap-1 text-[11px]"
+                  >
+                    <span>Mở cổng PayOS trên web</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopPayosPolling();
+                    setPayosModalOpen(false);
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 font-semibold text-xs ml-auto cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MoMo E-Wallet Payment Realtime Modal ──────────────── */}
+      {momoModalOpen && momoData && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-[440px] bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200 flex flex-col"
+            style={{ boxShadow: '0 25px 60px -15px rgba(165, 0, 100, 0.25)' }}
+          >
+            {/* Header with MoMo Brand styling */}
+            <div
+              className="px-6 py-4 flex items-center justify-between border-b"
+              style={{ background: 'linear-gradient(135deg, #a50064 0%, #d82d8b 100%)' }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner">
+                  <Smartphone className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-base leading-tight flex items-center gap-1.5">
+                    <span>Ví MoMo</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white border border-white/30 uppercase tracking-wider">
+                      Tự động
+                    </span>
+                  </h3>
+                  <p className="text-xs text-pink-100">Quét mã bằng ứng dụng Ví MoMo</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  stopMomoPolling();
+                  setMomoModalOpen(false);
+                }}
+                className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                title="Đóng cửa sổ"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 flex flex-col items-center text-center">
+              {momoStatus === 'WAITING' && (
+                <>
+                  {/* Amount Badge */}
+                  <div className="mb-4">
+                    <span className="text-xs text-slate-500 font-semibold block mb-0.5">Số tiền thanh toán</span>
+                    <span className="text-2xl sm:text-3xl font-black text-pink-600 tracking-tight money">
+                      {formatVND(momoData.amount)}
+                    </span>
+                  </div>
+
+                  {/* QR Code Container - Mã QR Thế hệ 2.0 STOCKPILOT (Sáng rõ nét) */}
+                  <div className="relative p-4 bg-white rounded-2xl border-2 border-pink-200 shadow-md mb-3 flex flex-col items-center justify-center">
+                    <div className="text-[10px] uppercase tracking-wider font-extrabold text-pink-700 bg-pink-100/70 px-2.5 py-0.5 rounded-full mb-2">
+                      QR Thế hệ 2.0 · Mọi Ví Điện Tử & Ngân Hàng
+                    </div>
+
+                    <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center">
+                      <img
+                        src={momoData.qrImageUrl || momoData.qrCodeUrl || '/momo-merchant-qr.png'}
+                        alt="Mã QR Thế hệ 2.0 MoMo STOCKPILOT"
+                        className="w-64 h-64 sm:w-72 sm:h-72 object-contain rounded-lg bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* MoMo Enterprise Transfer Details Card */}
+                  <div className="w-full bg-pink-50/50 rounded-2xl p-3 border border-pink-100 text-left space-y-2 text-xs mb-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Đơn vị thụ hưởng:</span>
+                      <strong className="text-slate-900 font-bold uppercase">{momoData.businessName || 'STOCKPILOT'}</strong>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Mã điểm bán (COM-QRC ID):</span>
+                      <div className="flex items-center gap-1.5">
+                        <strong className="text-pink-700 font-bold font-mono bg-pink-100 px-2 py-0.5 rounded text-xs">
+                          {momoData.storeQrId || '4032108'}
+                        </strong>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText('momo_store_id', momoData.storeQrId || '4032108')}
+                          className="p-1 hover:bg-pink-100 rounded text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                          title="Sao chép COM-QRC ID"
+                        >
+                          {copiedField === 'momo_store_id' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">Mã đối tác MoMo:</span>
+                      <div className="flex items-center gap-1.5">
+                        <strong className="text-slate-900 font-bold font-mono">{momoData.partnerCode || 'MOMOVA0I20261015'}</strong>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText('momo_partner', momoData.partnerCode || 'MOMOVA0I20261015')}
+                          className="p-1 hover:bg-pink-100 rounded text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                          title="Sao chép Mã đối tác"
+                        >
+                          {copiedField === 'momo_partner' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-1.5 border-t border-pink-100">
+                      <span className="text-slate-500 font-medium">Mã đơn hàng MoMo:</span>
+                      <div className="flex items-center gap-1.5">
+                        <strong className="text-slate-900 font-bold font-mono bg-pink-100/50 px-2 py-0.5 rounded text-xs">
+                          {momoData.momoOrderId}
+                        </strong>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyText('momo_code', momoData.momoOrderId)}
+                          className="p-1 hover:bg-pink-100 rounded text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                          title="Sao chép mã đơn hàng"
+                        >
+                          {copiedField === 'momo_code' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Realtime Status Banner */}
+                  <div className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-pink-50 border border-pink-200/80 text-xs text-pink-700 font-semibold">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-pink-600 shrink-0" />
+                      <span>Đang đợi khách quét trên ứng dụng MoMo...</span>
+                    </div>
+                    <span className="font-mono text-pink-800 text-[11px]">
+                      {Math.floor(momoCountdown / 60)}:{(momoCountdown % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {momoStatus === 'SUCCESS' && (
+                <div className="py-8 flex flex-col items-center animate-in zoom-in-90 duration-300">
+                  <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20">
+                    <CheckCircle className="w-12 h-12 stroke-[2.5]" />
+                  </div>
+                  <h4 className="text-xl font-black text-slate-900 mb-1">ĐÃ NHẬN TIỀN VÍ MOMO THÀNH CÔNG!</h4>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Ví MoMo đã xác nhận giao dịch <strong>{formatVND(momoData.amount)}</strong>
+                  </p>
+                  <div className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 flex items-center gap-2">
+                    <Printer className="w-4 h-4" />
+                    <span>Đang cập nhật tồn kho & hoàn tất đơn hàng...</span>
+                  </div>
+                </div>
+              )}
+
+              {momoStatus === 'EXPIRED' && (
+                <div className="py-6 flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mb-3">
+                    <AlertCircle className="w-9 h-9" />
+                  </div>
+                  <h4 className="text-lg font-bold text-slate-900 mb-1">Mã QR MoMo đã hết hạn</h4>
+                  <p className="text-xs text-slate-500 mb-4 max-w-xs">
+                    Phiên thanh toán quá 15 phút. Bạn vui lòng tạo lại mã QR MoMo mới.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMomoModalOpen(false);
+                      setIsCheckoutOpen(true);
+                    }}
+                    className="px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold rounded-xl transition-all"
+                  >
+                    Tạo lại mã thanh toán MoMo
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MoMo Enterprise Setup Modal ─────────────────── */}
+      {momoConfigModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
+            <div
+              className="px-6 py-4 flex items-center justify-between text-white"
+              style={{ background: 'linear-gradient(135deg, #a50064 0%, #d82d8b 100%)' }}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                  <Smartphone className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-base">Cấu hình Cổng MoMo Doanh Nghiệp</h3>
+                  <p className="text-xs text-pink-100">Kết nối trực tiếp MoMo Gateway Production</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMomoConfigModalOpen(false)}
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveMomoConfig} className="p-6 space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Mã đối tác (Partner Code) <span className="text-pink-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={momoPartnerCodeInput}
+                  onChange={(e) => setMomoPartnerCodeInput(e.target.value)}
+                  placeholder="VD: MOMOVA0I20261015"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Access Key <span className="text-pink-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={momoAccessKeyInput}
+                  onChange={(e) => setMomoAccessKeyInput(e.target.value)}
+                  placeholder="VD: sjqZwImFcjxZBhHF"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Secret Key <span className="text-pink-600">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={momoSecretKeyInput}
+                  onChange={(e) => setMomoSecretKeyInput(e.target.value)}
+                  placeholder="VD: OK6GwHc66ZBSdqyu..."
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tên Doanh nghiệp / Cửa hàng
+                </label>
+                <input
+                  type="text"
+                  value={momoBusinessNameInput}
+                  onChange={(e) => setMomoBusinessNameInput(e.target.value.toUpperCase())}
+                  placeholder="VD: STOCKPILOT"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold uppercase focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-pink-50/80 border border-pink-200/80 text-[11px] text-pink-900 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-pink-700">
+                  <Sparkles className="w-3.5 h-3.5 text-pink-600" /> Cổng MoMo Doanh Nghiệp Thật:
+                </p>
+                <p className="leading-relaxed">
+                  Đã kết nối với Cổng thanh toán <strong>payment.momo.vn</strong> theo hợp đồng doanh nghiệp đã duyệt. Toàn bộ tiền thanh toán sẽ chuyển trực tiếp vào tài khoản ngân hàng của doanh nghiệp.
+                </p>
+              </div>
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setMomoConfigModalOpen(false)}
+                  className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingMomoConfig}
+                  className="flex-1 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-bold text-xs shadow-md shadow-pink-500/25 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingMomoConfig ? 'Đang lưu...' : 'Lưu cấu hình Doanh Nghiệp'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

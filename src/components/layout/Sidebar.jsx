@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, FolderTree, ShoppingCart, ShoppingBag, Boxes, TrendingUp,
@@ -8,38 +8,35 @@ import {
 import { cn } from '../lib/utils';
 import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/uiStore';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useAlertsStore } from '../store/alertsStore';
 import { usePricingStore } from '../store/pricingStore';
 import { StockPilotLogoIcon } from '../common/StockPilotLogo';
 
-const ALL_NAV_ITEMS = [
+const NAV_ITEM_CONFIG = [
   // Hệ thống
-  { name: 'Tổng quan',          href: '/dashboard',       icon: LayoutDashboard, roles: ['store_owner','warehouse_staff','admin'], section: 'Hệ thống' },
-  { name: 'Sản phẩm',           href: '/products',        icon: Package,         roles: ['store_owner','warehouse_staff','admin'] },
-  { name: 'Thanh toán',         href: '/pos',             icon: ShoppingBag,     roles: ['store_owner','warehouse_staff','admin'] },
-  { name: 'Đơn hàng',          href: '/orders',           icon: ShoppingCart,    roles: ['store_owner','admin'] },
-  { name: 'Quản lý kho',        href: '/inventory',       icon: Boxes,           roles: ['store_owner','warehouse_staff','admin'] },
+  { key: 'navDashboard', sectionKey: 'systemSection', defaultName: 'Tổng quan', defaultSection: 'Hệ thống', href: '/dashboard', icon: LayoutDashboard, roles: ['store_owner','warehouse_staff','admin'] },
+  { key: 'navProducts', defaultName: 'Sản phẩm', href: '/products', icon: Package, roles: ['store_owner','warehouse_staff','admin'] },
+  { key: 'navPos', defaultName: 'Thanh toán', href: '/pos', icon: ShoppingBag, roles: ['store_owner','warehouse_staff','admin'] },
+  { key: 'navOrders', defaultName: 'Đơn hàng', href: '/orders', icon: ShoppingCart, roles: ['store_owner','admin'] },
+  { key: 'navInventory', defaultName: 'Quản lý kho', href: '/inventory', icon: Boxes, roles: ['store_owner','warehouse_staff','admin'] },
   // Hỗ trợ quyết định
-  { name: 'Cảnh báo rủi ro',   href: '/alerts',           icon: AlertTriangle,   badgeKey: 'alerts', badgeVariant: 'error', roles: ['store_owner','warehouse_staff','admin'], section: 'Hỗ trợ quyết định' },
-  { name: 'Gợi ý giá bán',     href: '/pricing',          icon: Tag,             badgeKey: 'pricing', badgeVariant: 'purple', roles: ['store_owner','admin'] },
-  { name: 'Phân tích & Báo cáo',href: '/analytics',       icon: TrendingUp,      roles: ['store_owner','admin'] },
-  { name: 'Trợ lý AI Pilot',   href: '/ai-assistant',     icon: Bot,             roles: ['store_owner','warehouse_staff','admin'] },
+  { key: 'navAlerts', sectionKey: 'decisionSupportSection', defaultName: 'Cảnh báo rủi ro', defaultSection: 'Hỗ trợ quyết định', href: '/alerts', icon: AlertTriangle, badgeKey: 'alerts', badgeVariant: 'error', roles: ['store_owner','warehouse_staff','admin'] },
+  { key: 'navPricing', defaultName: 'Gợi ý giá bán', href: '/pricing', icon: Tag, badgeKey: 'pricing', badgeVariant: 'purple', roles: ['store_owner','admin'] },
+  { key: 'navAnalytics', defaultName: 'Phân tích & Báo cáo', href: '/analytics', icon: TrendingUp, roles: ['store_owner','admin'] },
+  { key: 'navAiPilot', defaultName: 'Trợ lý AI Pilot', href: '/ai-assistant', icon: Bot, roles: ['store_owner','warehouse_staff','admin'] },
   // Quản trị
-  { name: 'Người dùng & Quyền', href: '/admin/users',     icon: Users,           roles: ['admin'], section: 'Quản trị hệ thống' },
-  { name: 'Nhật ký kiểm toán', href: '/admin/audit-log',  icon: FileText,        roles: ['admin'] },
-  { name: 'Cài đặt hệ thống',  href: '/settings',         icon: Settings,        roles: ['store_owner','admin'], section: 'Cấu hình' },
+  { key: 'navUsers', sectionKey: 'adminSection', defaultName: 'Người dùng & Quyền', defaultSection: 'Quản trị hệ thống', href: '/admin/users', icon: Users, roles: ['admin'] },
+  { key: 'navAuditLog', defaultName: 'Nhật ký kiểm toán', href: '/admin/audit-log', icon: FileText, roles: ['admin'] },
+  { key: 'navSettings', sectionKey: 'configSection', defaultName: 'Cài đặt hệ thống', defaultSection: 'Cấu hình', href: '/settings', icon: Settings, roles: ['store_owner','admin'] },
 ];
+
+import { normalizeRole } from '../../config/permissions.config';
 
 function getRoleIcon(role) {
   if (role === 'store_owner')    return <Store className="w-3.5 h-3.5 text-blue-600" />;
-  if (role === 'warehouse_staff') return <Warehouse className="w-3.5 h-3.5 text-amber-500" />;
-  return <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />;
-}
-
-function getRoleBadgeLabel(role) {
-  if (role === 'store_owner')    return 'Chủ cửa hàng';
-  if (role === 'warehouse_staff') return 'Nhân viên kho';
-  return 'Quản trị viên';
+  if (role === 'warehouse_staff') return <Warehouse className="w-3.5 h-3.5 text-emerald-600" />;
+  return <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />;
 }
 
 export function Sidebar() {
@@ -47,27 +44,44 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { user, clearUser } = useAuthStore();
   const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setSidebarMobileOpen } = useUIStore();
-  const { getOpenCount } = useAlertsStore();
-  const { getPendingCount } = usePricingStore();
+  const { t } = useTranslation();
+  const { getOpenCount, fetchAlerts } = useAlertsStore();
+  const { getPendingCount, fetchRecommendations } = usePricingStore();
+
+  const currentRole = normalizeRole(user?.role);
+
+  useEffect(() => {
+    fetchAlerts?.().catch(() => {});
+    if (currentRole !== 'warehouse_staff') {
+      fetchRecommendations?.().catch(() => {});
+    }
+  }, [fetchAlerts, fetchRecommendations, currentRole]);
 
   const openAlertsCount = getOpenCount();
   const pendingPricingCount = getPendingCount();
 
-  const currentRole = user?.role || 'store_owner';
-
   const visibleNavItems = useMemo(
     () =>
-      ALL_NAV_ITEMS.filter((item) => item.roles.includes(currentRole)).map((item) => {
-        if (item.badgeKey === 'alerts') {
-          return { ...item, badge: openAlertsCount };
-        }
-        if (item.badgeKey === 'pricing') {
-          return { ...item, badge: pendingPricingCount };
-        }
-        return item;
+      NAV_ITEM_CONFIG.filter((item) => item.roles.includes(currentRole)).map((item) => {
+        let badge = undefined;
+        if (item.badgeKey === 'alerts') badge = openAlertsCount;
+        if (item.badgeKey === 'pricing') badge = pendingPricingCount;
+
+        return {
+          ...item,
+          name: t(item.key, item.defaultName),
+          section: item.sectionKey ? t(item.sectionKey, item.defaultSection) : undefined,
+          badge,
+        };
       }),
-    [currentRole, openAlertsCount, pendingPricingCount]
+    [currentRole, openAlertsCount, pendingPricingCount, t]
   );
+
+  const getRoleBadgeLabel = (role) => {
+    if (role === 'store_owner')    return t('storeOwnerLong', 'Chủ cửa hàng');
+    if (role === 'warehouse_staff') return t('warehouseStaffLong', 'Nhân viên kho & POS');
+    return t('administrator', 'Quản trị viên hệ thống');
+  };
 
   const handleLogout = () => {
     clearUser();
@@ -112,12 +126,6 @@ export function Sidebar() {
               <div className="flex flex-col min-w-0">
                 <span className="font-black text-base tracking-tight text-slate-900 flex items-center gap-1.5">
                   StockPilot
-                  <span
-                    className="text-[9px] uppercase font-black px-1.5 py-0.5 rounded-md text-white"
-                    style={{ background: 'linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%)' }}
-                  >
-                    AI Pilot
-                  </span>
                 </span>
                 <span className="text-[11px] text-slate-400 truncate font-medium">
                   Smart Decision Support
