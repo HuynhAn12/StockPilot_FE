@@ -1,9 +1,16 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import { Globe } from 'lucide-react';
-import { useUIStore } from '../store/uiStore';
+import { useTranslation } from '../../i18n/useTranslation';
+import { useAuthStore } from '../store/authStore';
 
 export function AuthLayout() {
-  const { language, setLanguage } = useUIStore();
+  const { language, toggleLanguage } = useTranslation();
+  const { user, token, isHydrated } = useAuthStore();
+
+  // Nếu đã đăng nhập, tự động chuyển về /dashboard
+  if (isHydrated && user && token) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#dbeafe] via-[#eff6ff] to-[#e0e7ff] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 relative overflow-hidden">
@@ -15,11 +22,16 @@ export function AuthLayout() {
       {/* Top Bar Utilities - Only Language */}
       <div className="absolute top-5 right-5 z-20 flex items-center gap-2">
         <button
-          onClick={() => setLanguage(language === 'vi' ? 'en' : 'vi')}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/90 backdrop-blur-md border border-white/80 text-xs font-bold text-slate-800 hover:bg-white transition-all shadow-[0_4px_12px_rgba(37,99,235,0.08)] cursor-pointer"
+          onClick={toggleLanguage}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm cursor-pointer ${
+            language === 'en'
+              ? 'border-blue-500 bg-white text-blue-700 ring-2 ring-blue-400/30'
+              : 'border-slate-200 bg-white/90 text-slate-700 hover:bg-white hover:border-slate-300'
+          }`}
+          title={language === 'vi' ? 'Switch to English (EN)' : 'Chuyển sang Tiếng Việt (VI)'}
         >
-          <Globe className="w-3.5 h-3.5 text-blue-600" />
-          <span className="uppercase">{language}</span>
+          <Globe className={`w-3.5 h-3.5 ${language === 'en' ? 'text-blue-600' : 'text-slate-600'}`} />
+          <span className="uppercase font-extrabold">{language}</span>
         </button>
       </div>
 

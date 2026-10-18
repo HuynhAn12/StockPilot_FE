@@ -1,24 +1,27 @@
 import { useLocation } from 'react-router-dom';
 import { ChevronRight, Home } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useTranslation } from '../../i18n/useTranslation';
 
-const routeNameMap = {
-  dashboard: 'Tổng quan',
-  products: 'Sản phẩm',
-  categories: 'Danh mục',
-  orders: 'Đơn hàng & Bán lẻ',
-  inventory: 'Quản lý kho',
-  alerts: 'Cảnh báo rủi ro',
-  pricing: 'Gợi ý giá bán',
-  analytics: 'Phân tích & Báo cáo',
-  'ai-assistant': 'Trợ lý AI Pilot',
-  settings: 'Cài đặt',
-  admin: 'Quản trị',
-  users: 'Người dùng & Quyền',
-  'audit-log': 'Nhật ký kiểm toán',
+const routeKeyMap = {
+  dashboard: 'navDashboard',
+  products: 'navProducts',
+  categories: 'category',
+  orders: 'navOrders',
+  pos: 'navPos',
+  inventory: 'navInventory',
+  alerts: 'navAlerts',
+  pricing: 'navPricing',
+  analytics: 'navAnalytics',
+  'ai-assistant': 'navAiPilot',
+  settings: 'navSettings',
+  admin: 'admin',
+  users: 'navUsers',
+  'audit-log': 'navAuditLog',
 };
 
 export function Breadcrumbs() {
+  const { t } = useTranslation();
   const location = useLocation();
   const segments = location.pathname.split('/').filter(Boolean);
 
@@ -29,7 +32,8 @@ export function Breadcrumbs() {
       <Home className="w-3.5 h-3.5 text-muted-foreground" />
       {segments.map((seg, i) => {
         const isLast = i === segments.length - 1;
-        const label = routeNameMap[seg] || seg;
+        const key = routeKeyMap[seg];
+        const label = key ? t(key, seg) : seg;
         return (
           <div key={i} className="flex items-center gap-1.5">
             <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50" />

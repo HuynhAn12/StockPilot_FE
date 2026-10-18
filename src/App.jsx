@@ -74,29 +74,56 @@ class ErrorBoundary extends Component {
 
 // ─── Protected route: yêu cầu đăng nhập ───
 export function ProtectedRoute({ children }) {
-  const { user, token } = useAuthStore();
+  const { user, token, isHydrated } = useAuthStore();
+
+  if (!isHydrated) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#f8fafc'
+      }}>
+        <div style={{
+          width: '36px', height: '36px', border: '3px solid #e2e8f0',
+          borderTopColor: '#2563eb', borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite'
+        }} />
+      </div>
+    );
+  }
+
   if (!user || !token) return <Navigate to="/login" replace />;
   return children;
 }
 
 // ─── Role guard: chỉ cho phép role cụ thể ───
 export function RequireRole({ roles, children }) {
-  const { user } = useAuthStore();
+  const { user, isHydrated } = useAuthStore();
+  if (!isHydrated) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (!roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
+
+  const userRole = (user.role || '').toLowerCase().replace('shop_owner', 'store_owner');
+  const allowed = roles.map((r) => r.toLowerCase().replace('shop_owner', 'store_owner'));
+
+  if (!allowed.includes(userRole)) {
+    // If warehouse staff attempts restricted routes, redirect to POS
+    const fallbackPath = userRole === 'warehouse_staff' ? '/pos' : '/dashboard';
+    return <Navigate to={fallbackPath} replace />;
+  }
   return children;
 }
 
 export default function App() {
-  const { token, fetchMe, clearUser } = useAuthStore();
+  const { token, fetchMe } = useAuthStore();
 
-  // Khi reload trang: nếu có token thì xác minh lại với server
+  // Khi reload trang: nếu có token thì cập nhật thông tin user mới nhất từ server ở chế độ nền
   useEffect(() => {
     document.documentElement.classList.remove('dark');
     if (token) {
-      fetchMe().catch(() => clearUser());
+      fetchMe().catch((err) => {
+        console.warn('[StockPilot] Background session check:', err?.message || err);
+      });
     }
-  }, []);
+  }, [token, fetchMe]);
 
   return (
     <ErrorBoundary>
@@ -123,13 +150,41 @@ export default function App() {
             <Route path="/products" element={<ErrorBoundary><ProductsPage /></ErrorBoundary>} />
             <Route path="/pos" element={<ErrorBoundary><PosPage /></ErrorBoundary>} />
             <Route path="/categories" element={<Navigate to="/pos" replace />} />
-            <Route path="/orders" element={<ErrorBoundary><OrdersPage /></ErrorBoundary>} />
+            <Route
+              path="/orders"
+              element={
+                <RequireRole roles={['store_owner', 'admin']}>
+                  <ErrorBoundary><OrdersPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
             <Route path="/inventory" element={<ErrorBoundary><InventoryPage /></ErrorBoundary>} />
             <Route path="/alerts" element={<ErrorBoundary><AlertsPage /></ErrorBoundary>} />
-            <Route path="/pricing" element={<ErrorBoundary><PricingPage /></ErrorBoundary>} />
-            <Route path="/analytics" element={<ErrorBoundary><AnalyticsPage /></ErrorBoundary>} />
+            <Route
+              path="/pricing"
+              element={
+                <RequireRole roles={['store_owner', 'admin']}>
+                  <ErrorBoundary><PricingPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/analytics"
+              element={
+                <RequireRole roles={['store_owner', 'admin']}>
+                  <ErrorBoundary><AnalyticsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
             <Route path="/ai-assistant" element={<ErrorBoundary><AIAssistantPage /></ErrorBoundary>} />
-            <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
+            <Route
+              path="/settings"
+              element={
+                <RequireRole roles={['store_owner', 'admin']}>
+                  <ErrorBoundary><SettingsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
 
             {/* Admin-only routes */}
             <Route

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   User, Lock, Eye, EyeOff, ArrowRight,
@@ -7,11 +7,19 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../components/store/authStore';
 import { useToast } from '../components/common/Toast';
+import { useTranslation } from '../i18n/useTranslation';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuthStore();
+  const { login, user, token, isHydrated } = useAuthStore();
   const { toast } = useToast();
+  const { t, language } = useTranslation();
+
+  useEffect(() => {
+    if (isHydrated && user && token) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isHydrated, user, token, navigate]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -100,14 +108,14 @@ export function LoginPage() {
       <div className="md:w-[55%] p-8 sm:p-12 flex flex-col justify-between bg-white">
         <div className="max-w-md w-full mx-auto">
           <div className="mb-7">
-            <h2 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight">Đăng Nhập</h2>
-            <p className="text-sm text-slate-500 mt-1">Chào mừng bạn quay trở lại với StockPilot!</p>
+            <h2 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight">{t('loginTitle', 'Đăng Nhập')}</h2>
+            <p className="text-sm text-slate-500 mt-1">{t('loginSub', 'Chào mừng bạn quay trở lại với StockPilot!')}</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
             {/* Email */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Email / Tên đăng nhập</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">{t('emailLabel', 'Email / Tên đăng nhập')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <User className="w-4 h-4" />
@@ -116,7 +124,8 @@ export function LoginPage() {
                   type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="email@cuahang.com"
+                  placeholder={t('emailPlaceholder', 'email@cuahang.com')}
+                  autoComplete="off"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 text-slate-900 text-sm rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-400 font-medium"
                 />
               </div>
@@ -124,7 +133,7 @@ export function LoginPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Mật khẩu</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">{t('passwordLabel', 'Mật khẩu')}</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <Lock className="w-4 h-4" />
@@ -133,7 +142,8 @@ export function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={t('passwordPlaceholder', '••••••••')}
+                  autoComplete="new-password"
                   className="w-full pl-10 pr-10 py-2.5 bg-slate-50 text-slate-900 text-sm rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-400 font-medium tracking-wide"
                 />
                 <button
@@ -155,14 +165,14 @@ export function LoginPage() {
                   onChange={(e) => setRememberMe(e.target.checked)}
                   className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                 />
-                <span className="text-xs text-slate-600">Ghi nhớ đăng nhập</span>
+                <span className="text-xs text-slate-600">{t('rememberMe', 'Ghi nhớ đăng nhập')}</span>
               </label>
               <button
                 type="button"
                 onClick={() => navigate('/forgot-password')}
                 className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
               >
-                Quên mật khẩu?
+                {t('forgotPassword', 'Quên mật khẩu?')}
               </button>
             </div>
 
@@ -183,7 +193,7 @@ export function LoginPage() {
               {isLoading ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
-                <><span>Đăng Nhập</span><ArrowRight className="w-4 h-4" /></>
+                <><span>{t('loginButton', 'Đăng Nhập')}</span><ArrowRight className="w-4 h-4" /></>
               )}
             </button>
           </form>
@@ -194,16 +204,16 @@ export function LoginPage() {
               <div className="w-full border-t border-slate-200" />
             </div>
             <span className="relative px-3 bg-white text-[11px] font-semibold text-slate-400 uppercase">
-              Dành cho
+              {language === 'vi' ? 'Dành cho' : 'Roles'}
             </span>
           </div>
 
-          {/* Role info cards — display only, not clickable */}
+          {/* Role info cards */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { label: 'Chủ cửa hàng', sub: 'Quản lý toàn bộ hệ thống', icon: Store,        color: 'text-blue-500',   bg: 'bg-blue-50',   border: 'border-blue-100' },
-              { label: 'Nhân viên kho', sub: 'Nhập / xuất / kiểm hàng',  icon: Warehouse,    color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-              { label: 'Quản trị viên', sub: 'Hệ thống & kiểm toán',     icon: ShieldCheck,  color: 'text-violet-500',  bg: 'bg-violet-50',  border: 'border-violet-100' },
+              { label: t('storeOwnerLong', 'Chủ cửa hàng'), sub: language === 'vi' ? 'Quản lý toàn bộ' : 'Full Store Control', icon: Store, color: 'text-blue-500', bg: 'bg-blue-50', border: 'border-blue-100' },
+              { label: t('warehouseStaffLong', 'Nhân viên kho'), sub: language === 'vi' ? 'Nhập / xuất kho' : 'Stock & Inbound', icon: Warehouse, color: 'text-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+              { label: t('administrator', 'Quản trị viên'), sub: language === 'vi' ? 'Hệ thống & audit' : 'System & Audit', icon: ShieldCheck, color: 'text-violet-500', bg: 'bg-violet-50', border: 'border-violet-100' },
             ].map(({ label, sub, icon: Icon, color, bg, border }) => (
               <div
                 key={label}
@@ -222,12 +232,12 @@ export function LoginPage() {
 
         {/* Register link */}
         <div className="mt-5 text-center text-sm text-slate-500">
-          Chưa có tài khoản?{' '}
+          {t('dontHaveAccount', 'Chưa có tài khoản?')}{' '}
           <a
             href="/register"
             className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
           >
-            Đăng ký cửa hàng
+            {t('registerNow', 'Đăng ký dùng thử')}
           </a>
         </div>
 
