@@ -7,19 +7,20 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../components/store/authStore';
 import { useToast } from '../components/common/Toast';
+import { apiForgotPassword, apiVerifyOtp, apiResetPassword, getApiError } from '../services/authService';
 
 export function ForgotPasswordPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [resetToken, setResetToken] = useState(''); // token từ email link
+  const [resetToken, setResetToken] = useState(''); // token từ xác thực OTP
 
-  // Active recovery method: 'phone_otp' | 'email_otp' (Only Phone or Email/Gmail with OTP)
-  const [method, setMethod] = useState('phone_otp');
+  // Active recovery method: 'email_otp' | 'phone_otp' (Ưu tiên Gmail OTP theo yêu cầu)
+  const [method, setMethod] = useState('email_otp');
 
-  // Multi-step Flow (Step 1: Input Phone/Gmail -> Step 2: Input 6-digit OTP -> Step 3: Set new password -> Step 4: Success)
+  // Multi-step Flow (Step 1: Input Gmail/Phone -> Step 2: Input 6-digit OTP -> Step 3: Set new password -> Step 4: Success)
   const [step, setStep] = useState(1);
   const [phoneNumber, setPhoneNumber] = useState('0988 123 456');
-  const [email, setEmail] = useState('owner@demo.vn');
+  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -89,32 +90,49 @@ export function ForgotPasswordPage() {
     }
   };
 
-  // STEP 1: Gửi email lấy link reset password (API thật)
+  // STEP 1: Gửi mã OTP về Gmail hoặc Số điện thoại (SMS)
   const handleSendOtp = async (e) => {
     e.preventDefault();
-    const targetEmail = method === 'email_otp' ? email.trim() : email.trim();
-    if (!targetEmail || !targetEmail.includes('@')) {
-      toast({ type: 'error', title: 'Email không hợp lệ', message: 'Vui lòng nhập đúng địa chỉ email đăng ký!' });
-      return;
-    }
     setIsLoading(true);
+
     try {
-      const { apiForgotPassword } = await import('../services/authService');
-      const result = await apiForgotPassword({ email: targetEmail });
+      let result;
+      if (method === 'phone_otp') {
+        const targetPhone = phoneNumber.trim().replace(/\s+/g, '');
+        if (!targetPhone || targetPhone.length < 9) {
+          toast({ type: 'error', title: 'Số điện thoại không hợp lệ', message: 'Vui lòng nhập đúng số điện thoại đăng ký (ít nhất 9 chữ số)!' });
+          setIsLoading(false);
+          return;
+        }
+        result = await apiForgotPassword({ phone: targetPhone });
+        toast({
+          type: 'success',
+          title: 'Đã gửi mã OTP đến số điện thoại!',
+          message: `Hệ thống đã gửi mã OTP 6 số đến ${phoneNumber.trim()}. Vui lòng kiểm tra tin nhắn SMS để lấy mã.`
+        });
+      } else {
+        const targetEmail = email.trim();
+        if (!targetEmail || !targetEmail.includes('@')) {
+          toast({ type: 'error', title: 'Email không hợp lệ', message: 'Vui lòng nhập đúng địa chỉ Gmail / Email đăng ký!' });
+          setIsLoading(false);
+          return;
+        }
+        result = await apiForgotPassword({ email: targetEmail });
+        toast({
+          type: 'success',
+          title: 'Đã gửi mã OTP về Gmail!',
+          message: `Hệ thống đã gửi mã OTP 6 số đến ${targetEmail}. Vui lòng mở hộp thư Gmail (hoặc mục Spam) để lấy mã.`
+        });
+      }
+
       setIsLoading(false);
       setStep(2);
       setResendCooldown(60);
       setCanResend(false);
-      // Backend trả về reset token trong dev mode
+
       if (result?.data?.resetToken) setResetToken(result.data.resetToken);
-      toast({
-        type: 'success',
-        title: 'Đã gửi hướng dẫn về email!',
-        message: `Hệ thống đã gửi link đặt lại mật khẩu đến ${targetEmail}. Kiểm tra hộp thư của bạn.`
-      });
     } catch (err) {
-      const { getApiError } = await import('../services/authService');
-      toast({ type: 'error', title: 'Lỗi', message: getApiError(err) });
+      toast({ type: 'error', title: 'Lỗi gửi mã OTP', message: getApiError(err) });
       setIsLoading(false);
     }
   };
@@ -125,19 +143,36 @@ export function ForgotPasswordPage() {
     setCanResend(false);
     setResendCooldown(60);
     setOtp(['', '', '', '', '', '']);
-    const target = method === 'phone_otp' ? `SĐT ${phoneNumber}` : `Gmail ${email}`;
-    toast({ type: 'info', title: 'Đang gửi lại mã OTP', message: `Hệ thống đang phát lại mã xác thực mới đến ${target}.` });
-    await new Promise((r) => setTimeout(r, 500));
-    toast({ type: 'success', title: 'Đã gửi mã mới', message: 'Mã xác nhận thử nghiệm mới: 686868' });
+    
+    setIsLoading(true);
+    try {
+      let result;
+      if (method === 'phone_otp') {
+        const targetPhone = phoneNumber.trim().replace(/\s+/g, '');
+        result = await apiForgotPassword({ phone: targetPhone });
+        toast({
+          type: 'success',
+          title: 'Đã gửi lại mã OTP SMS!',
+          message: `Mã xác thực mới đã được gửi lại tới ${phoneNumber.trim()}.`
+        });
+      } else {
+        result = await apiForgotPassword({ email: email.trim() });
+        toast({
+          type: 'success',
+          title: 'Đã gửi lại mã OTP Gmail!',
+          message: `Hệ thống đã gửi mã xác thực mới đến ${email.trim()}. Vui lòng kiểm tra Gmail.`
+        });
+      }
+
+      setIsLoading(false);
+      if (result?.data?.resetToken) setResetToken(result.data.resetToken);
+    } catch (err) {
+      setIsLoading(false);
+      toast({ type: 'error', title: 'Không thể gửi lại mã', message: getApiError(err) });
+    }
   };
 
-  // Auto fill demo OTP
-  const handleFillDemoOtp = () => {
-    setOtp(['6', '8', '6', '8', '6', '8']);
-    toast({ type: 'info', title: 'Đã điền OTP mẫu', message: 'Mã xác nhận 686868 đã được điền tự động.' });
-  };
-
-  // STEP 2: Verify OTP
+  // STEP 2: Xác thực mã OTP qua Backend
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     const enteredCode = otp.join('');
@@ -147,13 +182,29 @@ export function ForgotPasswordPage() {
     }
 
     setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setIsLoading(false);
+    try {
+      const payload = { otp: enteredCode };
+      if (method === 'phone_otp') {
+        payload.phone = phoneNumber.trim().replace(/\s+/g, '');
+      } else {
+        payload.email = email.trim();
+      }
 
-    // Accept 686868 or any 6 digits
-    setStep(3);
-    const targetLabel = method === 'phone_otp' ? 'Số điện thoại' : 'Tài khoản Gmail';
-    toast({ type: 'success', title: 'Xác thực OTP thành công!', message: `${targetLabel} chính chủ. Hãy thiết lập mật khẩu mới ngay.` });
+      const result = await apiVerifyOtp(payload);
+      setIsLoading(false);
+      if (result?.data?.resetToken) {
+        setResetToken(result.data.resetToken);
+      }
+      setStep(3);
+      toast({ type: 'success', title: 'Xác thực OTP thành công!', message: 'Mã OTP chính xác. Hãy thiết lập mật khẩu mới ngay.' });
+    } catch (err) {
+      setIsLoading(false);
+      toast({
+        type: 'error',
+        title: 'Xác thực OTP thất bại',
+        message: getApiError(err) || 'Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại!'
+      });
+    }
   };
 
   // STEP 3: Đặt lại mật khẩu (API thật)
@@ -167,19 +218,25 @@ export function ForgotPasswordPage() {
       toast({ type: 'error', title: 'Mật khẩu không khớp', message: 'Mật khẩu xác nhận không trùng khớp!' });
       return;
     }
-    if (!resetToken) {
-      toast({ type: 'error', title: 'Thiếu token', message: 'Vui lòng nhập mã reset từ email.' });
-      return;
-    }
+
     setIsLoading(true);
     try {
-      const { apiResetPassword } = await import('../services/authService');
-      await apiResetPassword({ token: resetToken, newPassword });
+      const payload = {
+        token: resetToken,
+        otp: otp.join(''),
+        newPassword,
+      };
+      if (method === 'phone_otp') {
+        payload.phone = phoneNumber.trim().replace(/\s+/g, '');
+      } else {
+        payload.email = email.trim();
+      }
+
+      await apiResetPassword(payload);
       setIsLoading(false);
       setStep(4);
       toast({ type: 'success', title: 'Đổi mật khẩu thành công!', message: 'Mật khẩu tài khoản đã được cập nhật. Hãy đăng nhập lại.' });
     } catch (err) {
-      const { getApiError } = await import('../services/authService');
       toast({ type: 'error', title: 'Lỗi', message: getApiError(err) });
       setIsLoading(false);
     }
@@ -449,16 +506,12 @@ export function ForgotPasswordPage() {
                 </div>
               </div>
 
-              {/* Resend and Demo helper */}
+              {/* Resend and security notice */}
               <div className="flex items-center justify-between text-xs pt-1 px-1">
-                <button
-                  type="button"
-                  onClick={handleFillDemoOtp}
-                  className="text-slate-500 hover:text-blue-600 flex items-center gap-1 font-semibold cursor-pointer text-[11px]"
-                >
-                  <Sparkles className="w-3 h-3 text-amber-500" />
-                  Điền mã thử (686868)
-                </button>
+                <span className="text-slate-500 text-[11px] flex items-center gap-1">
+                  <Mail className="w-3.5 h-3.5 text-slate-400" />
+                  Kiểm tra hộp thư Gmail của bạn
+                </span>
 
                 <button
                   type="button"

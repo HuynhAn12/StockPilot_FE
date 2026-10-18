@@ -8,9 +8,12 @@ import {
 import { cn } from '../lib/utils';
 import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/uiStore';
+import { useTranslation } from '../../i18n/useTranslation';
 import { useToast } from '../common/Toast';
 import { Breadcrumbs } from './Breadcrumbs';
 import { apiGetNotifications, apiMarkNotificationRead, apiMarkAllNotificationsRead } from '../../services/analyticsService';
+
+import { normalizeRole } from '../../config/permissions.config';
 
 const INITIAL_NOTIFICATIONS = [
   { id: 'n-1', title: 'Hết hàng khẩn cấp', desc: 'Cà phê Arabica Đà Lạt đã chạm mức 0 hộp!', time: '10 phút trước', type: 'alert', isRead: false },
@@ -21,8 +24,9 @@ const INITIAL_NOTIFICATIONS = [
 
 export function Topbar() {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
-  const { theme, setTheme, language, setLanguage, setSidebarMobileOpen, openCommandPalette } = useUIStore();
+  const { user, login, logout } = useAuthStore();
+  const { theme, setTheme, setSidebarMobileOpen, openCommandPalette } = useUIStore();
+  const { t, language, toggleLanguage } = useTranslation();
   const { toast } = useToast();
 
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -39,7 +43,7 @@ export function Topbar() {
   const notifRef = useRef(null);
   const userRef = useRef(null);
 
-  const currentRole = user?.role || 'store_owner';
+  const currentRole = normalizeRole(user?.role);
 
   // Fetch notifications từ API thật (bảng notifications)
   useEffect(() => {
@@ -101,43 +105,44 @@ export function Topbar() {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2 sm:gap-3">
-        {/* Search */}
-        <button
-          onClick={openCommandPalette}
-          className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/60 hover:bg-muted text-xs text-muted-foreground border border-border/80 transition-colors cursor-pointer group"
-        >
-          <Search className="w-3.5 h-3.5" />
-          <span>Tìm kiếm & Thao tác...</span>
-          <kbd className="ml-2 font-mono text-[10px] bg-card px-1.5 py-0.5 rounded border">⌘K</kbd>
-        </button>
-        <button onClick={openCommandPalette} className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted" aria-label="Tìm kiếm">
-          <Search className="w-4 h-4" />
-        </button>
 
-        {/* Role Badge — hiển thị vai trò hiện tại, không click */}
+
+        {/* Role Badge (Phân định màu sắc chuẩn yêu cầu RBAC) */}
         <div className={cn(
-          'hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border select-none',
-          currentRole === 'store_owner' && 'bg-blue-50 text-blue-700 border-blue-200',
-          currentRole === 'warehouse_staff' && 'bg-amber-50 text-amber-700 border-amber-200',
-          currentRole === 'admin' && 'bg-blue-100 text-blue-800 border-blue-300'
+          'hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border select-none transition-all',
+          currentRole === 'store_owner' && 'bg-blue-600 text-white border-blue-700 shadow-xs',
+          currentRole === 'warehouse_staff' && 'bg-emerald-50 text-emerald-800 border-emerald-300',
+          currentRole === 'admin' && 'bg-purple-600 text-white border-purple-700 shadow-xs'
         )}>
           {currentRole === 'store_owner' && <Store className="w-3.5 h-3.5" />}
-          {currentRole === 'warehouse_staff' && <Warehouse className="w-3.5 h-3.5" />}
+          {currentRole === 'warehouse_staff' && <Warehouse className="w-3.5 h-3.5 text-emerald-600" />}
           {currentRole === 'admin' && <ShieldCheck className="w-3.5 h-3.5" />}
           <span>
-            {currentRole === 'store_owner' ? 'Chủ shop' : currentRole === 'warehouse_staff' ? 'NV Kho' : 'Admin'}
+            {currentRole === 'store_owner' ? 'Chủ shop' : currentRole === 'warehouse_staff' ? 'Nhân viên' : 'Quản trị viên / Admin'}
           </span>
         </div>
 
-        {/* Language Toggle */}
-        <button
-          onClick={() => setLanguage(language === 'vi' ? 'en' : 'vi')}
-          className="flex items-center gap-1 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors text-xs font-semibold"
-        >
-          <Globe className="w-4 h-4" />
-          <span className="uppercase">{language}</span>
-        </button>
+        {/* Store Switcher for Admin */}
+        {currentRole === 'admin' && (
+          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-800 text-xs font-bold">
+            <Building2 className="w-3.5 h-3.5 text-purple-600" />
+            <span>Kho Flagship (#4)</span>
+          </div>
+        )}
 
+        {/* Language Toggle with Active Style matching user screenshot */}
+        <button
+          onClick={toggleLanguage}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+            language === 'en'
+              ? 'border-blue-500 bg-blue-50/70 text-blue-700 shadow-xs ring-1 ring-blue-400/30'
+              : 'border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
+          }`}
+          title={language === 'vi' ? 'Switch to English (EN)' : 'Chuyển sang Tiếng Việt (VI)'}
+        >
+          <Globe className={`w-3.5 h-3.5 ${language === 'en' ? 'text-blue-600' : 'text-slate-600'}`} />
+          <span className="uppercase font-extrabold">{language}</span>
+        </button>
 
         {/* Notification Bell */}
         <div className="relative" ref={notifRef}>
@@ -155,17 +160,17 @@ export function Topbar() {
             <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95">
               <div className="flex items-center justify-between p-3.5 border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm text-foreground">Thông báo</span>
+                  <span className="font-semibold text-sm text-foreground">{t('notifications', 'Thông báo')}</span>
                   {unreadCount > 0 && (
                     <span className="text-xs bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">
-                      {unreadCount} mới
+                      {unreadCount} {t('new', 'mới')}
                     </span>
                   )}
                 </div>
                 {unreadCount > 0 && (
                   <button onClick={markAllRead} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
                     <CheckCheck className="w-3.5 h-3.5" />
-                    Đọc tất cả
+                    {t('markAllRead', 'Đã đọc')}
                   </button>
                 )}
               </div>
@@ -319,7 +324,6 @@ export function Topbar() {
                       <span className="block text-[10px] text-slate-400 truncate">Tìm kiếm nhanh mọi chức năng</span>
                     </div>
                   </div>
-                  <kbd className="text-[10px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.5 rounded border border-slate-200 shrink-0">⌘K</kbd>
                 </button>
 
                 {/* 6. TRỢ GIÚP & HƯỚNG DẪN (Thứ 6) */}
@@ -335,6 +339,69 @@ export function Topbar() {
                     <span className="block text-[10px] text-slate-400 truncate">Tài liệu HDSD & trợ lý AI StockPilot</span>
                   </div>
                 </button>
+              </div>
+
+              {/* CHUYỂN VAI TRÒ THỬ NGHIỆM (DEMO RBAC) */}
+              <div className="pt-2 mt-2 border-t border-slate-100">
+                <div className="px-2 pb-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Chuyển vai trò thử nghiệm (RBAC)
+                </div>
+                <div className="grid grid-cols-3 gap-1 px-1 mb-2">
+                  <button
+                    onClick={async () => {
+                      setUserMenuOpen(false);
+                      const res = await login({ email: 'minh33hieupc@gmail.com', password: 'Password123!' });
+                      if (res.success) {
+                        toast({ type: 'success', title: 'Đã chuyển sang Chủ shop', message: 'minh33hieupc@gmail.com' });
+                        navigate('/dashboard');
+                      }
+                    }}
+                    className={cn(
+                      'px-2 py-1.5 rounded-lg text-[11px] font-bold text-center border transition-all cursor-pointer',
+                      currentRole === 'store_owner'
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    )}
+                  >
+                    Chủ shop
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setUserMenuOpen(false);
+                      const res = await login({ email: 'staff@stockpilot.vn', password: 'Password123!' });
+                      if (res.success) {
+                        toast({ type: 'info', title: 'Đã chuyển sang Nhân viên', message: 'staff@stockpilot.vn (Ẩn giá vốn & doanh thu)' });
+                        navigate('/dashboard');
+                      }
+                    }}
+                    className={cn(
+                      'px-2 py-1.5 rounded-lg text-[11px] font-bold text-center border transition-all cursor-pointer',
+                      currentRole === 'warehouse_staff'
+                        ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    )}
+                  >
+                    Nhân viên
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setUserMenuOpen(false);
+                      const res = await login({ email: 'admin@stockpilot.vn', password: 'Password123!' });
+                      if (res.success) {
+                        toast({ type: 'info', title: 'Đã chuyển sang Admin', message: 'admin@stockpilot.vn (Quản trị hệ thống)' });
+                        navigate('/dashboard');
+                      }
+                    }}
+                    className={cn(
+                      'px-2 py-1.5 rounded-lg text-[11px] font-bold text-center border transition-all cursor-pointer',
+                      currentRole === 'admin'
+                        ? 'bg-purple-600 text-white border-purple-700 shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    )}
+                  >
+                    Admin
+                  </button>
+                </div>
               </div>
 
               {/* 7. ĐĂNG XUẤT KHỎI HỆ THỐNG (Thứ 7) */}
