@@ -7,12 +7,29 @@ import {
   Store, ChevronRight, Pencil, Upload, Camera
 } from "lucide-react";
 import { useProductStore, CATEGORIES } from "../components/store/productStore";
+import { useAuthStore } from "../store/authStore";
+import { canViewCostPrice, canDeleteProduct } from "../config/permissions.config";
 import { AddProduct } from "../components/AddProduct";
 import { useToast } from "../components/common/Toast";
+import { useTranslation } from "../i18n/useTranslation";
+import { uploadImageToCloudinary, uploadBase64ToCloudinary } from "../services/uploadService";
+
+function safeNum(val) {
+  if (val === null || val === undefined) return 0;
+  if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  if (typeof val === 'object') {
+    if (typeof val.toNumber === 'function') return val.toNumber();
+    if (Array.isArray(val.d) && val.d.length > 0) {
+      return Number(val.d[0]) * (val.s < 0 ? -1 : 1);
+    }
+    return 0;
+  }
+  const n = Number(val);
+  return isNaN(n) ? 0 : n;
+}
 
 function formatVND(val) {
-  if (val === undefined || val === null || val === "") return "0 đ";
-  return Number(val).toLocaleString("vi-VN") + " đ";
+  return safeNum(val).toLocaleString("vi-VN") + " đ";
 }
 
 function getCategoryBadge(category) {
@@ -23,6 +40,7 @@ function getCategoryBadge(category) {
     spice: { label: "Gia vị & Đồ khô", icon: "🧂", color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
     house: { label: "Đồ dùng gia đình", icon: "🧹", color: "#6366f1", bg: "#eef2ff", border: "#c7d2fe" },
     care: { label: "Chăm sóc cá nhân", icon: "🧴", color: "#ec4899", bg: "#fdf2f8", border: "#fbcfe8" },
+    office: { label: "Đồ dùng văn phòng", icon: "📎", color: "#0ea5e9", bg: "#f0f9ff", border: "#bae6fd" },
     misc: { label: "Tiêu dùng khác", icon: "🔌", color: "#64748b", bg: "#f8fafc", border: "#cbd5e1" },
     "thuc-pham": { label: "Thực phẩm", icon: "🍞", color: "#10b981", bg: "#ecfdf5", border: "#a7f3d0" },
     "do-an": { label: "Thực phẩm", icon: "🍞", color: "#10b981", bg: "#ecfdf5", border: "#a7f3d0" },
@@ -30,6 +48,7 @@ function getCategoryBadge(category) {
     "gia-vi": { label: "Gia vị & Đồ khô", icon: "🧂", color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
     "gia-dinh": { label: "Đồ dùng gia đình", icon: "🧹", color: "#6366f1", bg: "#eef2ff", border: "#c7d2fe" },
     "ca-nhan": { label: "Chăm sóc cá nhân", icon: "🧴", color: "#ec4899", bg: "#fdf2f8", border: "#fbcfe8" },
+    "van-phong": { label: "Đồ dùng văn phòng", icon: "📎", color: "#0ea5e9", bg: "#f0f9ff", border: "#bae6fd" },
   };
   return map[catKey] || { label: "Hàng hóa chung", icon: "📦", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" };
 }
@@ -43,89 +62,58 @@ function getProductSocialStats(id) {
 }
 
 function getProductImage(prod) {
-  if (prod?.imageUrl) return prod.imageUrl;
-  const name = (prod?.name || "").toLowerCase();
-  const sku = (prod?.sku || "").toLowerCase();
-  const cat = (prod?.category || "").toLowerCase();
-
-  if (name.includes("ổ cắm") || sku.includes("oc-")) {
-    return "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=600&h=600&fit=crop";
+  if (prod?.imageUrl && typeof prod.imageUrl === 'string' && prod.imageUrl.trim() !== '') {
+    return prod.imageUrl.trim();
   }
-  if (name.includes("pin") || sku.includes("pin")) {
-    return "https://images.unsplash.com/photo-1619725002198-6a689b72f41d?w=600&h=600&fit=crop";
-  }
-  if (name.includes("băng dính") || sku.includes("bd-")) {
-    return "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=600&h=600&fit=crop";
-  }
-  if (name.includes("khẩu trang") || sku.includes("kt-")) {
-    return "https://images.unsplash.com/photo-1584744982491-665216d95f8b?w=600&h=600&fit=crop";
-  }
-  if (name.includes("keo") || sku.includes("keo")) {
-    return "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=600&h=600&fit=crop";
-  }
-  if (name.includes("bánh mì") || cat.includes("tpcn") || cat.includes("do-an") || cat.includes("thuc-pham")) {
-    return "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=600&h=600&fit=crop";
-  }
-  if (name.includes("cà phê") || cat.includes("drink") || cat.includes("do-uong")) {
-    return "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=600&h=600&fit=crop";
-  }
-  if (cat.includes("spice") || cat.includes("gia-vi")) {
-    return "https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=600&h=600&fit=crop";
-  }
-  if (cat.includes("house") || cat.includes("gia-dinh")) {
-    return "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=600&h=600&fit=crop";
-  }
-  if (cat.includes("care") || cat.includes("ca-nhan")) {
-    return "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&h=600&fit=crop";
-  }
-  return "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=600&h=600&fit=crop";
+  return null;
 }
 
 const PAGE_CSS = `
 .pp-root {
-  padding: 24px;
-  max-width: 1400px;
+  padding: 20px;
+  max-width: 1200px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  gap: 18px;
+  font-family: var(--font-ui);
   color: #0f172a;
 }
 
-/* ─── Hero Header matching Screenshot ─── */
+/* ─── Hero Header: Màu xanh lợt chuẩn tinh tế ─── */
 .pp-header {
-  background: linear-gradient(135deg, #091224 0%, #152449 35%, #1e3a8a 70%, #2563eb 100%);
-  border-radius: 24px;
-  padding: 30px 36px;
-  color: white;
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%);
+  border: 1px solid #7dd3fc;
+  border-radius: 18px;
+  padding: 18px 24px;
+  color: #082f49;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 20px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.25);
+  box-shadow: 0 8px 22px -5px rgba(14, 165, 233, 0.22), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
 }
 .pp-header::before {
   content: '';
   position: absolute;
-  top: -80px;
-  right: -80px;
-  width: 280px;
-  height: 280px;
-  background: radial-gradient(circle, rgba(96, 165, 250, 0.25) 0%, rgba(96, 165, 250, 0) 70%);
+  top: -60px;
+  right: -60px;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 70%);
   border-radius: 50%;
   pointer-events: none;
 }
 .pp-header::after {
   content: '';
   position: absolute;
-  bottom: -60px;
-  left: 35%;
-  width: 300px;
-  height: 140px;
-  background: radial-gradient(ellipse, rgba(147, 197, 253, 0.15) 0%, rgba(147, 197, 253, 0) 70%);
+  bottom: -50px;
+  left: 30%;
+  width: 240px;
+  height: 120px;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 70%);
   border-radius: 50%;
   pointer-events: none;
 }
@@ -137,26 +125,27 @@ const PAGE_CSS = `
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
 }
 .pp-header-tag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 20px;
-  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 3px 10px;
   font-size: 11px;
-  font-weight: 600;
-  color: #e2e8f0;
+  font-weight: 700;
+  color: #0369a1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   backdrop-filter: blur(8px);
 }
 .pp-pulse-dot {
   width: 7px;
   height: 7px;
-  background: #34d399;
+  background: #10b981;
   border-radius: 50%;
   animation: ppPulse 1.6s infinite;
 }
@@ -165,23 +154,30 @@ const PAGE_CSS = `
   50% { opacity: 0.5; transform: scale(1.3); }
 }
 .pp-header h1 {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 900;
-  margin: 0 0 8px 0;
-  letter-spacing: -0.6px;
-  color: #ffffff;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.4px;
+  color: #082f49;
 }
 .pp-header p {
-  font-size: 13.5px;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  color: #0c4a6e;
+  font-weight: 500;
   margin: 0;
-  line-height: 1.5;
-  max-width: 600px;
+  line-height: 1.45;
+  max-width: none;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .pp-header p {
+    white-space: normal;
+  }
 }
 .pp-header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   position: relative;
   z-index: 1;
   flex-shrink: 0;
@@ -189,40 +185,48 @@ const PAGE_CSS = `
 .pp-btn-refresh {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 11px 18px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.26);
-  border-radius: 14px;
-  color: white;
-  font-size: 13px;
+  gap: 6px;
+  padding: 9px 15px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  color: #0284c7;
+  font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
   backdrop-filter: blur(8px);
 }
 .pp-btn-refresh:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: #ffffff;
+  border-color: #38bdf8;
+  color: #0369a1;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
 }
 .pp-btn-add {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 22px;
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 50%, #dc2626 100%);
-  border: none;
-  border-radius: 14px;
-  color: white;
-  font-size: 13.5px;
-  font-weight: 800;
+  gap: 6px;
+  padding: 9px 16px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  color: #0284c7;
+  font-size: 12.5px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(8px);
 }
 .pp-btn-add:hover {
+  background: #ffffff;
+  border-color: #38bdf8;
+  color: #0369a1;
   transform: translateY(-1px);
-  box-shadow: 0 8px 26px rgba(249, 115, 22, 0.55);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
 }
 
 /* ─── 4 KPI Cards Row matching Screenshot ─── */
@@ -241,10 +245,10 @@ const PAGE_CSS = `
   background: white;
   border: 1px solid #edf2f7;
   border-radius: 18px;
-  padding: 20px;
+  padding: 18px 20px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 15px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -903,50 +907,91 @@ const PAGE_CSS = `
 `;
 
 function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
+  const { t } = useTranslation();
+  const { user } = useAuthStore();
+  const canSeeCost = canViewCostPrice(user?.role);
+  const canDelete = canDeleteProduct(user?.role);
+
   const badge = getCategoryBadge(prod.category);
   const isLow = prod.stock > 0 && prod.stock <= (prod.alertThreshold || 10);
   const isOut = prod.stock === 0;
-  const marginPct = prod.salePrice && prod.costPrice && prod.salePrice > prod.costPrice
+  const marginPct = canSeeCost && prod.salePrice && prod.costPrice && prod.salePrice > prod.costPrice
     ? Math.round(((prod.salePrice - prod.costPrice) / prod.salePrice) * 100) : null;
   const imgSrc = getProductImage(prod);
 
   return (
     <div className="pp-card">
       <div className="pp-card-img-box" onClick={() => onZoom(prod)}>
-        <img
-          src={imgSrc}
-          alt={prod.name}
-          className="pp-card-img"
-          onError={(e) => {
-            e.target.src = "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=600&h=600&fit=crop";
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={prod.name}
+            className="pp-card-img"
+            onError={(e) => {
+              e.target.style.display = "none";
+              const fb = e.target.parentElement?.querySelector(".pp-card-fallback-box");
+              if (fb) fb.style.display = "flex";
+            }}
+          />
+        ) : null}
+        <div
+          className="pp-card-fallback-box"
+          style={{
+            display: imgSrc ? "none" : "flex",
+            width: "100%",
+            height: "100%",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+            gap: 6,
           }}
-        />
+        >
+          <span style={{ fontSize: 36 }}>{badge.icon || "📦"}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Chưa có ảnh</span>
+        </div>
         <div className={`pp-tag-stock${isOut ? " out" : ""}`}>
-          {isOut ? "Hết hàng" : `Tồn: ${prod.stock}`}
+          {isOut ? t('outOfStock', 'Hết hàng') : `${t('tableStock', 'Tồn')}: ${prod.stock}`}
         </div>
         {isLow && !isOut && (
           <div className="pp-tag-low">
-            <AlertTriangle style={{ width: 11, height: 11 }} /> Sắp hết
+            <AlertTriangle style={{ width: 11, height: 11 }} /> {t('lowStock', 'Sắp hết')}
           </div>
         )}
-        <div className="pp-img-hover-overlay">
-          <div className="pp-zoom-pill">
-            <ZoomIn style={{ width: 13, height: 13 }} /> Phóng to xem ảnh
+        {imgSrc && (
+          <div className="pp-img-hover-overlay">
+            <div className="pp-zoom-pill">
+              <ZoomIn style={{ width: 13, height: 13 }} /> {t('zoomImage', 'Phóng to xem ảnh')}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="pp-card-content">
-        <div
-          className="pp-card-cat-badge"
-          style={{
-            background: badge.bg,
-            color: badge.color,
-            border: `1px solid ${badge.border}`
-          }}
-        >
-          <span>{badge.icon}</span>
-          <span>{badge.label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+          <div
+            className="pp-card-cat-badge"
+            style={{
+              background: badge.bg,
+              color: badge.color,
+              border: `1px solid ${badge.border}`
+            }}
+          >
+            <span>{badge.icon}</span>
+            <span>{badge.label}</span>
+          </div>
+          <span style={{
+            fontSize: '11px',
+            fontWeight: 800,
+            color: '#2563eb',
+            background: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            padding: '2px 7px',
+            borderRadius: '6px',
+            letterSpacing: '0.02em',
+          }}>
+            {prod.code || `SP${prod.id}`}
+          </span>
         </div>
 
         <h3
@@ -959,7 +1004,9 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
 
         <div className="pp-price-section">
           <span className="pp-sale-price">{formatVND(prod.salePrice)}</span>
-          <span className="pp-cost-price">Vốn: {formatVND(prod.costPrice)}</span>
+          {canSeeCost && (
+            <span className="pp-cost-price">{t('costPrice', 'Giá vốn')}: {formatVND(prod.costPrice)}</span>
+          )}
         </div>
 
         <div className="pp-card-actions-bar">
@@ -975,7 +1022,7 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
                 e.stopPropagation();
                 onZoom(prod);
               }}
-              title="Phóng to ảnh"
+              title={t('zoomImage', 'Phóng to ảnh')}
             >
               <Eye style={{ width: 14, height: 14 }} />
             </button>
@@ -985,20 +1032,22 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
                 e.stopPropagation();
                 onEdit(prod);
               }}
-              title="Sửa tên, giá và ảnh"
+              title={t('edit', 'Sửa')}
             >
               <Pencil style={{ width: 13, height: 13 }} />
             </button>
-            <button
-              className="pp-card-btn-icon trash"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(prod.id);
-              }}
-              title="Xóa sản phẩm"
-            >
-              <Trash2 style={{ width: 14, height: 14 }} />
-            </button>
+            {canDelete && (
+              <button
+                className="pp-card-btn-icon trash"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(prod.id);
+                }}
+                title={t('delete', 'Xóa')}
+              >
+                <Trash2 style={{ width: 14, height: 14 }} />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1007,18 +1056,51 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
 }
 
 export function ProductsPage() {
+  const { t, language } = useTranslation();
+  const { user } = useAuthStore();
+  const canSeeCost = canViewCostPrice(user?.role);
+  const canDelete = canDeleteProduct(user?.role);
+
   const { products, deleteProduct, updateProduct, toggleProductStatus, fetchProducts, isLoading } = useProductStore();
   const { toast } = useToast();
 
   useEffect(() => {
     fetchProducts();
+
+    const handleSync = () => {
+      fetchProducts();
+    };
+    window.addEventListener('stockpilot_product_updated', handleSync);
+
+    let bc = null;
+    try {
+      bc = new BroadcastChannel('stockpilot_channel');
+      bc.onmessage = (event) => {
+        if (event.data?.type === 'PRODUCTS_UPDATED') {
+          fetchProducts();
+        }
+      };
+    } catch (_) {}
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchProducts();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      window.removeEventListener('stockpilot_product_updated', handleSync);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (bc) bc.close();
+    };
   }, []);
 
   const [viewMode, setViewMode] = useState("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [statusTab, setStatusTab] = useState("all");
-  const [sortBy, setSortBy] = useState("popular");
+  const [sortBy, setSortBy] = useState("code_asc");
   const [displayLayout, setDisplayLayout] = useState("grid");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
@@ -1032,6 +1114,7 @@ export function ProductsPage() {
     imageUrl: "",
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const handleOpenEdit = (prod) => {
     setEditingProduct(prod);
@@ -1052,11 +1135,20 @@ export function ProductsPage() {
     }
     setIsSaving(true);
     try {
+      let finalImageUrl = editForm.imageUrl.trim();
+      if (finalImageUrl.startsWith("data:image/")) {
+        try {
+          finalImageUrl = await uploadBase64ToCloudinary(finalImageUrl);
+        } catch (uploadErr) {
+          console.warn("Upload base64 to Cloudinary failed:", uploadErr);
+        }
+      }
+
       await updateProduct(editingProduct.id, {
         name: editForm.name.trim(),
         salePrice: Number(editForm.salePrice) || 0,
         costPrice: Number(editForm.costPrice) || 0,
-        imageUrl: editForm.imageUrl.trim() || undefined,
+        imageUrl: finalImageUrl || undefined,
       });
       toast({
         type: "success",
@@ -1068,7 +1160,7 @@ export function ProductsPage() {
       toast({
         type: "error",
         title: "Lỗi cập nhật",
-        message: err?.message || "Không thể lưu sản phẩm",
+        message: err?.response?.data?.error?.message || err?.message || "Không thể lưu sản phẩm",
       });
     } finally {
       setIsSaving(false);
@@ -1096,6 +1188,7 @@ export function ProductsPage() {
             (selectedCategory === "spice" && cat.includes("gia-vi")) ||
             (selectedCategory === "house" && cat.includes("gia-dinh")) ||
             (selectedCategory === "care" && cat.includes("ca-nhan")) ||
+            (selectedCategory === "office" && (cat.includes("office") || cat.includes("van-phong"))) ||
             (selectedCategory === "misc" && (cat.includes("misc") || cat.includes("tieu-dung")));
         }
 
@@ -1108,8 +1201,13 @@ export function ProductsPage() {
         return matchSearch && matchCategory && matchStatus;
       })
       .sort((a, b) => {
+        if (sortBy === "code_asc" || !sortBy) {
+          const numA = parseInt(String(a.code || a.id).replace(/\D/g, ''), 10) || Number(a.id) || 0;
+          const numB = parseInt(String(b.code || b.id).replace(/\D/g, ''), 10) || Number(b.id) || 0;
+          return numA - numB;
+        }
         if (sortBy === "popular") return getProductSocialStats(b.id).soldCount - getProductSocialStats(a.id).soldCount;
-        if (sortBy === "newest") return (b.id || "").localeCompare(a.id || "");
+        if (sortBy === "newest") return (Number(b.id) || 0) - (Number(a.id) || 0);
         if (sortBy === "price_asc") return (a.salePrice || 0) - (b.salePrice || 0);
         if (sortBy === "price_desc") return (b.salePrice || 0) - (a.salePrice || 0);
         if (sortBy === "stock_asc") return (a.stock || 0) - (b.stock || 0);
@@ -1128,21 +1226,22 @@ export function ProductsPage() {
     return {
       total,
       lowStock,
-      totalInventoryValue: totalInventoryValue || 52567000,
+      totalInventoryValue,
       activeCount,
-      flashSaleCount: flashSaleCount || 27,
+      flashSaleCount,
     };
   }, [products]);
 
   // Categories list matching Screenshot 1 (1 hàng duy nhất)
   const categoryPills = [
-    { key: "all", label: "Tất cả", icon: "🌟", count: products.length },
-    { key: "tpcn", label: "Thực phẩm", icon: "📦", count: products.filter(p => (p.category || "").includes("tpcn") || (p.category || "").includes("thuc-pham") || (p.category || "").includes("do-an")).length || 5 },
-    { key: "drink", label: "Đồ uống", icon: "☕", count: products.filter(p => (p.category || "").includes("drink") || (p.category || "").includes("do-uong")).length || 5 },
-    { key: "spice", label: "Gia vị & Đồ khô", icon: "🧂", count: products.filter(p => (p.category || "").includes("spice") || (p.category || "").includes("gia-vi")).length || 5 },
-    { key: "house", label: "Đồ dùng gia đình", icon: "🧹", count: products.filter(p => (p.category || "").includes("house") || (p.category || "").includes("gia-dinh")).length || 5 },
-    { key: "care", label: "Chăm sóc cá nhân", icon: "🧴", count: products.filter(p => (p.category || "").includes("care") || (p.category || "").includes("ca-nhan")).length || 5 },
-    { key: "misc", label: "Tiêu dùng khác", icon: "🔌", count: products.filter(p => (p.category || "").includes("misc") || (p.category || "").includes("tieu-dung")).length || 5 },
+    { key: "all", label: t('catAll', 'Tất cả'), icon: "🌟", count: products.length },
+    { key: "tpcn", label: t('catTpcn', 'Thực phẩm'), icon: "📦", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("tpcn") || c.includes("thuc-pham") || c.includes("do-an"); }).length },
+    { key: "drink", label: t('catDrink', 'Đồ uống'), icon: "☕", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("drink") || c.includes("do-uong"); }).length },
+    { key: "spice", label: t('catSpice', 'Gia vị & Đồ khô'), icon: "🧂", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("spice") || c.includes("gia-vi"); }).length },
+    { key: "house", label: t('catHouse', 'Đồ dùng gia đình'), icon: "🧹", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("house") || c.includes("gia-dinh"); }).length },
+    { key: "care", label: t('catCare', 'Chăm sóc cá nhân'), icon: "🧴", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("care") || c.includes("ca-nhan"); }).length },
+    { key: "office", label: t('catOffice', 'Đồ dùng văn phòng'), icon: "📎", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("office") || c.includes("van-phong"); }).length },
+    { key: "misc", label: t('catMisc', 'Tiêu dùng khác'), icon: "🔌", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("misc") || c.includes("tieu-dung"); }).length },
   ];
 
   if (viewMode === "add") {
@@ -1160,17 +1259,9 @@ export function ProductsPage() {
       {/* ─── Hero Header Banner (screenshot 1) ─── */}
       <div className="pp-header">
         <div className="pp-header-left">
-          <div className="pp-header-badges">
-            <div className="pp-header-tag">
-              <Store style={{ width: 13, height: 13 }} /> Quản lý kho
-            </div>
-            <div className="pp-header-tag">
-              <div className="pp-pulse-dot" /> Cập nhật thời gian thực
-            </div>
-          </div>
-          <h1>Danh mục Sản phẩm & Kho hàng</h1>
+          <h1>{t('heroTitle', 'Danh mục Sản phẩm & Kho hàng')}</h1>
           <p>
-            Quản lý mặt hàng, theo dõi tồn kho, giá vốn và giá bán lẻ chính xác, cảnh báo sắp hết hàng.
+            {t('heroSubtitle', 'Quản lý mặt hàng, theo dõi tồn kho, giá vốn và giá bán lẻ chính xác, cảnh báo sắp hết hàng.')}
           </p>
         </div>
         <div className="pp-header-actions">
@@ -1180,15 +1271,15 @@ export function ProductsPage() {
               fetchProducts();
               toast({
                 type: "info",
-                title: "Làm mới thành công",
-                message: "Đã cập nhật danh sách kho hàng và số lượng tồn mới nhất!",
+                title: t('refreshSuccessTitle', 'Làm mới thành công'),
+                message: t('refreshSuccessMsg', 'Đã cập nhật danh sách kho hàng và số lượng tồn mới nhất!'),
               });
             }}
           >
-            <RefreshCw style={{ width: 14, height: 14 }} /> Làm mới
+            <RefreshCw style={{ width: 14, height: 14 }} /> {t('refresh', 'Làm mới')}
           </button>
           <button className="pp-btn-add" onClick={() => setViewMode("add")}>
-            <Plus style={{ width: 16, height: 16, strokeWidth: 3 }} /> Thêm sản phẩm mới
+            <Plus style={{ width: 16, height: 16, strokeWidth: 3 }} /> {t('addNewProduct', 'Thêm sản phẩm mới')}
           </button>
         </div>
       </div>
@@ -1201,25 +1292,19 @@ export function ProductsPage() {
             <Package style={{ width: 26, height: 26 }} />
           </div>
           <div>
-            <div className="pp-stat-label">TỔNG MẶT HÀNG</div>
-            <div className="pp-stat-value">{stats.total} SKU</div>
-            <div className="pp-stat-sub" style={{ color: "#059669" }}>
-              <span style={{ fontSize: 13, color: "#10b981" }}>●</span> {stats.activeCount} đang bán trực tiếp
-            </div>
+            <div className="pp-stat-label">{t('productsTotal', 'TỔNG MẶT HÀNG')}</div>
+            <div className="pp-stat-value">{stats.total} {t('itemsCount', 'SP')}</div>
           </div>
         </div>
 
-        {/* Card 2: Khuyến mãi / Flash Sale */}
+        {/* Card 2: Khuyến mãi */}
         <div className="pp-stat-card">
           <div className="pp-stat-icon-wrap" style={{ background: "#fff7ed", color: "#ea580c" }}>
             <Zap style={{ width: 26, height: 26, fill: "#ea580c" }} />
           </div>
           <div>
-            <div className="pp-stat-label">KHUYẾN MÃI / FLASH SALE</div>
-            <div className="pp-stat-value">{stats.flashSaleCount} SKU</div>
-            <div className="pp-stat-sub" style={{ color: "#64748b" }}>
-              Có thể giảm giá để xả kho
-            </div>
+            <div className="pp-stat-label">{t('productsFlashSale', 'KHUYẾN MÃI')}</div>
+            <div className="pp-stat-value">{stats.flashSaleCount} {t('itemsCount', 'SP')}</div>
           </div>
         </div>
 
@@ -1229,29 +1314,25 @@ export function ProductsPage() {
             <AlertTriangle style={{ width: 26, height: 26 }} />
           </div>
           <div>
-            <div className="pp-stat-label">CẢNH BÁO SẮP HẾT</div>
-            <div className="pp-stat-value">{stats.lowStock} SKU</div>
-            <div className="pp-stat-sub" style={{ color: "#64748b" }}>
-              Dưới mức an toàn kho
-            </div>
+            <div className="pp-stat-label">{t('productsLowStock', 'CẢNH BÁO SẮP HẾT')}</div>
+            <div className="pp-stat-value">{stats.lowStock} {t('itemsCount', 'SP')}</div>
           </div>
         </div>
 
-        {/* Card 4: Tổng vốn tồn kho */}
-        <div className="pp-stat-card">
-          <div className="pp-stat-icon-wrap" style={{ background: "#f0fdf4", color: "#16a34a" }}>
-            <DollarSign style={{ width: 26, height: 26 }} />
-          </div>
-          <div>
-            <div className="pp-stat-label">TỔNG VỐN TỒN KHO</div>
-            <div className="pp-stat-value" style={{ fontSize: 19 }}>
-              {formatVND(stats.totalInventoryValue)}
+        {/* Card 4: Tổng vốn tồn kho (Ẩn đối với Nhân viên WAREHOUSE_STAFF) */}
+        {canSeeCost && (
+          <div className="pp-stat-card">
+            <div className="pp-stat-icon-wrap" style={{ background: "#f0fdf4", color: "#16a34a" }}>
+              <DollarSign style={{ width: 26, height: 26 }} />
             </div>
-            <div className="pp-stat-sub" style={{ color: "#059669" }}>
-              Biên lãi TB: <strong>+28.5%</strong>
+            <div>
+              <div className="pp-stat-label">{t('productsTotalInventoryValue', 'TỔNG VỐN TỒN KHO')}</div>
+              <div className="pp-stat-value" style={{ fontSize: 19 }}>
+                {formatVND(stats.totalInventoryValue)}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ─── DANH MỤC NGÀNH HÀNG (screenshot 1) ─── */}
@@ -1259,10 +1340,10 @@ export function ProductsPage() {
         <div className="pp-cat-card-header">
           <div className="pp-cat-title">
             <Layers style={{ width: 16, height: 16, color: "#2563eb" }} />
-            <span>DANH MỤC NGÀNH HÀNG</span>
+            <span>{t('categorySection', 'DANH MỤC NGÀNH HÀNG')}</span>
           </div>
           <div className="pp-cat-count-badge">
-            {filteredProducts.length} sản phẩm phù hợp
+            {filteredProducts.length} {t('matchingProducts', 'sản phẩm phù hợp')}
           </div>
         </div>
 
@@ -1273,7 +1354,6 @@ export function ProductsPage() {
               className={`pp-cat-pill-btn ${selectedCategory === cp.key ? "active" : ""}`}
               onClick={() => setSelectedCategory(cp.key)}
             >
-              <span>{cp.icon}</span>
               <span>{cp.label}</span>
               <span className="pp-cat-pill-count">{cp.count}</span>
             </button>
@@ -1285,18 +1365,18 @@ export function ProductsPage() {
       <div className="pp-toolbar">
         <div className="pp-status-tabs">
           {[
-            { key: "all", label: "Tất cả", icon: "📦" },
-            { key: "active", label: "Đang bán", icon: "🔥" },
-            { key: "flash_sale", label: "Flash Sale", icon: "⚡" },
-            { key: "low_stock", label: "Sắp hết", icon: "⚠️" },
-            { key: "out_of_stock", label: "Hết hàng", icon: "❌" },
+            { key: "all", label: t('tabAll', 'Tất cả') },
+            { key: "active", label: t('tabActive', 'Đang bán') },
+            { key: "flash_sale", label: t('tabFlashSale', 'Khuyến mãi') },
+            { key: "low_stock", label: t('tabLowStock', 'Sắp hết') },
+            { key: "out_of_stock", label: t('tabOutOfStock', 'Hết hàng') },
           ].map((tab) => (
             <button
               key={tab.key}
               className={`pp-status-tab-btn ${statusTab === tab.key ? "active" : ""}`}
               onClick={() => setStatusTab(tab.key)}
             >
-              <span>{tab.icon}</span> {tab.label}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -1308,7 +1388,7 @@ export function ProductsPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm theo tên, SKU, mã vạch..."
+            placeholder={t('searchProductInput', 'Tìm theo tên, mã SP, mã vạch...')}
           />
           {searchQuery && (
             <button className="pp-search-clear" onClick={() => setSearchQuery("")}>
@@ -1322,12 +1402,13 @@ export function ProductsPage() {
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
         >
-          <option value="popular">🔥 Bán chạy nhất</option>
-          <option value="newest">🆕 Mới nhất</option>
-          <option value="price_asc">💰 Giá thấp → cao</option>
-          <option value="price_desc">💰 Giá cao → thấp</option>
-          <option value="stock_desc">📦 Tồn kho nhiều</option>
-          <option value="stock_asc">📦 Tồn kho ít</option>
+          <option value="code_asc">Mã sản phẩm (từ 1 trở đi)</option>
+          <option value="popular">{t('sortPopular', 'Bán chạy nhất')}</option>
+          <option value="newest">{t('sortNewest', 'Mới nhất')}</option>
+          <option value="price_asc">{t('sortPriceAsc', 'Giá thấp → cao')}</option>
+          <option value="price_desc">{t('sortPriceDesc', 'Giá cao → thấp')}</option>
+          <option value="stock_desc">{t('sortStockDesc', 'Tồn kho nhiều')}</option>
+          <option value="stock_asc">{t('sortStockAsc', 'Tồn kho ít')}</option>
         </select>
 
         <div className="pp-view-toggle">
@@ -1352,14 +1433,14 @@ export function ProductsPage() {
       {isLoading ? (
         <div style={{ textAlign: "center", padding: 60, color: "#64748b" }}>
           <RefreshCw className="pp-spin" style={{ width: 28, height: 28, margin: "0 auto 12px" }} />
-          <p style={{ fontWeight: 600 }}>Đang đồng bộ dữ liệu kho hàng...</p>
+          <p style={{ fontWeight: 600 }}>{t('syncingInventory', 'Đang đồng bộ dữ liệu kho hàng...')}</p>
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className="pp-empty-box">
           <ShoppingBag style={{ width: 44, height: 44, color: "#94a3b8", margin: "0 auto 14px" }} />
-          <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>Không tìm thấy sản phẩm nào</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 800, margin: "0 0 6px" }}>{t('noProductsTitle', 'Không tìm thấy sản phẩm nào')}</h3>
           <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 16px" }}>
-            Hãy thử tìm bằng từ khóa khác hoặc bỏ chọn bộ lọc danh mục.
+            {t('noProductsSub', 'Hãy thử tìm bằng từ khóa khác hoặc bỏ chọn bộ lọc danh mục.')}
           </p>
           <button
             style={{
@@ -1377,7 +1458,7 @@ export function ProductsPage() {
               setStatusTab("all");
             }}
           >
-            Xóa bộ lọc
+            {t('clearFilter', 'Xóa bộ lọc')}
           </button>
         </div>
       ) : displayLayout === "grid" ? (
@@ -1399,13 +1480,13 @@ export function ProductsPage() {
             <table className="pp-table">
               <thead>
                 <tr>
-                  <th style={{ textAlign: "left" }}>Sản phẩm</th>
-                  <th style={{ textAlign: "left" }}>Danh mục</th>
-                  <th style={{ textAlign: "right" }}>Giá vốn</th>
-                  <th style={{ textAlign: "right" }}>Giá bán</th>
-                  <th style={{ textAlign: "center" }}>Tồn kho</th>
-                  <th style={{ textAlign: "center" }}>Trạng thái</th>
-                  <th style={{ textAlign: "right" }}>Thao tác</th>
+                  <th style={{ textAlign: "left" }}>{t('tableProduct', 'Sản phẩm')}</th>
+                  <th style={{ textAlign: "left" }}>{t('tableCategory', 'Danh mục')}</th>
+                  {canSeeCost && <th style={{ textAlign: "right" }}>{t('tableCostPrice', 'Giá vốn')}</th>}
+                  <th style={{ textAlign: "right" }}>{t('tableSalePrice', 'Giá bán')}</th>
+                  <th style={{ textAlign: "center" }}>{t('tableStock', 'Tồn kho')}</th>
+                  <th style={{ textAlign: "center" }}>{t('tableStatus', 'Trạng thái')}</th>
+                  <th style={{ textAlign: "right" }}>{t('tableActions', 'Thao tác')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1418,24 +1499,39 @@ export function ProductsPage() {
                     <tr key={prod.id} onClick={() => setSelectedProduct(prod)}>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          <img
-                            src={imgSrc}
-                            alt={prod.name}
-                            className="pp-tbl-thumb"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setZoomImageProduct(prod);
-                            }}
-                            onError={(e) => {
-                              e.target.src = "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=200&h=200&fit=crop";
-                            }}
-                          />
+                          {imgSrc ? (
+                            <img
+                              src={imgSrc}
+                              alt={prod.name}
+                              className="pp-tbl-thumb"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setZoomImageProduct(prod);
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = "none";
+                              }}
+                            />
+                          ) : (
+                            <div
+                              className="pp-tbl-thumb"
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "#f1f5f9",
+                                fontSize: 18,
+                              }}
+                            >
+                              {badge.icon || "📦"}
+                            </div>
+                          )}
                           <div>
                             <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: 3 }}>
                               {prod.name}
                             </div>
                             <span style={{ fontSize: 10.5, color: "#64748b", fontFamily: "monospace", background: "#f1f5f9", padding: "2px 6px", borderRadius: 4 }}>
-                              {prod.sku || "SKU"}
+                              {prod.sku || "SP"}
                             </span>
                           </div>
                         </div>
@@ -1445,15 +1541,17 @@ export function ProductsPage() {
                           {badge.icon} {badge.label}
                         </span>
                       </td>
-                      <td style={{ textAlign: "right", color: "#64748b", fontWeight: 600 }}>
-                        {formatVND(prod.costPrice)}
-                      </td>
+                      {canSeeCost && (
+                        <td style={{ textAlign: "right", color: "#64748b", fontWeight: 600 }}>
+                          {formatVND(prod.costPrice)}
+                        </td>
+                      )}
                       <td style={{ textAlign: "right", fontWeight: 800, color: "#0f172a" }}>
                         {formatVND(prod.salePrice)}
                       </td>
                       <td style={{ textAlign: "center" }}>
                         <span style={{ fontWeight: 800, color: isOut ? "#dc2626" : isLow ? "#d97706" : "#16a34a" }}>
-                          {prod.stock} {prod.unit || "Cái"}
+                          {prod.stock} {prod.unit || t('unitPiece', 'Cái')}
                         </span>
                       </td>
                       <td style={{ textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
@@ -1470,7 +1568,7 @@ export function ProductsPage() {
                             cursor: "pointer",
                           }}
                         >
-                          {prod.status === "active" ? "● Đang bán" : "Tạm dừng"}
+                          {prod.status === "active" ? t('statusSelling', '● Đang bán') : t('statusPaused', 'Tạm dừng')}
                         </button>
                       </td>
                       <td style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
@@ -1478,24 +1576,26 @@ export function ProductsPage() {
                           <button
                             className="pp-tbl-btn zoom"
                             onClick={() => setZoomImageProduct(prod)}
-                            title="Phóng to ảnh"
+                            title={t('zoomImage', 'Phóng to ảnh')}
                           >
                             <Eye style={{ width: 15, height: 15 }} />
                           </button>
                           <button
                             className="pp-tbl-btn edit"
                             onClick={() => handleOpenEdit(prod)}
-                            title="Sửa tên, giá và ảnh"
+                            title={t('edit', 'Sửa')}
                           >
                             <Pencil style={{ width: 15, height: 15 }} />
                           </button>
-                          <button
-                            className="pp-tbl-btn trash"
-                            onClick={() => setDeleteConfirmId(prod.id)}
-                            title="Xóa hàng hóa"
-                          >
-                            <Trash2 style={{ width: 15, height: 15 }} />
-                          </button>
+                          {canDelete && (
+                            <button
+                              className="pp-tbl-btn trash"
+                              onClick={() => setDeleteConfirmId(prod.id)}
+                              title={t('delete', 'Xóa')}
+                            >
+                              <Trash2 style={{ width: 15, height: 15 }} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1517,7 +1617,7 @@ export function ProductsPage() {
                   {zoomImageProduct.name}
                 </h4>
                 <span style={{ fontSize: 11, color: "#64748b", fontFamily: "monospace" }}>
-                  Mã SKU: {zoomImageProduct.sku || "N/A"}
+                  Mã SP: {zoomImageProduct.sku || "N/A"}
                 </span>
               </div>
               <button className="pp-zoom-close-btn" onClick={() => setZoomImageProduct(null)}>
@@ -1525,15 +1625,20 @@ export function ProductsPage() {
               </button>
             </div>
 
-            <div className="pp-zoom-img-wrap">
-              <img
-                src={zoomImageProduct.imageUrl || getProductImage(zoomImageProduct)}
-                alt={zoomImageProduct.name}
-                className="pp-zoom-img"
-                onError={(e) => {
-                  e.target.src = "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=800&h=800&fit=crop";
-                }}
-              />
+            <div className="pp-zoom-img-wrap" style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc" }}>
+              {zoomImageProduct.imageUrl ? (
+                <img
+                  src={zoomImageProduct.imageUrl}
+                  alt={zoomImageProduct.name}
+                  className="pp-zoom-img"
+                />
+              ) : (
+                <div style={{ textAlign: "center", color: "#64748b", padding: 60 }}>
+                  <div style={{ fontSize: 64, marginBottom: 12 }}>{getCategoryBadge(zoomImageProduct.category).icon || "📦"}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>Chưa có hình ảnh cho sản phẩm này</div>
+                  <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>Bạn có thể nhấn vào nút Sửa để cập nhật hình ảnh</div>
+                </div>
+              )}
               <div
                 style={{
                   position: "absolute",
@@ -1618,15 +1723,19 @@ export function ProductsPage() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ position: "relative", height: 210, background: "#f8fafc" }}>
-              <img
-                src={selectedProduct.imageUrl || getProductImage(selectedProduct)}
-                alt={selectedProduct.name}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                onError={(e) => {
-                  e.target.src = "https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?w=800&h=400&fit=crop";
-                }}
-              />
+            <div style={{ position: "relative", height: 210, background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {selectedProduct.imageUrl ? (
+                <img
+                  src={selectedProduct.imageUrl}
+                  alt={selectedProduct.name}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <div style={{ textAlign: "center", color: "#64748b" }}>
+                  <div style={{ fontSize: 52, marginBottom: 8 }}>{getCategoryBadge(selectedProduct.category).icon || "📦"}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>Chưa có hình ảnh sản phẩm</div>
+                </div>
+              )}
               <button
                 className="pp-zoom-close-btn"
                 style={{ position: "absolute", top: 12, right: 12, background: "rgba(0,0,0,0.6)", color: "white" }}
@@ -1649,11 +1758,13 @@ export function ProductsPage() {
                 </p>
               )}
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-                <div style={{ background: "#f8fafc", padding: "10px 14px", borderRadius: 12, border: "1px solid #e2e8f0" }}>
-                  <div style={{ fontSize: 10.5, color: "#64748b", fontWeight: 700 }}>GIÁ VỐN NHẬP</div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", marginTop: 2 }}>{formatVND(selectedProduct.costPrice)}</div>
-                </div>
+              <div style={{ display: "grid", gridTemplateColumns: canSeeCost ? "1fr 1fr" : "1fr", gap: 10, marginBottom: 16 }}>
+                {canSeeCost && (
+                  <div style={{ background: "#f8fafc", padding: "10px 14px", borderRadius: 12, border: "1px solid #e2e8f0" }}>
+                    <div style={{ fontSize: 10.5, color: "#64748b", fontWeight: 700 }}>GIÁ VỐN NHẬP</div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#0f172a", marginTop: 2 }}>{formatVND(selectedProduct.costPrice)}</div>
+                  </div>
+                )}
                 <div style={{ background: "#f8fafc", padding: "10px 14px", borderRadius: 12, border: "1px solid #e2e8f0" }}>
                   <div style={{ fontSize: 10.5, color: "#64748b", fontWeight: 700 }}>GIÁ BÁN LẺ</div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: "#2563eb", marginTop: 2 }}>{formatVND(selectedProduct.salePrice)}</div>
@@ -1724,14 +1835,13 @@ export function ProductsPage() {
                 <Trash2 style={{ width: 28, height: 28 }} />
               </div>
               <h3 style={{ fontSize: 17, fontWeight: 900, color: "#0f172a", margin: "0 0 8px" }}>
-                Xác nhận xóa hàng hóa?
+                {t('deleteConfirmTitle', 'Xác nhận xóa hàng hóa?')}
               </h3>
               <p style={{ fontSize: 13, color: "#64748b", margin: "0 0 8px", lineHeight: 1.5 }}>
-                Bạn có chắc chắn muốn xóa sản phẩm{" "}
-                <strong style={{ color: "#0f172a" }}>"{item?.name || "này"}"</strong> ra khỏi kho sản phẩm?
+                {t('deleteConfirmDesc', 'Bạn có chắc chắn muốn xóa sản phẩm này ra khỏi kho sản phẩm?')}
               </p>
               <p style={{ fontSize: 12, color: "#e11d48", fontWeight: 600, margin: "0 0 20px" }}>
-                Hành động này sẽ xóa dữ liệu và không thể hoàn tác.
+                {item?.name ? `"${item.name}"` : ""}
               </p>
 
               <div style={{ display: "flex", gap: 10 }}>
@@ -1749,7 +1859,7 @@ export function ProductsPage() {
                   }}
                   onClick={() => setDeleteConfirmId(null)}
                 >
-                  Hủy bỏ
+                  {t('cancel', 'Hủy bỏ')}
                 </button>
                 <button
                   style={{
@@ -1770,12 +1880,12 @@ export function ProductsPage() {
                     await deleteProduct(idToDelete);
                     toast({
                       type: "success",
-                      title: "Đã xóa hàng hóa",
-                      message: `Đã xóa sản phẩm "${item?.name || ""}" khỏi danh mục thành công.`,
+                      title: t('delete', 'Đã xóa hàng hóa'),
+                      message: `"${item?.name || ""}"`,
                     });
                   }}
                 >
-                  Xóa ngay
+                  {t('confirmDelete', 'Xác nhận xóa')}
                 </button>
               </div>
             </div>
@@ -1825,10 +1935,10 @@ export function ProductsPage() {
                 </div>
                 <div>
                   <h4 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: "#0f172a" }}>
-                    Chỉnh sửa sản phẩm
+                    {t('editProductTitle', 'Chỉnh sửa sản phẩm')}
                   </h4>
                   <span style={{ fontSize: 11, color: "#64748b", fontFamily: "monospace" }}>
-                    SKU: {editingProduct.sku || "N/A"}
+                    Mã SP: {editingProduct.sku || "N/A"}
                   </span>
                 </div>
               </div>
@@ -1862,17 +1972,18 @@ export function ProductsPage() {
                 />
               </div>
 
-              {/* 2. Giá bán & Giá vốn */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {/* 2. Giá bán & Giá vốn (Phân quyền: Nhân viên không được sửa giá bán và không được xem giá vốn) */}
+              <div style={{ display: "grid", gridTemplateColumns: canSeeCost ? "1fr 1fr" : "1fr", gap: 12 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                    Giá bán lẻ (VNĐ) <span style={{ color: "#dc2626" }}>*</span>
+                    Giá bán lẻ (VNĐ) <span style={{ color: "#dc2626" }}>*</span> {!canSeeCost && <span style={{ color: "#e11d48", fontSize: 11, fontWeight: 500 }}>(Chỉ Chủ shop mới được sửa giá)</span>}
                   </label>
                   <input
                     type="number"
                     min="0"
-                    step="1000"
+                    step="any"
                     required
+                    disabled={!canSeeCost}
                     value={editForm.salePrice}
                     onChange={(e) => setEditForm({ ...editForm, salePrice: e.target.value })}
                     style={{
@@ -1885,6 +1996,8 @@ export function ProductsPage() {
                       color: "#2563eb",
                       outline: "none",
                       boxSizing: "border-box",
+                      background: !canSeeCost ? "#f1f5f9" : "#fff",
+                      cursor: !canSeeCost ? "not-allowed" : "text",
                     }}
                   />
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
@@ -1892,32 +2005,34 @@ export function ProductsPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                    Giá vốn nhập (VNĐ)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1000"
-                    value={editForm.costPrice}
-                    onChange={(e) => setEditForm({ ...editForm, costPrice: e.target.value })}
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      borderRadius: 12,
-                      border: "1.5px solid #cbd5e1",
-                      fontSize: 13.5,
-                      fontWeight: 700,
-                      color: "#475569",
-                      outline: "none",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
-                    {formatVND(editForm.costPrice)}
+                {canSeeCost && (
+                  <div>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                      Giá vốn nhập (VNĐ)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={editForm.costPrice}
+                      onChange={(e) => setEditForm({ ...editForm, costPrice: e.target.value })}
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        borderRadius: 12,
+                        border: "1.5px solid #cbd5e1",
+                        fontSize: 13.5,
+                        fontWeight: 700,
+                        color: "#475569",
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+                      {formatVND(editForm.costPrice)}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* 3. Ảnh sản phẩm */}
@@ -1971,29 +2086,47 @@ export function ProductsPage() {
                           gap: 6,
                           padding: "6px 12px",
                           borderRadius: 8,
-                          background: "#f1f5f9",
+                          background: isUploadingImage ? "#e2e8f0" : "#f1f5f9",
                           border: "1px solid #cbd5e1",
                           fontSize: 11.5,
                           fontWeight: 700,
                           color: "#334155",
-                          cursor: "pointer",
+                          cursor: isUploadingImage ? "not-allowed" : "pointer",
+                          opacity: isUploadingImage ? 0.7 : 1,
                         }}
                       >
-                        <Upload style={{ width: 13, height: 13 }} /> Tải ảnh từ máy
+                        {isUploadingImage ? (
+                          <RefreshCw className="pp-spin" style={{ width: 13, height: 13 }} />
+                        ) : (
+                          <Upload style={{ width: 13, height: 13 }} />
+                        )}
+                        {isUploadingImage ? "Đang tải ảnh lên Cloudinary..." : "Tải ảnh từ máy"}
                         <input
                           type="file"
                           accept="image/*"
+                          disabled={isUploadingImage}
                           style={{ display: "none" }}
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
-                            if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (re) => {
-                                if (re.target?.result) {
-                                  setEditForm((prev) => ({ ...prev, imageUrl: String(re.target.result) }));
-                                }
-                              };
-                              reader.readAsDataURL(file);
+                            if (!file) return;
+                            setIsUploadingImage(true);
+                            try {
+                              const cloudUrl = await uploadImageToCloudinary(file);
+                              setEditForm((prev) => ({ ...prev, imageUrl: cloudUrl }));
+                              toast({
+                                type: "success",
+                                title: "Tải ảnh thành công",
+                                message: "Ảnh đã được tải lên Cloudinary!",
+                              });
+                            } catch (uploadErr) {
+                              toast({
+                                type: "error",
+                                title: "Lỗi tải ảnh",
+                                message: uploadErr?.message || "Không thể tải ảnh lên",
+                              });
+                            } finally {
+                              setIsUploadingImage(false);
+                              e.target.value = "";
                             }
                           }}
                         />
@@ -2038,7 +2171,7 @@ export function ProductsPage() {
                     cursor: "pointer",
                   }}
                 >
-                  Hủy bỏ
+                  {t('cancel', 'Hủy bỏ')}
                 </button>
                 <button
                   type="submit"
@@ -2061,7 +2194,7 @@ export function ProductsPage() {
                   }}
                 >
                   <Check style={{ width: 16, height: 16 }} />
-                  {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
+                  {isSaving ? t('saving', 'Đang lưu...') : t('saveChanges', 'Lưu thay đổi')}
                 </button>
               </div>
             </form>

@@ -1,352 +1,415 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Boxes, Plus, ArrowDownRight, ArrowUpRight, RefreshCw,
-  Search, Filter, CheckCircle2, AlertTriangle, ShieldAlert,
-  ClipboardList, ArrowRight, Download, Package, DollarSign,
-  TrendingDown, Eye, Check, X, FileText
+  Boxes, ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal, RefreshCw,
+  Search, ClipboardList, Package, DollarSign, AlertTriangle, ShieldOff,
+  TrendingUp, X, Check, ArrowRight, Activity, BarChart3
 } from 'lucide-react';
 import { useProductStore } from '../components/store/productStore';
 import { useInventoryStore } from '../components/store/inventoryStore';
 import { useToast } from '../components/common/Toast';
+import { useAuthStore } from '../store/authStore';
+import { canViewCostPrice } from '../config/permissions.config';
 
-function formatVND(n) {
-  return Number(n || 0).toLocaleString('vi-VN') + ' đ';
+/* ─────────────────────────── helpers ─────────────────────────── */
+function fmtVND(n) {
+  return Number(n || 0).toLocaleString('vi-VN') + ' ₫';
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+}
+function movTypeBadge(type) {
+  const map = {
+    INFLOW: { label: 'Nhập kho', cls: 'bg-emerald-100 text-emerald-800' },
+    OUTFLOW: { label: 'Xuất kho', cls: 'bg-amber-100 text-amber-800' },
+    AUDIT_ADJUSTMENT: { label: 'Điều chỉnh', cls: 'bg-sky-100 text-sky-800' },
+    SALE: { label: 'Bán hàng', cls: 'bg-purple-100 text-purple-800' },
+    RETURN: { label: 'Trả hàng', cls: 'bg-pink-100 text-pink-800' },
+  };
+  const d = map[type] || { label: type, cls: 'bg-slate-100 text-slate-700' };
+  return <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${d.cls}`}>{d.label}</span>;
 }
 
+const CSS = `
+.inv-root { font-family:var(--font-ui); }
+.inv-header {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%);
+  border: 1px solid #7dd3fc; border-radius: 18px; padding: 18px 24px;
+  color: #082f49; display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  position: relative; overflow: hidden;
+  box-shadow: 0 8px 22px -5px rgba(14, 165, 233, 0.22), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+}
+.inv-header::before {
+  content: ''; position: absolute; top: -60px; right: -60px; width: 220px; height: 220px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 70%);
+  border-radius: 50%; pointer-events: none;
+}
+.inv-header::after {
+  content: ''; position: absolute; bottom: -50px; left: 30%; width: 240px; height: 120px;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 70%);
+  border-radius: 50%; pointer-events: none;
+}
+.inv-header h1 { font-size:22px; font-weight:900; margin:0 0 3px; letter-spacing:-.4px; color:#082f49; }
+.inv-header p  { font-size:12.5px; color:#0c4a6e; margin:0; font-weight:500; white-space:nowrap; }
+@media (max-width:768px) { .inv-header p { white-space:normal; } }
+.inv-tag {
+  display:inline-flex; align-items:center; gap:5px;
+  background:rgba(255,255,255,.88); border:1px solid rgba(255,255,255,.95);
+  border-radius:14px; padding:3px 10px; font-size:11px; font-weight:700; color:#0369a1;
+}
+.inv-btn-primary {
+  display:flex; align-items:center; gap:6px; padding:9px 16px;
+  background:rgba(255,255,255,.92); border:1px solid rgba(255,255,255,.95);
+  border-radius:12px; color:#0284c7; font-size:12.5px; font-weight:700;
+  cursor:pointer; transition:all .2s; box-shadow:0 2px 6px rgba(0,0,0,.05); backdrop-filter:blur(8px);
+}
+.inv-btn-primary:hover { background:#fff; border-color:#38bdf8; color:#0369a1; transform:translateY(-1px); box-shadow:0 4px 12px rgba(2,132,199,.2); }
+.inv-kpi { background:#fff; border:1px solid #edf2f7; border-radius:18px; padding:18px 20px; display:flex; align-items:center; gap:14px; box-shadow:0 2px 8px rgba(0,0,0,.03); transition:all .25s; }
+.inv-kpi:hover { box-shadow:0 8px 24px rgba(0,0,0,.07); transform:translateY(-2px); }
+.inv-kpi-icon { width:48px; height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.inv-kpi-label { font-size:11px; color:#64748b; font-weight:800; text-transform:uppercase; letter-spacing:.05em; margin-bottom:3px; }
+.inv-kpi-value { font-size:20px; font-weight:900; color:#0f172a; line-height:1.2; }
+.inv-kpi-sub { font-size:11px; font-weight:600; margin-top:3px; color:#94a3b8; }
+.inv-tab-bar { display:flex; border-bottom:2px solid #e2e8f0; gap:2px; }
+.inv-tab { padding:10px 18px; font-size:13px; font-weight:700; border-bottom:2px solid transparent; margin-bottom:-2px; cursor:pointer; transition:all .18s; color:#64748b; display:flex; align-items:center; gap:6px; background:none; border-top:none; border-left:none; border-right:none; }
+.inv-tab.active { border-bottom-color:#0ea5e9; color:#0284c7; }
+.inv-tab:hover:not(.active) { color:#0f172a; border-bottom-color:#cbd5e1; }
+.inv-card { background:#fff; border:1px solid #edf2f7; border-radius:18px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.03); }
+.inv-table { width:100%; text-align:left; border-collapse:collapse; font-size:12.5px; }
+.inv-table thead tr { background:#f8fafc; border-bottom:1px solid #edf2f7; }
+.inv-table thead th { padding:11px 14px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#64748b; }
+.inv-table tbody tr { border-bottom:1px solid #f1f5f9; transition:background .15s; }
+.inv-table tbody tr:last-child { border-bottom:none; }
+.inv-table tbody tr:hover { background:#f8fafc; }
+.inv-table td { padding:11px 14px; color:#0f172a; }
+.inv-status-pill { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+.inv-modal-overlay { position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,.55); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn .15s ease; }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+.inv-modal { background:#fff; border-radius:20px; padding:24px; width:100%; max-width:480px; box-shadow:0 24px 64px rgba(0,0,0,.15),0 8px 20px rgba(0,0,0,.08); animation:slideUp .18s ease; }
+@keyframes slideUp { from { transform:translateY(16px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+.inv-field-label { font-size:12px; font-weight:700; color:#374151; margin-bottom:5px; display:block; }
+.inv-input { width:100%; padding:9px 13px; border:1.5px solid #e2e8f0; border-radius:12px; font-size:13px; background:#f8fafc; transition:border-color .18s,box-shadow .18s; box-sizing:border-box; }
+.inv-input:focus { outline:none; border-color:#38bdf8; box-shadow:0 0 0 3px rgba(56,189,248,.15); background:#fff; }
+.inv-action-btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:12px; font-size:13px; font-weight:700; cursor:pointer; border:none; transition:all .2s; }
+.inv-btn-in  { background:linear-gradient(135deg,#059669,#10b981); color:#fff; box-shadow:0 4px 12px rgba(5,150,105,.25); }
+.inv-btn-in:hover  { transform:translateY(-1px); box-shadow:0 6px 16px rgba(5,150,105,.35); }
+.inv-btn-out { background:linear-gradient(135deg,#d97706,#f59e0b); color:#fff; box-shadow:0 4px 12px rgba(217,119,6,.25); }
+.inv-btn-out:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(217,119,6,.35); }
+.inv-btn-adj { background:linear-gradient(135deg,#2563eb,#3b82f6); color:#fff; box-shadow:0 4px 12px rgba(37,99,235,.25); }
+.inv-btn-adj:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(37,99,235,.35); }
+.inv-btn-take { background:linear-gradient(135deg,#7c3aed,#8b5cf6); color:#fff; box-shadow:0 4px 12px rgba(124,58,237,.25); }
+.inv-btn-take:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(124,58,237,.35); }
+.inv-cancel-btn { padding:9px 16px; border-radius:12px; border:1.5px solid #e2e8f0; background:#f8fafc; font-size:13px; font-weight:600; color:#64748b; cursor:pointer; transition:all .15s; }
+.inv-cancel-btn:hover { background:#fff; border-color:#cbd5e1; color:#0f172a; }
+.inv-empty { text-align:center; padding:48px 24px; color:#94a3b8; }
+.inv-empty-icon { width:48px; height:48px; margin:0 auto 12px; opacity:.35; }
+.inv-search-wrap { position:relative; }
+.inv-search-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); width:15px; height:15px; color:#94a3b8; pointer-events:none; }
+.inv-search-input { width:100%; padding:9px 12px 9px 36px; border:1.5px solid #e2e8f0; border-radius:12px; font-size:13px; background:#f8fafc; transition:all .18s; }
+.inv-search-input:focus { outline:none; border-color:#38bdf8; box-shadow:0 0 0 3px rgba(56,189,248,.12); background:#fff; }
+.inv-filter-pill { padding:5px 14px; border-radius:20px; border:1.5px solid #e2e8f0; font-size:12px; font-weight:600; cursor:pointer; transition:all .15s; background:#fff; color:#64748b; }
+.inv-filter-pill.active { background:#eff6ff; border-color:#bfdbfe; color:#1d4ed8; }
+.inv-filter-pill:hover:not(.active) { background:#f8fafc; color:#374151; border-color:#cbd5e1; }
+.inv-loading { display:flex; align-items:center; justify-content:center; gap:8px; padding:32px; color:#94a3b8; font-size:13px; }
+.spin { animation:spin 1s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+`;
+
+/* ─────────────────── Main Component ─────────────────── */
 export function InventoryPage() {
   const { toast } = useToast();
+  const { user } = useAuthStore();
+  const canSeeCost = canViewCostPrice(user?.role);
   const { products, fetchProducts } = useProductStore();
-  const { 
-    movements, balances, stockTakeSessions,
-    stockIn, stockOut, stockAdjustment,
-    fetchMovements, fetchBalances, fetchStockTakes
-  } = useInventoryStore();
+  const { movements, stockIn, stockOut, stockAdjustment, fetchMovements, fetchBalances, isLoading } = useInventoryStore();
 
+  /* load */
   useEffect(() => {
-    fetchMovements();
-    fetchBalances();
-    fetchStockTakes();
     if (!products.length) fetchProducts();
+    fetchMovements({ limit: 50 });
+    fetchBalances({ limit: 100 });
   }, []);
 
-  const [activeTab, setActiveTab] = useState('balances'); // balances | movements | stocktake
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStockFilter, setSelectedStockFilter] = useState('ALL'); // ALL | LOW | OUT | OVER | NORMAL
+  /* tabs */
+  const [tab, setTab] = useState('balances');
 
-  // Modals
-  const [isStockInOpen, setIsStockInOpen] = useState(false);
-  const [isStockOutOpen, setIsStockOutOpen] = useState(false);
-  const [isAdjustOpen, setIsAdjustOpen] = useState(false);
+  /* search / filter */
+  const [search, setSearch] = useState('');
+  const [stockFilter, setStockFilter] = useState('ALL');
 
-  // Form states
-  const [targetProductId, setTargetProductId] = useState('');
-  const [quantityInput, setQuantityInput] = useState('');
-  const [sourceReasonInput, setSourceReasonInput] = useState('');
-  const [notesInput, setNotesInput] = useState('');
+  /* modal: which one open + loading state */
+  const [modal, setModal] = useState(null); // 'in' | 'out' | 'adj' | 'take'
+  const [saving, setSaving] = useState(false);
 
-  // Stock-take form state
-  const [stockTakeCounts, setStockTakeCounts] = useState({});
+  /* form shared state */
+  const [selProductId, setSelProductId] = useState('');
+  const [qty, setQty] = useState('');
+  const [note, setNote] = useState('');
+  const [outReason, setOutReason] = useState('Xuất bán lẻ');
 
-  // KPIs
-  const totalInventoryValue = useMemo(() => {
-    return products.reduce((acc, p) => acc + (p.stock || 0) * (p.costPrice || 0), 0);
-  }, [products]);
+  /* stock-take counts */
+  const [takeCounts, setTakeCounts] = useState({});
 
-  const lowStockCount = useMemo(() => {
-    return products.filter((p) => p.stock > 0 && p.stock <= (p.alertThreshold || 10)).length;
-  }, [products]);
+  /* ─── derived ─── */
+  const selProduct = useMemo(() => products.find(p => String(p.id) === String(selProductId)), [products, selProductId]);
 
-  const outOfStockCount = useMemo(() => {
-    return products.filter((p) => p.stock === 0).length;
-  }, [products]);
+  const kpiOut  = useMemo(() => products.filter(p => p.stock === 0).length, [products]);
+  const kpiLow  = useMemo(() => products.filter(p => p.stock > 0 && p.stock <= (p.alertThreshold || 10)).length, [products]);
+  const kpiOver = useMemo(() => products.filter(p => p.stock >= 50).length, [products]);
+  const kpiVal  = useMemo(() => products.reduce((s, p) => s + (p.stock||0)*(p.costPrice||0), 0), [products]);
 
-  const overstockCount = useMemo(() => {
-    return products.filter((p) => p.stock >= 50).length;
-  }, [products]);
-
-  // Filtered Products
   const filteredProducts = useMemo(() => {
-    return products.filter((p) => {
-      if (selectedStockFilter === 'OUT' && p.stock !== 0) return false;
-      if (selectedStockFilter === 'LOW' && (p.stock === 0 || p.stock > (p.alertThreshold || 10))) return false;
-      if (selectedStockFilter === 'OVER' && p.stock < 50) return false;
-      if (selectedStockFilter === 'NORMAL' && (p.stock <= (p.alertThreshold || 10) || p.stock >= 50)) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          p.name.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q) ||
-          p.categoryLabel.toLowerCase().includes(q)
-        );
+    return products.filter(p => {
+      if (stockFilter === 'OUT'    && p.stock !== 0) return false;
+      if (stockFilter === 'LOW'    && (p.stock === 0 || p.stock > (p.alertThreshold||10))) return false;
+      if (stockFilter === 'OVER'   && p.stock < 50) return false;
+      if (stockFilter === 'NORMAL' && (p.stock <= (p.alertThreshold||10) || p.stock >= 50)) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        return (p.name||'').toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q) || (p.categoryLabel||'').toLowerCase().includes(q);
       }
       return true;
     });
-  }, [products, selectedStockFilter, searchQuery]);
+  }, [products, stockFilter, search]);
 
-  // Handlers
-  const handleStockInSubmit = () => {
-    if (!targetProductId || !quantityInput || Number(quantityInput) <= 0) {
-      toast({ title: 'Dữ liệu không hợp lệ', description: 'Vui lòng chọn sản phẩm và số lượng > 0.', type: 'warning' });
-      return;
-    }
-    stockIn(targetProductId, Number(quantityInput), sourceReasonInput, notesInput);
-    setIsStockInOpen(false);
-    resetForm();
-    toast({ title: 'Nhập kho thành công', description: `Đã cộng thêm ${quantityInput} sản phẩm vào kho.`, type: 'success' });
+  /* ─── helpers ─── */
+  const resetForm = () => { setSelProductId(''); setQty(''); setNote(''); setOutReason('Xuất bán lẻ'); };
+  const closeModal = () => { setModal(null); resetForm(); };
+
+  /* Get stockItemId from product */
+  const getStockItemId = (productId) => {
+    const p = products.find(pr => String(pr.id) === String(productId));
+    return p?.stockItems?.[0]?.id || null;
   };
 
-  const handleStockOutSubmit = () => {
-    if (!targetProductId || !quantityInput || Number(quantityInput) <= 0) {
-      toast({ title: 'Dữ liệu không hợp lệ', description: 'Vui lòng chọn sản phẩm và số lượng > 0.', type: 'warning' });
+  /* ─── actions ─── */
+  const handleStockIn = async () => {
+    const stockItemId = getStockItemId(selProductId);
+    if (!stockItemId || !qty || Number(qty) <= 0) {
+      toast({ type: 'warning', title: 'Thiếu thông tin', message: 'Vui lòng chọn sản phẩm và nhập số lượng > 0.' });
       return;
     }
+    setSaving(true);
     try {
-      stockOut(targetProductId, Number(quantityInput), sourceReasonInput, notesInput);
-      setIsStockOutOpen(false);
-      resetForm();
-      toast({ title: 'Xuất kho thành công', description: `Đã trừ ${quantityInput} sản phẩm khỏi kho.`, type: 'success' });
+      await stockIn({ items: [{ stockItemId, quantity: Number(qty) }], note: note || 'Nhập kho thủ công' });
+      await fetchProducts();
+      toast({ type: 'success', title: 'Nhập kho thành công', message: `Đã nhập thêm ${qty} ${selProduct?.unit||''} vào kho.` });
+      closeModal();
     } catch (err) {
-      toast({ title: 'Lỗi xuất kho', description: err.message, type: 'error' });
-    }
+      toast({ type: 'error', title: 'Lỗi nhập kho', message: err?.response?.data?.error?.message || err?.message || 'Không thể nhập kho.' });
+    } finally { setSaving(false); }
   };
 
-  const handleAdjustSubmit = () => {
-    if (!targetProductId || quantityInput === '' || Number(quantityInput) < 0) {
-      toast({ title: 'Dữ liệu không hợp lệ', description: 'Vui lòng nhập số tồn kho mới >= 0.', type: 'warning' });
+  const handleStockOut = async () => {
+    const stockItemId = getStockItemId(selProductId);
+    if (!stockItemId || !qty || Number(qty) <= 0) {
+      toast({ type: 'warning', title: 'Thiếu thông tin', message: 'Vui lòng chọn sản phẩm và nhập số lượng > 0.' });
       return;
     }
-    stockAdjustment(targetProductId, Number(quantityInput), sourceReasonInput || 'Điều chỉnh kiểm kê');
-    setIsAdjustOpen(false);
-    resetForm();
-    toast({ title: 'Điều chỉnh thành công', description: 'Đã cập nhật lại số lượng tồn kho thực tế.', type: 'success' });
-  };
-
-  const resetForm = () => {
-    setTargetProductId('');
-    setQuantityInput('');
-    setSourceReasonInput('');
-    setNotesInput('');
-  };
-
-  const handleApplyStockTake = () => {
-    const updatedKeys = Object.keys(stockTakeCounts);
-    if (updatedKeys.length === 0) {
-      toast({ title: 'Chưa có thay đổi', description: 'Vui lòng nhập số đếm thực tế của ít nhất 1 sản phẩm.', type: 'info' });
+    if (selProduct && Number(qty) > selProduct.stock) {
+      toast({ type: 'warning', title: 'Vượt tồn kho', message: `Tồn hiện tại chỉ còn ${selProduct.stock} ${selProduct.unit||''}.` });
       return;
     }
+    setSaving(true);
+    try {
+      await stockOut({ items: [{ stockItemId, quantity: Number(qty) }], note: `${outReason}${note ? ': ' + note : ''}` });
+      await fetchProducts();
+      toast({ type: 'success', title: 'Xuất kho thành công', message: `Đã xuất ${qty} ${selProduct?.unit||''} khỏi kho.` });
+      closeModal();
+    } catch (err) {
+      toast({ type: 'error', title: 'Lỗi xuất kho', message: err?.response?.data?.error?.message || err?.message || 'Không thể xuất kho.' });
+    } finally { setSaving(false); }
+  };
 
-    updatedKeys.forEach((id) => {
-      const actual = Number(stockTakeCounts[id]);
-      if (!isNaN(actual)) {
-        stockAdjustment(id, actual, 'Khớp số liệu kiểm kê kho thực tế');
+  const handleAdjust = async () => {
+    const stockItemId = getStockItemId(selProductId);
+    if (!stockItemId || qty === '' || Number(qty) < 0) {
+      toast({ type: 'warning', title: 'Thiếu thông tin', message: 'Vui lòng chọn sản phẩm và nhập số tồn mới >= 0.' });
+      return;
+    }
+    setSaving(true);
+    try {
+      await stockAdjustment({ items: [{ stockItemId, countedQuantity: Number(qty) }], note: note || 'Điều chỉnh tồn kho' });
+      await fetchProducts();
+      toast({ type: 'success', title: 'Điều chỉnh thành công', message: `Số tồn đã được cập nhật thành ${qty} ${selProduct?.unit||''}.` });
+      closeModal();
+    } catch (err) {
+      toast({ type: 'error', title: 'Lỗi điều chỉnh', message: err?.response?.data?.error?.message || err?.message || 'Không thể điều chỉnh tồn.' });
+    } finally { setSaving(false); }
+  };
+
+  const handleStockTake = async () => {
+    const keys = Object.keys(takeCounts).filter(id => takeCounts[id] !== '' && takeCounts[id] !== undefined);
+    if (keys.length === 0) {
+      toast({ type: 'info', title: 'Chưa có thay đổi', message: 'Nhập số đếm thực tế cho ít nhất 1 sản phẩm.' });
+      return;
+    }
+    setSaving(true);
+    try {
+      const items = [];
+      for (const productId of keys) {
+        const stockItemId = getStockItemId(productId);
+        if (stockItemId) {
+          items.push({ stockItemId, countedQuantity: Number(takeCounts[productId]) });
+        }
       }
-    });
-
-    setStockTakeCounts({});
-    toast({ title: 'Hoàn tất kiểm kê', description: `Đã đồng bộ ${updatedKeys.length} sản phẩm theo số đếm thực tế.`, type: 'success' });
+      if (items.length === 0) throw new Error('Không lấy được stockItemId cho sản phẩm đã chọn');
+      await stockAdjustment({ items, note: 'Kiểm kê kho thực tế' });
+      await fetchProducts();
+      setTakeCounts({});
+      toast({ type: 'success', title: 'Hoàn tất kiểm kê', message: `Đã đồng bộ ${items.length} mặt hàng theo số đếm thực tế.` });
+    } catch (err) {
+      toast({ type: 'error', title: 'Lỗi kiểm kê', message: err?.response?.data?.error?.message || err?.message || 'Không thể thực hiện kiểm kê.' });
+    } finally { setSaving(false); }
   };
 
+  /* ─── render ─── */
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Quản lý tồn kho & Kiểm kê (Inventory)
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Theo dõi vị trí kệ, biến động xuất nhập tồn, tự động tính Days of Inventory (DOI) và hỗ trợ kiểm kê định kỳ.
-          </p>
+    <div className="inv-root" style={{ maxWidth: 1200, margin: '0 auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <style>{CSS}</style>
+
+      {/* HEADER */}
+      <div className="inv-header">
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <h1>Quản lý Kho hàng & Tồn kho</h1>
+          <p>Nhập kho, xuất kho, điều chỉnh tồn, kiểm kê định kỳ — theo dõi chính xác từng mặt hàng.</p>
         </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => setIsStockInOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
-          >
-            <ArrowDownRight className="w-4 h-4" />
-            Nhập kho
-          </button>
-
-          <button
-            onClick={() => setIsStockOutOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-amber-600 text-white hover:bg-amber-700 shadow-sm"
-          >
-            <ArrowUpRight className="w-4 h-4" />
-            Xuất kho
-          </button>
-
-          <button
-            onClick={() => setIsAdjustOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-border bg-card text-foreground hover:bg-muted"
-          >
-            Điều chỉnh tồn
+        <div style={{ display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
+          <button className="inv-btn-primary" onClick={async () => { await fetchProducts(); await fetchMovements({ limit: 50 }); toast({ type: 'info', title: 'Đã làm mới', message: 'Dữ liệu kho đã được cập nhật.' }); }}>
+            <RefreshCw style={{ width: 13, height: 13 }} /> Làm mới
           </button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-card p-4 rounded-xl border border-border shadow-sm">
-          <p className="text-xs text-muted-foreground font-medium">Tổng giá trị vốn trong kho</p>
-          <h3 className="text-2xl font-bold text-foreground mt-1">{formatVND(totalInventoryValue)}</h3>
-          <span className="text-xs text-muted-foreground mt-1 inline-block">Tính theo giá vốn nhập</span>
+      {/* KPI (Phân quyền: Nhân viên ẩn thẻ Giá trị tồn kho) */}
+      <div style={{ display: 'grid', gridTemplateColumns: canSeeCost ? 'repeat(4,1fr)' : 'repeat(3,1fr)', gap: 14 }}>
+        {canSeeCost && (
+          <div className="inv-kpi">
+            <div className="inv-kpi-icon" style={{ background: '#eff6ff', color: '#2563eb' }}><DollarSign style={{ width: 22, height: 22 }} /></div>
+            <div>
+              <div className="inv-kpi-label">Giá trị tồn kho</div>
+              <div className="inv-kpi-value" style={{ fontSize: 16 }}>{fmtVND(kpiVal)}</div>
+              <div className="inv-kpi-sub">Tổng vốn trong kho</div>
+            </div>
+          </div>
+        )}
+        <div className="inv-kpi">
+          <div className="inv-kpi-icon" style={{ background: '#fef2f2', color: '#dc2626' }}><ShieldOff style={{ width: 22, height: 22 }} /></div>
+          <div>
+            <div className="inv-kpi-label">Hết hàng</div>
+            <div className="inv-kpi-value" style={{ color: '#dc2626' }}>{kpiOut} SP</div>
+            <div className="inv-kpi-sub">Cần nhập ngay</div>
+          </div>
         </div>
-
-        <div className="bg-card p-4 rounded-xl border border-red-200/60 shadow-sm">
-          <p className="text-xs text-muted-foreground font-medium">Hết hàng hoàn toàn (0 sp)</p>
-          <h3 className="text-2xl font-bold text-red-600 mt-1">{outOfStockCount} mặt hàng</h3>
-          <span className="text-xs text-red-700 font-medium mt-1 inline-block">Mất cơ hội bán</span>
+        <div className="inv-kpi">
+          <div className="inv-kpi-icon" style={{ background: '#fffbeb', color: '#d97706' }}><AlertTriangle style={{ width: 22, height: 22 }} /></div>
+          <div>
+            <div className="inv-kpi-label">Sắp hết hàng</div>
+            <div className="inv-kpi-value" style={{ color: '#d97706' }}>{kpiLow} SP</div>
+            <div className="inv-kpi-sub">Dưới ngưỡng an toàn</div>
+          </div>
         </div>
-
-        <div className="bg-card p-4 rounded-xl border border-amber-200/60 shadow-sm">
-          <p className="text-xs text-muted-foreground font-medium">Sắp hết hàng (Dưới ngưỡng)</p>
-          <h3 className="text-2xl font-bold text-amber-600 mt-1">{lowStockCount} mặt hàng</h3>
-          <span className="text-xs text-amber-700 font-medium mt-1 inline-block">Cần đặt hàng sớm</span>
-        </div>
-
-        <div className="bg-card p-4 rounded-xl border border-blue-200/60 shadow-sm">
-          <p className="text-xs text-muted-foreground font-medium">Tồn kho nhiều (Vốn đọng)</p>
-          <h3 className="text-2xl font-bold text-blue-600 mt-1">{overstockCount} mặt hàng</h3>
-          <span className="text-xs text-blue-700 font-medium mt-1 inline-block">Cần đẩy mạnh xả hàng</span>
+        <div className="inv-kpi">
+          <div className="inv-kpi-icon" style={{ background: '#eff6ff', color: '#2563eb' }}><TrendingUp style={{ width: 22, height: 22 }} /></div>
+          <div>
+            <div className="inv-kpi-label">Tồn nhiều</div>
+            <div className="inv-kpi-value" style={{ color: '#2563eb' }}>{kpiOver} SP</div>
+            <div className="inv-kpi-sub">Vốn đọng, cần xả</div>
+          </div>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex border-b border-border gap-2">
-        <button
-          onClick={() => setActiveTab('balances')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
-            activeTab === 'balances'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Tồn kho hiện tại ({products.length} SKU)
-        </button>
-        <button
-          onClick={() => setActiveTab('movements')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all ${
-            activeTab === 'movements'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Lịch sử xuất nhập tồn ({movements.length})
-        </button>
-        <button
-          onClick={() => setActiveTab('stocktake')}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 ${
-            activeTab === 'stocktake'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <ClipboardList className="w-4 h-4" />
-          Phiên kiểm kê kho
-        </button>
+      {/* TAB BAR */}
+      <div className="inv-tab-bar">
+        {[
+          { id: 'balances', label: `Tồn kho (${products.length} SP)`, icon: <Package style={{ width: 14, height: 14 }} /> },
+          { id: 'movements', label: `Lịch sử xuất nhập (${movements.length})`, icon: <BarChart3 style={{ width: 14, height: 14 }} /> },
+          { id: 'stocktake', label: 'Phiên kiểm kê', icon: <ClipboardList style={{ width: 14, height: 14 }} /> },
+        ].map(t => (
+          <button key={t.id} className={`inv-tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+            {t.icon}{t.label}
+          </button>
+        ))}
       </div>
 
-      {/* Tab 1: Current Balances */}
-      {activeTab === 'balances' && (
-        <div className="space-y-4">
+      {/* ── TAB 1: BALANCES ── */}
+      {tab === 'balances' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Filters */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2 flex-wrap text-xs">
-              <span className="text-muted-foreground font-medium">Lọc tình trạng:</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[
-                { key: 'ALL', label: 'Tất cả' },
-                { key: 'OUT', label: `Hết hàng (${outOfStockCount})` },
-                { key: 'LOW', label: `Sắp hết (${lowStockCount})` },
-                { key: 'OVER', label: `Tồn nhiều (${overstockCount})` },
-                { key: 'NORMAL', label: 'Bình thường' }
-              ].map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => setSelectedStockFilter(f.key)}
-                  className={`px-3 py-1 rounded-full border transition-colors ${
-                    selectedStockFilter === f.key
-                      ? 'bg-blue-50 border-blue-300 text-blue-700 font-semibold'
-                      : 'bg-card border-border text-muted-foreground hover:bg-muted'
-                  }`}
-                >
-                  {f.label}
-                </button>
+                { k: 'ALL',    l: 'Tất cả' },
+                { k: 'OUT',    l: `Hết hàng (${kpiOut})` },
+                { k: 'LOW',    l: `Sắp hết (${kpiLow})` },
+                { k: 'OVER',   l: `Tồn nhiều (${kpiOver})` },
+                { k: 'NORMAL', l: 'Bình thường' },
+              ].map(f => (
+                <button key={f.k} className={`inv-filter-pill ${stockFilter === f.k ? 'active' : ''}`} onClick={() => setStockFilter(f.k)}>{f.l}</button>
               ))}
             </div>
-
-            <div className="relative w-full sm:w-64">
-              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Tìm SKU, tên sản phẩm..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="inv-search-wrap" style={{ width: 240 }}>
+              <Search className="inv-search-icon" />
+              <input className="inv-search-input" placeholder="Tìm sản phẩm, mã SP..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
           </div>
 
-          {/* Table */}
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase font-semibold">
+          <div className="inv-card">
+            <div style={{ overflowX: 'auto' }}>
+              <table className="inv-table">
+                <thead>
                   <tr>
-                    <th className="py-3 px-4">Sản phẩm / SKU</th>
-                    <th className="py-3 px-4">Danh mục</th>
-                    <th className="py-3 px-4 text-center">Tồn hiện tại</th>
-                    <th className="py-3 px-4 text-center">Ngưỡng an toàn</th>
-                    <th className="py-3 px-4 text-right">Giá vốn</th>
-                    <th className="py-3 px-4 text-right">Tổng giá trị tồn</th>
-                    <th className="py-3 px-4">Trạng thái kho</th>
+                    <th>Sản phẩm / Mã SP</th>
+                    <th>Danh mục</th>
+                    <th style={{ textAlign: 'center' }}>Tồn hiện tại</th>
+                    <th style={{ textAlign: 'center' }}>Ngưỡng an toàn</th>
+                    {canSeeCost && <th style={{ textAlign: 'right' }}>Giá vốn</th>}
+                    {canSeeCost && <th style={{ textAlign: 'right' }}>Tổng giá trị</th>}
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredProducts.map((p) => {
-                    const isOut = p.stock === 0;
-                    const isLow = p.stock > 0 && p.stock <= (p.alertThreshold || 10);
+                <tbody>
+                  {filteredProducts.length === 0 ? (
+                    <tr><td colSpan={canSeeCost ? 8 : 6} style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Không có sản phẩm nào phù hợp</td></tr>
+                  ) : filteredProducts.map(p => {
+                    const isOut  = p.stock === 0;
+                    const isLow  = p.stock > 0 && p.stock <= (p.alertThreshold || 10);
                     const isOver = p.stock >= 50;
-
                     return (
-                      <tr key={p.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="py-3.5 px-4">
-                          <div className="font-semibold text-foreground text-sm">{p.name}</div>
-                          <span className="font-mono text-muted-foreground text-[11px]">SKU: {p.sku}</span>
+                      <tr key={p.id}>
+                        <td>
+                          <div style={{ fontWeight: 700, fontSize: 13 }}>{p.name}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{p.sku}</div>
                         </td>
-                        <td className="py-3.5 px-4 text-muted-foreground">
-                          {p.categoryLabel}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <span className={`text-base font-bold ${isOut ? 'text-red-600' : isLow ? 'text-amber-600' : 'text-foreground'}`}>
-                            {p.stock}
+                        <td style={{ color: '#64748b', fontSize: 12 }}>{p.categoryLabel}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span style={{ fontWeight: 700, fontSize: 13, color: isOut ? '#dc2626' : isLow ? '#d97706' : '#0f172a' }}>
+                            {p.stock} {p.unit}
                           </span>
-                          <span className="text-[11px] text-muted-foreground ml-1">{p.unit}</span>
                         </td>
-                        <td className="py-3.5 px-4 text-center text-muted-foreground font-medium">
-                          {p.alertThreshold || 10} {p.unit}
-                        </td>
-                        <td className="py-3.5 px-4 text-right text-muted-foreground">
-                          {formatVND(p.costPrice)}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-bold text-foreground">
-                          {formatVND(p.stock * p.costPrice)}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 ${
-                              isOut
-                                ? 'bg-red-100 text-red-800'
-                                : isLow
-                                ? 'bg-amber-100 text-amber-800'
-                                : isOver
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-emerald-100 text-emerald-800'
-                            }`}
-                          >
-                            {isOut ? 'Đã hết hàng' : isLow ? 'Sắp hết hàng' : isOver ? 'Tồn quá nhiều' : 'Tồn ổn định'}
+                        <td style={{ textAlign: 'center', color: '#64748b', fontSize: 12 }}>{p.alertThreshold || 10} {p.unit}</td>
+                        {canSeeCost && <td style={{ textAlign: 'right', color: '#64748b', fontSize: 12 }}>{fmtVND(p.costPrice)}</td>}
+                        {canSeeCost && <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtVND(p.stock * p.costPrice)}</td>}
+                        <td>
+                          <span className="inv-status-pill" style={
+                            isOut  ? { background: '#fef2f2', color: '#dc2626' } :
+                            isLow  ? { background: '#fffbeb', color: '#d97706' } :
+                            isOver ? { background: '#eff6ff', color: '#2563eb' } :
+                                     { background: '#f0fdf4', color: '#16a34a' }
+                          }>
+                            {isOut ? '⚠ Hết hàng' : isLow ? '↓ Sắp hết' : isOver ? '↑ Tồn nhiều' : '✓ Ổn định'}
                           </span>
+                        </td>
+                        <td>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button title="Nhập kho" style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #d1fae5', background: '#f0fdf4', color: '#16a34a', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+                              onClick={() => { setSelProductId(String(p.id)); setModal('in'); }}>+ Nhập</button>
+                            <button title="Xuất kho" style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #fde68a', background: '#fffbeb', color: '#b45309', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+                              onClick={() => { setSelProductId(String(p.id)); setModal('out'); }}>- Xuất</button>
+                            <button title="Điều chỉnh tồn" style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid #bfdbfe', background: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+                              onClick={() => { setSelProductId(String(p.id)); setQty(String(p.stock)); setModal('adj'); }}>⚙ Điều chỉnh</button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -358,136 +421,134 @@ export function InventoryPage() {
         </div>
       )}
 
-      {/* Tab 2: Movements */}
-      {activeTab === 'movements' && (
-        <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-          <div className="p-4 border-b border-border bg-muted/20 flex justify-between items-center">
-            <h3 className="font-bold text-sm text-foreground">Nhật ký chuyển kho (Stock Movements)</h3>
-            <span className="text-xs text-muted-foreground">Lưu vết tất cả hoạt động xuất, nhập, điều chỉnh</span>
+      {/* ── TAB 2: MOVEMENTS ── */}
+      {tab === 'movements' && (
+        <div className="inv-card">
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid #edf2f7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>Nhật ký xuất nhập tồn kho</div>
+              <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>Toàn bộ biến động kho được ghi lại tự động</div>
+            </div>
+            <button className="inv-filter-pill" onClick={() => fetchMovements({ limit: 100 })}>
+              <RefreshCw style={{ width: 12, height: 12, display: 'inline', marginRight: 4 }} />Tải thêm
+            </button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase font-semibold">
-                <tr>
-                  <th className="py-3 px-4">Thời gian</th>
-                  <th className="py-3 px-4">Loại giao dịch</th>
-                  <th className="py-3 px-4">Sản phẩm</th>
-                  <th className="py-3 px-4 text-center">Số lượng</th>
-                  <th className="py-3 px-4">Biến động (Trước → Sau)</th>
-                  <th className="py-3 px-4">Nguồn / Lý do</th>
-                  <th className="py-3 px-4">Người thực hiện</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {movements.map((m) => (
-                  <tr key={m.id} className="hover:bg-muted/30">
-                    <td className="py-3 px-4 font-mono text-muted-foreground">
-                      {new Date(m.createdAt).toLocaleString('vi-VN')}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`px-2.5 py-0.5 rounded text-[11px] font-bold ${
-                          m.type === 'IN'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : m.type === 'OUT'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-blue-100 text-blue-800'
-                        }`}
-                      >
-                        {m.typeLabel}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-semibold text-foreground">
-                      {m.productName}
-                      <span className="block text-[10px] text-muted-foreground font-mono">{m.sku}</span>
-                    </td>
-                    <td className="py-3 px-4 text-center font-bold text-sm">
-                      {m.type === 'IN' ? `+${m.quantity}` : m.quantity}
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">
-                      {m.beforeStock} → <strong className="text-foreground">{m.afterStock}</strong>
-                    </td>
-                    <td className="py-3 px-4 text-foreground">{m.source}</td>
-                    <td className="py-3 px-4 text-muted-foreground">{m.performedBy}</td>
+          <div style={{ overflowX: 'auto' }}>
+            {isLoading ? (
+              <div className="inv-loading"><RefreshCw className="spin" style={{ width: 16, height: 16 }} />Đang tải lịch sử...</div>
+            ) : movements.length === 0 ? (
+              <div className="inv-empty">
+                <BarChart3 className="inv-empty-icon" />
+                <div style={{ fontWeight: 700, color: '#64748b', marginBottom: 4 }}>Chưa có giao dịch nào</div>
+                <div style={{ fontSize: 12 }}>Thực hiện nhập/xuất kho để xem lịch sử tại đây</div>
+              </div>
+            ) : (
+              <table className="inv-table">
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Loại giao dịch</th>
+                    <th>Sản phẩm / Mã SP</th>
+                    <th style={{ textAlign: 'center' }}>Số lượng (Δ)</th>
+                    <th style={{ textAlign: 'center' }}>Trước → Sau</th>
+                    <th>Ghi chú</th>
+                    <th>Người thực hiện</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {movements.map(m => {
+                    const delta = Number(m.delta ?? 0);
+                    const isPos = delta >= 0;
+                    const productName = m.stockItem?.product?.name || m.stockItem?.name || `SP #${m.stockItemId}`;
+                    const sku = m.stockItem?.sku || '—';
+                    return (
+                      <tr key={m.id}>
+                        <td style={{ fontSize: 11.5, color: '#64748b', whiteSpace: 'nowrap' }}>{fmtDate(m.createdAt)}</td>
+                        <td>{movTypeBadge(m.type)}</td>
+                        <td>
+                          <div style={{ fontWeight: 700, fontSize: 13 }}>{productName}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{sku}</div>
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: 900, fontSize: 14, color: isPos ? '#16a34a' : '#dc2626' }}>
+                          {isPos ? `+${delta}` : delta}
+                        </td>
+                        <td style={{ textAlign: 'center', fontSize: 12, color: '#64748b' }}>
+                          {m.beforeQuantity} <ArrowRight style={{ width: 12, height: 12, display: 'inline', verticalAlign: 'middle' }} /> <strong style={{ color: '#0f172a' }}>{m.afterQuantity}</strong>
+                        </td>
+                        <td style={{ fontSize: 12, color: '#64748b', maxWidth: 200 }}>{m.note || '—'}</td>
+                        <td style={{ fontSize: 12, color: '#64748b' }}>{m.createdBy?.fullName || m.createdBy?.email || '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}
 
-      {/* Tab 3: Stock-take (Kiểm kê) */}
-      {activeTab === 'stocktake' && (
-        <div className="space-y-4">
-          <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      {/* ── TAB 3: STOCK-TAKE ── */}
+      {tab === 'stocktake' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 16, padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <h4 className="font-bold text-sm text-blue-900">Bảng nhập số lượng thực đếm (Stock-take Form)</h4>
-              <p className="text-xs text-blue-700 mt-0.5">
-                Nhập số lượng thực tế đếm tại quầy/kệ. Hệ thống sẽ tự động tính chênh lệch so với số liệu tồn kho.
-              </p>
+              <div style={{ fontWeight: 800, fontSize: 14, color: '#082f49' }}>📋 Bảng kiểm kê kho thực tế</div>
+              <div style={{ fontSize: 12, color: '#0c4a6e', marginTop: 3 }}>Nhập số đếm thực tế. Hệ thống tự tính chênh lệch và đồng bộ tồn kho.</div>
             </div>
-            <button
-              onClick={handleApplyStockTake}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 shadow-sm"
-            >
-              Hoàn tất kiểm kê & Đồng bộ
+            <button className="inv-action-btn inv-btn-take" onClick={handleStockTake} disabled={saving}>
+              {saving ? <RefreshCw className="spin" style={{ width: 14, height: 14 }} /> : <Check style={{ width: 14, height: 14 }} />}
+              {saving ? 'Đang xử lý...' : `Hoàn tất kiểm kê (${Object.keys(takeCounts).filter(k => takeCounts[k] !== '').length} SP)`}
             </button>
           </div>
 
-          <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-muted/50 border-b border-border text-muted-foreground uppercase font-semibold">
+          <div className="inv-card">
+            <div style={{ overflowX: 'auto' }}>
+              <table className="inv-table">
+                <thead>
                   <tr>
-                    <th className="py-3 px-4">Sản phẩm / SKU</th>
-                    <th className="py-3 px-4 text-center">Tồn trên hệ thống</th>
-                    <th className="py-3 px-4 text-center w-40">Số đếm thực tế</th>
-                    <th className="py-3 px-4 text-center">Chênh lệch</th>
+                    <th>Sản phẩm / Mã SP</th>
+                    <th style={{ textAlign: 'center' }}>Tồn hệ thống</th>
+                    <th style={{ textAlign: 'center', width: 160 }}>Số đếm thực tế</th>
+                    <th style={{ textAlign: 'center' }}>Chênh lệch</th>
+                    <th>Trạng thái</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border">
-                  {products.map((p) => {
-                    const actualCount = stockTakeCounts[p.id];
-                    const hasEntered = actualCount !== undefined && actualCount !== '';
-                    const diff = hasEntered ? Number(actualCount) - p.stock : 0;
-
+                <tbody>
+                  {products.map(p => {
+                    const actual = takeCounts[p.id];
+                    const hasEntered = actual !== undefined && actual !== '';
+                    const diff = hasEntered ? Number(actual) - p.stock : null;
                     return (
                       <tr key={p.id}>
-                        <td className="py-3 px-4">
-                          <span className="font-bold text-foreground text-sm block">{p.name}</span>
-                          <span className="text-[11px] text-muted-foreground font-mono">{p.sku}</span>
+                        <td>
+                          <div style={{ fontWeight: 700, fontSize: 13 }}>{p.name}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{p.sku}</div>
                         </td>
-                        <td className="py-3 px-4 text-center font-bold text-base text-foreground">
-                          {p.stock}
-                        </td>
-                        <td className="py-3 px-4 text-center">
+                        <td style={{ textAlign: 'center', fontWeight: 900, fontSize: 15 }}>{p.stock}</td>
+                        <td style={{ textAlign: 'center' }}>
                           <input
-                            type="number"
+                            type="number" min="0"
                             placeholder={String(p.stock)}
-                            value={actualCount ?? ''}
-                            onChange={(e) =>
-                              setStockTakeCounts({ ...stockTakeCounts, [p.id]: e.target.value })
-                            }
-                            className="w-24 px-2 py-1 text-center font-bold border border-border rounded-md bg-card focus:ring-2 focus:ring-blue-500"
+                            value={actual ?? ''}
+                            onChange={e => setTakeCounts(prev => ({ ...prev, [p.id]: e.target.value }))}
+                            style={{ width: 90, padding: '6px 10px', textAlign: 'center', fontWeight: 700, border: '1.5px solid #e2e8f0', borderRadius: 10, fontSize: 13, background: hasEntered ? '#fff' : '#f8fafc', borderColor: hasEntered ? '#38bdf8' : '#e2e8f0' }}
                           />
                         </td>
-                        <td className="py-3 px-4 text-center">
-                          {hasEntered ? (
-                            <span
-                              className={`font-bold px-2 py-0.5 rounded text-xs ${
-                                diff === 0
-                                  ? 'bg-slate-100 text-slate-700'
-                                  : diff > 0
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}
-                            >
+                        <td style={{ textAlign: 'center' }}>
+                          {diff === null ? <span style={{ color: '#94a3b8' }}>—</span> : (
+                            <span style={{ fontWeight: 800, padding: '3px 10px', borderRadius: 20, fontSize: 12,
+                              background: diff === 0 ? '#f1f5f9' : diff > 0 ? '#f0fdf4' : '#fef2f2',
+                              color: diff === 0 ? '#64748b' : diff > 0 ? '#16a34a' : '#dc2626'
+                            }}>
                               {diff > 0 ? `+${diff}` : diff}
                             </span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
                           )}
+                        </td>
+                        <td>
+                          {diff === null ? <span style={{ color: '#94a3b8', fontSize: 12 }}>Chưa nhập</span>
+                          : diff === 0 ? <span style={{ color: '#16a34a', fontWeight: 700, fontSize: 12 }}>✓ Khớp</span>
+                          : diff > 0 ? <span style={{ color: '#2563eb', fontWeight: 700, fontSize: 12 }}>↑ Thừa {diff}</span>
+                          : <span style={{ color: '#dc2626', fontWeight: 700, fontSize: 12 }}>↓ Thiếu {Math.abs(diff)}</span>}
                         </td>
                       </tr>
                     );
@@ -499,209 +560,165 @@ export function InventoryPage() {
         </div>
       )}
 
-      {/* Modal: Nhập kho */}
-      {isStockInOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in-0">
-          <div className="bg-card w-full max-w-md rounded-2xl border border-border shadow-2xl p-5 space-y-4">
-            <div className="flex justify-between items-center border-b border-border pb-3">
-              <h3 className="font-bold text-base text-foreground flex items-center gap-2">
-                <ArrowDownRight className="w-5 h-5 text-emerald-600" />
-                Phiếu nhập kho bổ sung
-              </h3>
-              <button onClick={() => setIsStockInOpen(false)} className="p-1 rounded text-muted-foreground hover:bg-muted">
-                <X className="w-4 h-4" />
-              </button>
+      {/* ═══════ MODAL: NHẬP KHO ═══════ */}
+      {modal === 'in' && (
+        <div className="inv-modal-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
+          <div className="inv-modal">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid #edf2f7' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ArrowDownToLine style={{ width: 18, height: 18, color: '#16a34a' }} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 900, fontSize: 16, color: '#0f172a' }}>Phiếu Nhập Kho</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Bổ sung hàng hóa vào kho</div>
+                </div>
+              </div>
+              <button onClick={closeModal} style={{ border: 'none', background: '#f1f5f9', borderRadius: 8, padding: 6, cursor: 'pointer', color: '#64748b' }}><X style={{ width: 16, height: 16 }} /></button>
             </div>
-
-            <div className="space-y-3 text-xs">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label className="font-semibold block mb-1">Chọn sản phẩm</label>
-                <select
-                  value={targetProductId}
-                  onChange={(e) => setTargetProductId(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-card"
-                >
-                  <option value="">-- Chọn sản phẩm --</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} (Tồn hiện tại: {p.stock})
-                    </option>
-                  ))}
+                <label className="inv-field-label">Sản phẩm <span style={{ color: '#ef4444' }}>*</span></label>
+                <select className="inv-input" value={selProductId} onChange={e => setSelProductId(e.target.value)}>
+                  <option value="">— Chọn sản phẩm —</option>
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name} (Tồn: {p.stock} {p.unit})</option>)}
                 </select>
+                {selProduct && (
+                  <div style={{ marginTop: 6, padding: '8px 12px', background: '#f0fdf4', borderRadius: 10, fontSize: 12, color: '#16a34a', fontWeight: 600 }}>
+                    Tồn hiện tại: <strong>{selProduct.stock}</strong> {selProduct.unit}{canSeeCost ? ` | Giá vốn: ${fmtVND(selProduct.costPrice)}` : ''}
+                  </div>
+                )}
               </div>
-
               <div>
-                <label className="font-semibold block mb-1">Số lượng nhập thêm</label>
-                <input
-                  type="number"
-                  placeholder="Ví dụ: 30"
-                  value={quantityInput}
-                  onChange={(e) => setQuantityInput(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-card font-bold text-sm"
-                />
+                <label className="inv-field-label">Số lượng nhập thêm <span style={{ color: '#ef4444' }}>*</span></label>
+                <input className="inv-input" type="number" min="1" placeholder="Ví dụ: 50" value={qty} onChange={e => setQty(e.target.value)} />
               </div>
-
               <div>
-                <label className="font-semibold block mb-1">Nhà cung cấp / Nguồn nhập</label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: Công ty Acecook VN"
-                  value={sourceReasonInput}
-                  onChange={(e) => setSourceReasonInput(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-border rounded-lg bg-card"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold block mb-1">Ghi chú phiếu nhập</label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: Lô date mới 2027..."
-                  value={notesInput}
-                  onChange={(e) => setNotesInput(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-border rounded-lg bg-card"
-                />
+                <label className="inv-field-label">Ghi chú / Nguồn hàng</label>
+                <input className="inv-input" type="text" placeholder="Ví dụ: Nhập từ NCC Acecook, lô tháng 10/2026" value={note} onChange={e => setNote(e.target.value)} />
               </div>
             </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-border">
-              <button onClick={() => setIsStockInOpen(false)} className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold">
-                Hủy
-              </button>
-              <button onClick={handleStockInSubmit} className="px-4 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700">
-                Xác nhận nhập kho
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid #edf2f7' }}>
+              <button className="inv-cancel-btn" onClick={closeModal}>Hủy</button>
+              <button className="inv-action-btn inv-btn-in" onClick={handleStockIn} disabled={saving}>
+                {saving ? <RefreshCw className="spin" style={{ width: 14, height: 14 }} /> : <Check style={{ width: 14, height: 14 }} />}
+                {saving ? 'Đang xử lý...' : 'Xác nhận Nhập kho'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Xuất kho */}
-      {isStockOutOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in-0">
-          <div className="bg-card w-full max-w-md rounded-2xl border border-border shadow-2xl p-5 space-y-4">
-            <div className="flex justify-between items-center border-b border-border pb-3">
-              <h3 className="font-bold text-base text-foreground flex items-center gap-2">
-                <ArrowUpRight className="w-5 h-5 text-amber-600" />
-                Phiếu xuất kho
-              </h3>
-              <button onClick={() => setIsStockOutOpen(false)} className="p-1 rounded text-muted-foreground hover:bg-muted">
-                <X className="w-4 h-4" />
-              </button>
+      {/* ═══════ MODAL: XUẤT KHO ═══════ */}
+      {modal === 'out' && (
+        <div className="inv-modal-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
+          <div className="inv-modal">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid #edf2f7' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: '#fffbeb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ArrowUpFromLine style={{ width: 18, height: 18, color: '#d97706' }} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 900, fontSize: 16, color: '#0f172a' }}>Phiếu Xuất Kho</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Xuất hàng thủ công khỏi kho</div>
+                </div>
+              </div>
+              <button onClick={closeModal} style={{ border: 'none', background: '#f1f5f9', borderRadius: 8, padding: 6, cursor: 'pointer', color: '#64748b' }}><X style={{ width: 16, height: 16 }} /></button>
             </div>
-
-            <div className="space-y-3 text-xs">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label className="font-semibold block mb-1">Chọn sản phẩm</label>
-                <select
-                  value={targetProductId}
-                  onChange={(e) => setTargetProductId(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-card"
-                >
-                  <option value="">-- Chọn sản phẩm --</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} (Tồn khả dụng: {p.stock})
-                    </option>
-                  ))}
+                <label className="inv-field-label">Sản phẩm <span style={{ color: '#ef4444' }}>*</span></label>
+                <select className="inv-input" value={selProductId} onChange={e => setSelProductId(e.target.value)}>
+                  <option value="">— Chọn sản phẩm —</option>
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name} (Tồn: {p.stock} {p.unit})</option>)}
+                </select>
+                {selProduct && (
+                  <div style={{ marginTop: 6, padding: '8px 12px', background: '#fffbeb', borderRadius: 10, fontSize: 12, color: '#b45309', fontWeight: 600 }}>
+                    Tồn khả dụng: <strong>{selProduct.stock}</strong> {selProduct.unit}
+                    {selProduct.stock === 0 && <span style={{ color: '#dc2626', marginLeft: 8 }}>⚠ Đã hết hàng!</span>}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="inv-field-label">Số lượng xuất <span style={{ color: '#ef4444' }}>*</span></label>
+                <input className="inv-input" type="number" min="1" max={selProduct?.stock || undefined} placeholder="Ví dụ: 10" value={qty} onChange={e => setQty(e.target.value)} />
+              </div>
+              <div>
+                <label className="inv-field-label">Lý do xuất</label>
+                <select className="inv-input" value={outReason} onChange={e => setOutReason(e.target.value)}>
+                  <option>Xuất bán lẻ</option>
+                  <option>Xuất sỉ / đại lý</option>
+                  <option>Xuất hủy hàng hỏng / hết hạn</option>
+                  <option>Hàng mẫu trưng bày</option>
+                  <option>Xuất nội bộ / sử dụng</option>
+                  <option>Xuất chênh lệch kiểm kê</option>
                 </select>
               </div>
-
               <div>
-                <label className="font-semibold block mb-1">Số lượng xuất</label>
-                <input
-                  type="number"
-                  placeholder="Ví dụ: 5"
-                  value={quantityInput}
-                  onChange={(e) => setQuantityInput(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-card font-bold text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="font-semibold block mb-1">Lý do xuất</label>
-                <select
-                  value={sourceReasonInput}
-                  onChange={(e) => setSourceReasonInput(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-card"
-                >
-                  <option value="Xuất bán lẻ">Xuất bán lẻ</option>
-                  <option value="Xuất sỉ / đại lý">Xuất sỉ / đại lý</option>
-                  <option value="Xuất hủy hàng hỏng/hết hạn">Xuất hủy hàng hỏng/hết hạn</option>
-                  <option value="Hàng mẫu trưng bày">Hàng mẫu trưng bày</option>
-                </select>
+                <label className="inv-field-label">Ghi chú thêm</label>
+                <input className="inv-input" type="text" placeholder="Ghi chú tùy chọn..." value={note} onChange={e => setNote(e.target.value)} />
               </div>
             </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-border">
-              <button onClick={() => setIsStockOutOpen(false)} className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold">
-                Hủy
-              </button>
-              <button onClick={handleStockOutSubmit} className="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700">
-                Xác nhận xuất kho
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid #edf2f7' }}>
+              <button className="inv-cancel-btn" onClick={closeModal}>Hủy</button>
+              <button className="inv-action-btn inv-btn-out" onClick={handleStockOut} disabled={saving || (selProduct && selProduct.stock === 0)}>
+                {saving ? <RefreshCw className="spin" style={{ width: 14, height: 14 }} /> : <Check style={{ width: 14, height: 14 }} />}
+                {saving ? 'Đang xử lý...' : 'Xác nhận Xuất kho'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Điều chỉnh */}
-      {isAdjustOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in-0">
-          <div className="bg-card w-full max-w-md rounded-2xl border border-border shadow-2xl p-5 space-y-4">
-            <div className="flex justify-between items-center border-b border-border pb-3">
-              <h3 className="font-bold text-base text-foreground">Điều chỉnh số lượng tồn kho</h3>
-              <button onClick={() => setIsAdjustOpen(false)} className="p-1 rounded text-muted-foreground hover:bg-muted">
-                <X className="w-4 h-4" />
-              </button>
+      {/* ═══════ MODAL: ĐIỀU CHỈNH TỒN ═══════ */}
+      {modal === 'adj' && (
+        <div className="inv-modal-overlay" onClick={e => e.target === e.currentTarget && closeModal()}>
+          <div className="inv-modal">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid #edf2f7' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <SlidersHorizontal style={{ width: 18, height: 18, color: '#2563eb' }} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 900, fontSize: 16, color: '#0f172a' }}>Điều chỉnh Tồn kho</div>
+                  <div style={{ fontSize: 12, color: '#94a3b8' }}>Cập nhật số tồn thực tế (ghi đè)</div>
+                </div>
+              </div>
+              <button onClick={closeModal} style={{ border: 'none', background: '#f1f5f9', borderRadius: 8, padding: 6, cursor: 'pointer', color: '#64748b' }}><X style={{ width: 16, height: 16 }} /></button>
             </div>
-
-            <div className="space-y-3 text-xs">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label className="font-semibold block mb-1">Chọn sản phẩm</label>
-                <select
-                  value={targetProductId}
-                  onChange={(e) => setTargetProductId(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-card"
-                >
-                  <option value="">-- Chọn sản phẩm --</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} (Tồn hiện tại: {p.stock})
-                    </option>
-                  ))}
+                <label className="inv-field-label">Sản phẩm <span style={{ color: '#ef4444' }}>*</span></label>
+                <select className="inv-input" value={selProductId} onChange={e => { setSelProductId(e.target.value); const p = products.find(pr => String(pr.id) === e.target.value); if (p) setQty(String(p.stock)); }}>
+                  <option value="">— Chọn sản phẩm —</option>
+                  {products.map(p => <option key={p.id} value={p.id}>{p.name} (Tồn: {p.stock} {p.unit})</option>)}
                 </select>
               </div>
-
+              {selProduct && (
+                <div style={{ padding: '10px 14px', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b' }}>Tồn hệ thống hiện tại:</span>
+                  <span style={{ fontWeight: 800, color: '#0f172a' }}>{selProduct.stock} {selProduct.unit}</span>
+                </div>
+              )}
               <div>
-                <label className="font-semibold block mb-1">Số tồn mới thực tế</label>
-                <input
-                  type="number"
-                  placeholder="Nhập số tồn chính xác"
-                  value={quantityInput}
-                  onChange={(e) => setQuantityInput(e.target.value)}
-                  className="w-full px-3 py-2 border border-border rounded-lg bg-card font-bold text-sm"
-                />
+                <label className="inv-field-label">Số tồn thực tế (mới) <span style={{ color: '#ef4444' }}>*</span></label>
+                <input className="inv-input" type="number" min="0" placeholder="Nhập số tồn chính xác thực tế" value={qty} onChange={e => setQty(e.target.value)} />
+                {selProduct && qty !== '' && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: Number(qty) > selProduct.stock ? '#16a34a' : Number(qty) < selProduct.stock ? '#dc2626' : '#64748b', fontWeight: 600 }}>
+                    Chênh lệch: {Number(qty) - selProduct.stock > 0 ? '+' : ''}{Number(qty) - selProduct.stock} {selProduct.unit}
+                  </div>
+                )}
               </div>
-
               <div>
-                <label className="font-semibold block mb-1">Lý do điều chỉnh (Bắt buộc)</label>
-                <input
-                  type="text"
-                  placeholder="Ví dụ: Kiểm kê khớp lại sau ngày 30/9..."
-                  value={sourceReasonInput}
-                  onChange={(e) => setSourceReasonInput(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-border rounded-lg bg-card"
-                />
+                <label className="inv-field-label">Lý do điều chỉnh</label>
+                <input className="inv-input" type="text" placeholder="Ví dụ: Kiểm kê ngày 13/10, hao hụt do vỡ..." value={note} onChange={e => setNote(e.target.value)} />
               </div>
             </div>
-
-            <div className="flex justify-end gap-2 pt-3 border-t border-border">
-              <button onClick={() => setIsAdjustOpen(false)} className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold">
-                Hủy
-              </button>
-              <button onClick={handleAdjustSubmit} className="px-4 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700">
-                Lưu điều chỉnh
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid #edf2f7' }}>
+              <button className="inv-cancel-btn" onClick={closeModal}>Hủy</button>
+              <button className="inv-action-btn inv-btn-adj" onClick={handleAdjust} disabled={saving}>
+                {saving ? <RefreshCw className="spin" style={{ width: 14, height: 14 }} /> : <Check style={{ width: 14, height: 14 }} />}
+                {saving ? 'Đang xử lý...' : 'Lưu điều chỉnh'}
               </button>
             </div>
           </div>

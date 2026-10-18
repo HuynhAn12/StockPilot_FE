@@ -136,33 +136,112 @@ export function PricingPage() {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Đề xuất giá thông minh (AI Pricing)
-            </h1>
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800">
-              Decision Engine Active
-            </span>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Thuật toán Decision Engine đề xuất mức giá tối ưu dựa trên tốc độ bán, tồn kho, biên lợi nhuận mục tiêu và biến động thị trường.
+      {/* CSS CHO KHUNG HEADER MÀU XANH GIỐNG TRANG SẢN PHẨM */}
+      <style>{`
+        .pricing-hero-header {
+          background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 50%, #7dd3fc 100%);
+          border: 1px solid #7dd3fc;
+          border-radius: 18px;
+          padding: 18px 24px;
+          color: #082f49;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 8px 22px -5px rgba(14, 165, 233, 0.22), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
+        }
+        .pricing-hero-header::before {
+          content: '';
+          position: absolute;
+          top: -60px;
+          right: -60px;
+          width: 220px;
+          height: 220px;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 70%);
+          border-radius: 50%;
+          pointer-events: none;
+        }
+        .pricing-hero-header::after {
+          content: '';
+          position: absolute;
+          bottom: -50px;
+          left: 30%;
+          width: 240px;
+          height: 120px;
+          background: radial-gradient(ellipse, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 70%);
+          border-radius: 50%;
+          pointer-events: none;
+        }
+        .pricing-hero-left {
+          position: relative;
+          z-index: 1;
+        }
+        .pricing-hero-title {
+          font-size: 22px;
+          font-weight: 900;
+          margin: 0 0 4px 0;
+          letter-spacing: -0.4px;
+          color: #082f49;
+        }
+        .pricing-hero-desc {
+          font-size: 13px;
+          color: #0c4a6e;
+          font-weight: 500;
+          margin: 0;
+          line-height: 1.45;
+          max-width: none;
+          white-space: nowrap;
+        }
+        @media (max-width: 768px) {
+          .pricing-hero-desc {
+            white-space: normal;
+          }
+        }
+        .pricing-btn-refresh {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 9px 16px;
+          background: rgba(255, 255, 255, 0.92);
+          border: 1px solid rgba(255, 255, 255, 0.95);
+          border-radius: 12px;
+          color: #0284c7;
+          font-size: 12.5px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+          backdrop-filter: blur(8px);
+          position: relative;
+          z-index: 1;
+          flex-shrink: 0;
+        }
+        .pricing-btn-refresh:hover:not(:disabled) {
+          background: #ffffff;
+          border-color: #38bdf8;
+          color: #0369a1;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
+        }
+        .pricing-btn-refresh:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      `}</style>
+
+      {/* Header: KHUNG MÀU XANH GIỐNG TRANG SẢN PHẨM */}
+      <div className="pricing-hero-header">
+        <div className="pricing-hero-left">
+          <h1 className="pricing-hero-title">
+            Gợi ý giá bán thông minh
+          </h1>
+          <p className="pricing-hero-desc">
+            Thuật toán phân tích đề xuất mức giá tối ưu dựa trên tốc độ bán, tồn kho, biên lợi nhuận mục tiêu và biến động thị trường.
           </p>
         </div>
 
-        <button
-          disabled={isLoading}
-          onClick={async () => {
-            await triggerRecalculate();
-            toast({ title: 'Đã hoàn thành', description: 'Đã quét và đồng bộ đề xuất giá từ dữ liệu kho SQL.', type: 'success' });
-          }}
-          className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-border bg-card text-foreground hover:bg-muted transition-colors shadow-sm self-start md:self-auto disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          {isLoading ? 'Đang phân tích...' : 'Quét & Tính lại từ kho'}
-        </button>
       </div>
 
       {/* KPI Cards */}
@@ -269,7 +348,7 @@ export function PricingPage() {
             <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Tìm sản phẩm, SKU..."
+              placeholder="Tìm sản phẩm, mã SP..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 text-sm bg-card border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -519,7 +598,7 @@ export function PricingPage() {
               <div className="p-4 rounded-xl border border-border bg-muted/20 flex flex-col sm:flex-row justify-between gap-4">
                 <div>
                   <h4 className="text-base font-bold text-foreground">{detailModalItem.productName}</h4>
-                  <p className="text-xs text-muted-foreground mt-0.5">Mã SKU: {detailModalItem.sku}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Mã SP: {detailModalItem.sku}</p>
                   <p className="text-xs text-muted-foreground mt-1">Giá vốn: <span className="font-semibold text-foreground">{formatVND(detailModalItem.costPrice)}</span></p>
                 </div>
                 <div className="text-right">

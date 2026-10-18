@@ -1,10 +1,10 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   User, Mail, Lock, Eye, EyeOff, ArrowRight, Store,
   Phone, Globe2, MapPin, CheckCircle2, Circle, Shield,
   Sparkles, Package, DollarSign, AlertTriangle, Check,
-  ChevronRight, Building2, Tag
+  ChevronRight, Building2, Tag, KeyRound, RefreshCw, X
 } from 'lucide-react';
 import { useAuthStore } from '../components/store/authStore';
 import { useToast } from '../components/common/Toast';
@@ -119,11 +119,20 @@ function StepAccount({ form, errors, onChange }) {
 
   return (
     <div className="space-y-4">
+      {/* Honeypot inputs ẩn để đánh lừa trình duyệt tự điền vào đây thay vì form thật */}
+      <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: 0, height: 0, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
+        <input type="text" name="username" tabIndex={-1} />
+        <input type="email" name="email" tabIndex={-1} />
+        <input type="password" name="password" tabIndex={-1} />
+      </div>
+
       {/* Row: Name + Phone */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Họ và tên chủ cửa hàng" required error={errors.name} icon={User}>
           <TextInput
-            id="reg-name"
+            id="reg-fullname"
+            name="sp_owner_name_x7k"
+            autoComplete="new-password"
             icon
             type="text"
             placeholder="Nguyễn Văn A"
@@ -134,7 +143,9 @@ function StepAccount({ form, errors, onChange }) {
 
         <Field label="Số điện thoại liên hệ" error={errors.phone} icon={Phone}>
           <TextInput
-            id="reg-phone"
+            id="reg-phonenumber"
+            name="sp_owner_phone_x7k"
+            autoComplete="new-password"
             icon
             type="tel"
             placeholder="0901234567"
@@ -148,9 +159,11 @@ function StepAccount({ form, errors, onChange }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Email đăng nhập" required error={errors.email} icon={Mail}>
           <TextInput
-            id="reg-email"
+            id="reg-emailaddress"
+            name="sp_owner_email_x7k"
+            autoComplete="new-password"
             icon
-            type="email"
+            type="text"
             placeholder="chushop@cuahang.vn"
             value={form.email}
             onChange={(e) => onChange('email', e.target.value)}
@@ -159,7 +172,9 @@ function StepAccount({ form, errors, onChange }) {
 
         <Field label="Mật khẩu khởi tạo" required error={errors.password}>
           <input
-            id="reg-password"
+            id="reg-passwordfield"
+            name="sp_owner_pw_x7k"
+            autoComplete="new-password"
             type={showPw ? 'text' : 'password'}
             placeholder="Tối thiểu 8 ký tự"
             value={form.password}
@@ -225,7 +240,9 @@ function StepAccount({ form, errors, onChange }) {
             <Shield className="w-4 h-4" />
           </div>
           <input
-            id="reg-confirm"
+            id="reg-confirmpassword"
+            name="sp_confirm_pw_x7k"
+            autoComplete="new-password"
             type={showConfirm ? 'text' : 'password'}
             placeholder="Nhập lại mật khẩu để xác nhận"
             value={form.confirmPassword}
@@ -437,6 +454,62 @@ export function RegisterPage() {
     setStep(2);
   };
 
+  // OTP Verification Modal State
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(60);
+  const [canResend, setCanResend] = useState(false);
+  const otpInputsRef = useRef([]);
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    let timer;
+    if (showOtpModal && resendCooldown > 0) {
+      timer = setInterval(() => {
+        setResendCooldown((prev) => {
+          if (prev <= 1) {
+            setCanResend(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [showOtpModal, resendCooldown]);
+
+  // Handle OTP digit change
+  const handleOtpChange = (index, value) => {
+    if (!/^\d*$/.test(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value.slice(-1);
+    setOtp(newOtp);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      otpInputsRef.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpInputsRef.current[index - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').trim();
+    if (/^\d{6}$/.test(pasted)) {
+      const digits = pasted.split('');
+      setOtp(digits);
+      otpInputsRef.current[5]?.focus();
+      toast({ type: 'success', title: 'Đã dán mã OTP', message: `Mã xác nhận: ${pasted}` });
+    }
+  };
+
+  // Bước 1: Khi bấm "Đăng ký" -> Kiểm tra form và Gửi OTP về Email
   const handleFinalSubmit = async (e) => {
     e.preventDefault();
     const errs = validateStep2();
@@ -447,34 +520,98 @@ export function RegisterPage() {
 
     setIsLoading(true);
     try {
+      const { apiSendRegisterOtp } = await import('../services/authService');
+      await apiSendRegisterOtp({
+        fullName: form.name.trim(),
+        email: form.email.trim(),
+        storeCode: form.storeSlug.trim(),
+      });
+
+      setIsLoading(false);
+      setOtp(['', '', '', '', '', '']);
+      setResendCooldown(60);
+      setCanResend(false);
+      setShowOtpModal(true);
+
+      toast({
+        type: 'success',
+        title: 'Đã gửi mã OTP về Gmail!',
+        message: `Mã xác thực gồm 6 chữ số đã được gửi tới ${form.email.trim()}. Vui lòng kiểm tra hộp thư để hoàn tất đăng ký!`,
+      });
+    } catch (err) {
+      const { getApiError } = await import('../services/authService');
+      const msg = getApiError(err);
+      toast({ type: 'error', title: 'Không thể gửi mã OTP', message: msg });
+      setIsLoading(false);
+    }
+  };
+
+  // Gửi lại mã OTP
+  const handleResendOtp = async () => {
+    if (!canResend) return;
+    setCanResend(false);
+    setResendCooldown(60);
+    setOtp(['', '', '', '', '', '']);
+
+    try {
+      const { apiSendRegisterOtp } = await import('../services/authService');
+      await apiSendRegisterOtp({
+        fullName: form.name.trim(),
+        email: form.email.trim(),
+        storeCode: form.storeSlug.trim(),
+      });
+
+      toast({
+        type: 'success',
+        title: 'Đã gửi lại mã OTP!',
+        message: `Hệ thống đã gửi lại mã xác thực mới đến ${form.email.trim()}.`,
+      });
+    } catch (err) {
+      const { getApiError } = await import('../services/authService');
+      toast({ type: 'error', title: 'Không thể gửi lại mã', message: getApiError(err) });
+    }
+  };
+
+  // Bước 2: Xác thực mã OTP và hoàn tất tạo tài khoản
+  const handleVerifyAndRegister = async (e) => {
+    e.preventDefault();
+    const enteredCode = otp.join('');
+    if (enteredCode.length < 6) {
+      toast({ type: 'error', title: 'Chưa đủ 6 số', message: 'Vui lòng nhập đầy đủ 6 chữ số mã OTP!' });
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    try {
       const { apiRegister } = await import('../services/authService');
-      const { user, token, refreshToken } = await apiRegister({
-        fullName: form.name,
-        email: form.email,
+      await apiRegister({
+        fullName: form.name.trim(),
+        email: form.email.trim(),
         password: form.password,
-        storeName: form.storeName,
-        storeCode: form.storeSlug,
+        storeName: form.storeName.trim(),
+        storeCode: form.storeSlug.trim(),
         phone: form.phone || undefined,
         address: form.storeAddress || undefined,
+        otp: enteredCode,
       });
-      // Lưu token vào authStore
-      const { useAuthStore: store } = await import('../components/store/authStore');
-      store.getState().setToken(token, refreshToken);
-      store.getState().clearUser();
-      // Gọn hơn: dùng login() trực tiếp
-      const result = await login({ email: form.email, password: form.password });
+
+      // Tự động đăng nhập sau khi đăng ký thành công
+      await login({ email: form.email.trim(), password: form.password });
+
       toast({
         type: 'success',
         title: 'Đăng ký thành công!',
         message: `Chào mừng ${form.name} đến với StockPilot!`,
       });
-      setIsLoading(false);
+
+      setIsVerifyingOtp(false);
+      setShowOtpModal(false);
       navigate('/dashboard');
     } catch (err) {
       const { getApiError } = await import('../services/authService');
       const msg = getApiError(err);
-      toast({ type: 'error', title: 'Đăng ký thất bại', message: msg });
-      setIsLoading(false);
+      toast({ type: 'error', title: 'Xác thực OTP thất bại', message: msg });
+      setIsVerifyingOtp(false);
     }
   };
 
@@ -606,7 +743,7 @@ export function RegisterPage() {
 
           {/* Step 1 form */}
           {step === 1 && (
-            <form onSubmit={handleStep1Next} className="space-y-5">
+            <form onSubmit={handleStep1Next} className="space-y-5" autoComplete="off">
               <StepAccount form={form} errors={errors} onChange={onChange} />
 
               <button
@@ -621,7 +758,7 @@ export function RegisterPage() {
 
           {/* Step 2 form */}
           {step === 2 && (
-            <form onSubmit={handleFinalSubmit} className="space-y-5">
+            <form onSubmit={handleFinalSubmit} className="space-y-5" autoComplete="off">
               <StepStore form={form} errors={errors} onChange={onChange} />
 
               <div className="flex gap-3">
@@ -642,7 +779,7 @@ export function RegisterPage() {
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
-                      <span>Hoàn tất đăng ký & Mở Dashboard</span>
+                      <span>Đăng ký</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -664,6 +801,104 @@ export function RegisterPage() {
           Phiên bản 1.0 • © 2026 StockPilot Vietnam
         </div>
       </div>
+
+      {/* ─── MODAL NHẬP MÃ OTP XÁC THỰC ĐĂNG KÝ ─── */}
+      {showOtpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 relative animate-in zoom-in-95 duration-200">
+            {/* Close / Go back button */}
+            <button
+              type="button"
+              onClick={() => setShowOtpModal(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
+                <KeyRound className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-900">Xác thực đăng ký tài khoản</h3>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                Mã OTP gồm 6 chữ số đã được gửi đến email đăng nhập của bạn:
+                <br />
+                <strong className="text-blue-600 font-semibold">{form.email}</strong>
+              </p>
+            </div>
+
+            {/* OTP Form */}
+            <form onSubmit={handleVerifyAndRegister} className="space-y-5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-2.5 text-center">
+                  Nhập mã OTP 6 chữ số trong hộp thư Gmail:
+                </label>
+
+                {/* 6 Digits Inputs */}
+                <div className="flex justify-center gap-2 sm:gap-2.5" onPaste={handleOtpPaste}>
+                  {otp.map((digit, idx) => (
+                    <input
+                      key={idx}
+                      ref={(el) => (otpInputsRef.current[idx] = el)}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleOtpChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                      autoFocus={idx === 0}
+                      className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl font-bold rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Resend OTP button */}
+              <div className="flex items-center justify-center text-xs">
+                {canResend ? (
+                  <button
+                    type="button"
+                    onClick={handleResendOtp}
+                    className="text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1.5 cursor-pointer hover:underline"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Gửi lại mã OTP mới</span>
+                  </button>
+                ) : (
+                  <span className="text-slate-400">
+                    Gửi lại mã sau <strong className="text-blue-600">{resendCooldown}s</strong>
+                  </span>
+                )}
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowOtpModal(false)}
+                  className="flex-1 py-3 px-4 border border-slate-200 text-slate-600 font-semibold text-sm rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Quay về
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isVerifyingOtp}
+                  className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-xl shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-70"
+                >
+                  {isVerifyingOtp ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <span>Xác nhận & Hoàn tất</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

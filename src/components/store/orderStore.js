@@ -12,6 +12,9 @@ import {
 
 export const useOrderStore = create((set, get) => ({
   orders: [],
+  pagination: { page: 1, limit: 50, total: 0, totalPages: 1 },
+  metrics: null,
+  timeframeCounts: null,
   isLoading: false,
   error: null,
 
@@ -19,9 +22,14 @@ export const useOrderStore = create((set, get) => ({
   fetchOrders: async (params = {}) => {
     set({ isLoading: true, error: null });
     try {
-      const data = await apiGetOrders(params);
-      const items = Array.isArray(data) ? data : (data.items || data.data || []);
-      set({ orders: items, isLoading: false });
+      const res = await apiGetOrders(params);
+      set({
+        orders: res.items || [],
+        pagination: res.pagination || { page: 1, limit: 50, total: 0, totalPages: 1 },
+        metrics: res.metrics || null,
+        timeframeCounts: res.timeframeCounts || null,
+        isLoading: false,
+      });
     } catch (err) {
       set({ error: err?.response?.data?.error?.message || 'Lỗi tải đơn hàng', isLoading: false });
     }
