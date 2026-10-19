@@ -52,10 +52,10 @@ export const useAuthStore = create(
         const { refreshToken } = get();
         try {
           if (refreshToken) await apiLogout({ refreshToken });
-        } catch (_) {}
+        } catch {}
         try {
           localStorage.removeItem('stockpilot_pos_scanner_code');
-        } catch (_) {}
+        } catch {}
         set({ user: null, token: null, refreshToken: null });
       },
 

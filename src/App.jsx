@@ -1,19 +1,18 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, Component } from 'react';
-import { useUIStore } from './components/store/uiStore';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient();
 import { useAuthStore } from './components/store/authStore';
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { ProductsPage } from './pages/ProductsPage';
-import { CategoriesPage } from './pages/CategoriesPage';
 import { PosPage } from './pages/PosPage';
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import { AIAssistantPage } from './pages/AIAssistantPage';
 import { OrdersPage } from './pages/OrdersPage';
-import { InventoryPage } from './pages/InventoryPage';
 import { AlertsPage } from './pages/AlertsPage';
 import { PricingPage } from './pages/PricingPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
@@ -21,6 +20,23 @@ import { SettingsPage } from './pages/SettingsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { AdminAuditPage } from './pages/AdminAuditPage';
 import { ToastContainer } from './components/common/Toast';
+
+// ─── IMPORT CÁC TRANG CATALOG & INVENTORY ───
+import { ProductsPage } from './pages/ProductsPage';
+import { ProductCreatePage } from './pages/ProductCreatePage';
+import { ProductEditPage } from './pages/ProductEditPage';
+import { ProductDetailPage } from './pages/ProductDetailPage';
+import { CategoriesPage } from './pages/CategoriesPage';
+import { CategoryCreatePage } from './pages/CategoryCreatePage';
+import { CategoryEditPage } from './pages/CategoryEditPage';
+
+import { InventoryPage } from './pages/InventoryPage';
+import { MovementsPage } from './pages/MovementsPage';
+import { StockInflowPage } from './pages/StockInflowPage';
+import { StockOutflowPage } from './pages/StockOutflowPage';
+import { StockTakesListPage } from './pages/StockTakesListPage';
+import { StockTakeNewPage } from './pages/StockTakeNewPage';
+import { StockTakeDetailPage } from './pages/StockTakeDetailPage';
 
 // ─── Error Boundary: bắt lỗi render, hiển thị thông báo thay vì màn trắng ───
 class ErrorBoundary extends Component {
@@ -105,7 +121,6 @@ export function RequireRole({ roles, children }) {
   const allowed = roles.map((r) => r.toLowerCase().replace('shop_owner', 'store_owner'));
 
   if (!allowed.includes(userRole)) {
-    // If warehouse staff attempts restricted routes, redirect to POS
     const fallbackPath = userRole === 'warehouse_staff' ? '/pos' : '/dashboard';
     return <Navigate to={fallbackPath} replace />;
   }
@@ -115,7 +130,6 @@ export function RequireRole({ roles, children }) {
 export default function App() {
   const { token, fetchMe } = useAuthStore();
 
-  // Khi reload trang: nếu có token thì cập nhật thông tin user mới nhất từ server ở chế độ nền
   useEffect(() => {
     document.documentElement.classList.remove('dark');
     if (token) {
@@ -126,7 +140,8 @@ export default function App() {
   }, [token, fetchMe]);
 
   return (
-    <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
       <BrowserRouter>
         <Routes>
           {/* Auth Routes */}
@@ -147,9 +162,28 @@ export default function App() {
             }
           >
             <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-            <Route path="/products" element={<ErrorBoundary><ProductsPage /></ErrorBoundary>} />
             <Route path="/pos" element={<ErrorBoundary><PosPage /></ErrorBoundary>} />
-            <Route path="/categories" element={<Navigate to="/pos" replace />} />
+            
+            {/* ─── ROUTES CỦA KHIÊM (CATALOG) ─── */}
+            <Route path="/products" element={<ErrorBoundary><ProductsPage /></ErrorBoundary>} />
+            <Route path="/products/new" element={<ErrorBoundary><ProductCreatePage /></ErrorBoundary>} />
+            <Route path="/products/:id" element={<ErrorBoundary><ProductDetailPage /></ErrorBoundary>} />
+            <Route path="/products/:id/edit" element={<ErrorBoundary><ProductEditPage /></ErrorBoundary>} />
+            
+            <Route path="/categories" element={<ErrorBoundary><CategoriesPage /></ErrorBoundary>} />
+            <Route path="/categories/new" element={<ErrorBoundary><CategoryCreatePage /></ErrorBoundary>} />
+            <Route path="/categories/:id/edit" element={<ErrorBoundary><CategoryEditPage /></ErrorBoundary>} />
+
+            {/* ─── ROUTES CỦA KHIÊM (INVENTORY & STOCK TAKES) ─── */}
+            <Route path="/inventory" element={<ErrorBoundary><InventoryPage /></ErrorBoundary>} />
+            <Route path="/inventory/movements" element={<ErrorBoundary><MovementsPage /></ErrorBoundary>} />
+            <Route path="/inventory/inflow" element={<ErrorBoundary><StockInflowPage /></ErrorBoundary>} />
+            <Route path="/inventory/outflow" element={<ErrorBoundary><StockOutflowPage /></ErrorBoundary>} />
+            <Route path="/stock-takes" element={<ErrorBoundary><StockTakesListPage /></ErrorBoundary>} />
+            <Route path="/stock-takes/new" element={<ErrorBoundary><StockTakeNewPage /></ErrorBoundary>} />
+            <Route path="/stock-takes/:id" element={<ErrorBoundary><StockTakeDetailPage /></ErrorBoundary>} />
+
+            {/* Các Routes khác của Hiếu */}
             <Route
               path="/orders"
               element={
@@ -158,7 +192,6 @@ export default function App() {
                 </RequireRole>
               }
             />
-            <Route path="/inventory" element={<ErrorBoundary><InventoryPage /></ErrorBoundary>} />
             <Route path="/alerts" element={<ErrorBoundary><AlertsPage /></ErrorBoundary>} />
             <Route
               path="/pricing"
@@ -185,8 +218,6 @@ export default function App() {
                 </RequireRole>
               }
             />
-
-            {/* Admin-only routes */}
             <Route
               path="/admin/users"
               element={
@@ -205,14 +236,13 @@ export default function App() {
             />
           </Route>
 
-          {/* Default redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
 
-        {/* Global Toast Notifications */}
         <ToastContainer />
       </BrowserRouter>
     </ErrorBoundary>
+    </QueryClientProvider>
   );
 }
