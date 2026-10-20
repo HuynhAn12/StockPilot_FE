@@ -54,7 +54,7 @@ export function LoginPage() {
     <div className="w-full bg-white rounded-[28px] shadow-[0_25px_70px_-12px_rgba(30,58,138,0.18),0_10px_25px_-5px_rgba(15,23,42,0.08)] border border-white/80 ring-1 ring-blue-900/5 overflow-hidden flex flex-col md:flex-row">
 
       {/* LEFT: Blue gradient panel with BLACK text and BLACK icons as requested */}
-      <div className="md:w-[45%] bg-gradient-to-br from-sky-400 via-blue-400 to-indigo-400 p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
+      <div className="md:w-[45%] bg-linear-to-br from-sky-400 via-blue-400 to-indigo-400 p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
         {/* Soft glowing ambient circles */}
         <div className="absolute top-0 right-0 w-72 h-72 bg-white/20 rounded-full blur-3xl pointer-events-none -translate-y-1/3 translate-x-1/3" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-sky-200/30 rounded-full blur-3xl pointer-events-none translate-y-1/3 -translate-x-1/3" />
@@ -74,7 +74,7 @@ export function LoginPage() {
             </span>
           </div>
           <h1 className="text-3xl font-black tracking-tight text-slate-950 mb-2">StockPilot</h1>
-          <p className="text-xs font-bold text-slate-900 max-w-[250px] leading-relaxed">
+          <p className="text-xs font-bold text-slate-900 max-w-62.5 leading-relaxed">
             Hệ thống hỗ trợ quyết định Tồn kho, Giá bán & Doanh thu thông minh
           </p>
         </div>
