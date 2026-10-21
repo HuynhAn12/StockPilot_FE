@@ -21,7 +21,7 @@ function StatCard({ icon: Icon, label, value, sub, color = 'blue' }) {
   const c = COLOR_MAPS[color] || COLOR_MAPS.blue;
   return (
     <div className={`rounded-2xl border ${c.border} ${c.bg} p-4 flex items-center gap-4 shadow-sm`}>
-      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${c.gradient} flex items-center justify-center shadow-md flex-shrink-0`}>
+      <div className={`w-12 h-12 rounded-xl bg-linear-to-br ${c.gradient} flex items-center justify-center shadow-md shrink-0`}>
         <Icon size={22} className="text-white" />
       </div>
       <div>
@@ -51,7 +51,7 @@ function CategoryCard({ cat, stats, isSelected, onClick }) {
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
-        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${c.gradient} flex items-center justify-center shadow-md text-2xl`}>
+        <div className={`w-14 h-14 rounded-2xl bg-linear-to-br ${c.gradient} flex items-center justify-center shadow-md text-2xl`}>
           {cat.icon}
         </div>
         <span className={`text-xs font-bold px-2 py-1 rounded-full ${c.badge}`}>
@@ -72,7 +72,7 @@ function CategoryCard({ cat, stats, isSelected, onClick }) {
         </div>
         <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
           <div
-            className={`h-full bg-gradient-to-r ${c.gradient} rounded-full transition-all duration-500`}
+            className={`h-full bg-linear-to-r ${c.gradient} rounded-full transition-all duration-500`}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -113,13 +113,13 @@ function ProductRow({ product, index }) {
   return (
     <div className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-150 hover:bg-gray-50 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}>
       {/* Rank */}
-      <div className="w-6 text-center text-xs font-bold text-gray-400 flex-shrink-0">{index + 1}</div>
+      <div className="w-6 text-center text-xs font-bold text-gray-400 shrink-0">{index + 1}</div>
 
       {/* Image */}
       <img
         src={product.imageUrl}
         alt={product.name}
-        className="w-10 h-10 rounded-lg object-cover border border-gray-100 flex-shrink-0"
+        className="w-10 h-10 rounded-lg object-cover border border-gray-100 shrink-0"
         onError={e => { e.target.src = 'https://via.placeholder.com/40x40?text=SP'; }}
       />
 
@@ -130,12 +130,12 @@ function ProductRow({ product, index }) {
       </div>
 
       {/* Category badge */}
-      <span className={`hidden sm:inline-flex text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 ${c.badge}`}>
+      <span className={`hidden sm:inline-flex text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${c.badge}`}>
         {catObj?.icon} {catObj?.label?.split(' ')[0]}
       </span>
 
       {/* Stock */}
-      <div className="text-right flex-shrink-0 w-20">
+      <div className="text-right shrink-0 w-20">
         <p className={`text-sm font-bold ${isOut ? 'text-red-600' : isLow ? 'text-orange-500' : 'text-gray-700'}`}>
           {product.stock.toLocaleString()}
         </p>
@@ -143,13 +143,13 @@ function ProductRow({ product, index }) {
       </div>
 
       {/* Price */}
-      <div className="text-right flex-shrink-0 w-24 hidden md:block">
+      <div className="text-right shrink-0 w-24 hidden md:block">
         <p className="text-sm font-bold text-gray-800">{product.salePrice.toLocaleString()}₫</p>
         <p className="text-xs text-emerald-600">+{margin}%</p>
       </div>
 
       {/* Status pill */}
-      <div className="flex-shrink-0">
+      <div className="shrink-0">
         {isOut ? (
           <span className="text-xs font-bold px-2 py-1 rounded-full bg-red-100 text-red-600">Hết</span>
         ) : isLow ? (
@@ -234,7 +234,7 @@ export function CategoriesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 p-4 md:p-6">
+    <div className="min-h-screen bg-linear-to-br from-slate-50 via-white to-blue-50 p-4 md:p-6">
       {/* Page header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
@@ -329,15 +329,15 @@ export function CategoriesPage() {
                 const pct = Math.round((cat.count / maxCount) * 100);
                 return (
                   <div key={cat.value} className="flex items-center gap-3">
-                    <span className="text-base w-6 text-center flex-shrink-0">{cat.icon}</span>
+                    <span className="text-base w-6 text-center shrink-0">{cat.icon}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between text-xs mb-1">
                         <span className="text-gray-600 font-medium truncate">{cat.label}</span>
-                        <span className={`font-bold ${c.text} flex-shrink-0 ml-2`}>{cat.count} SP</span>
+                        <span className={`font-bold ${c.text} shrink-0 ml-2`}>{cat.count} SP</span>
                       </div>
                       <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
-                          className={`h-full bg-gradient-to-r ${c.gradient} rounded-full transition-all duration-700`}
+                          className={`h-full bg-linear-to-r ${c.gradient} rounded-full transition-all duration-700`}
                           style={{ width: `${pct}%` }}
                         />
                       </div>
@@ -352,7 +352,7 @@ export function CategoriesPage() {
         {/* Product list panel */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
           {/* Panel header */}
-          <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-t-2xl">
+          <div className="p-4 border-b border-gray-100 bg-linear-to-r from-blue-600 to-indigo-600 rounded-t-2xl">
             <div className="flex items-center gap-2">
               <ShoppingBag size={16} className="text-white/80" />
               <h3 className="font-bold text-white text-sm">
@@ -385,7 +385,7 @@ export function CategoriesPage() {
           {/* Alert rows */}
           {currentCatStats && currentCatStats.lowStock > 0 && (
             <div className="mx-3 mt-3 p-3 bg-orange-50 border border-orange-200 rounded-xl flex items-center gap-2">
-              <AlertCircle size={15} className="text-orange-500 flex-shrink-0" />
+              <AlertCircle size={15} className="text-orange-500 shrink-0" />
               <p className="text-xs text-orange-700 font-medium">
                 {currentCatStats.lowStock} sản phẩm sắp hết hàng cần nhập thêm
               </p>
@@ -393,7 +393,7 @@ export function CategoriesPage() {
           )}
           {currentCatStats && currentCatStats.outOfStock > 0 && (
             <div className="mx-3 mt-2 p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2">
-              <Flame size={15} className="text-red-500 flex-shrink-0" />
+              <Flame size={15} className="text-red-500 shrink-0" />
               <p className="text-xs text-red-700 font-medium">
                 {currentCatStats.outOfStock} sản phẩm đã hết hàng
               </p>
@@ -401,7 +401,7 @@ export function CategoriesPage() {
           )}
 
           {/* Product list */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-1 max-h-[520px]">
+          <div className="flex-1 overflow-y-auto p-3 space-y-1 max-h-130">
             {displayedProducts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="text-4xl mb-3">📭</div>

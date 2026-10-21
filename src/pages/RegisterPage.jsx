@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   User, Mail, Lock, Eye, EyeOff, ArrowRight, Store,
@@ -654,10 +655,11 @@ export function RegisterPage() {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="w-full bg-white rounded-[28px] shadow-[0_25px_70px_-12px_rgba(30,58,138,0.18),0_10px_25px_-5px_rgba(15,23,42,0.08)] border border-white/80 ring-1 ring-blue-900/5 overflow-hidden flex flex-col md:flex-row">
+    <>
+      <div className="w-full bg-white rounded-[28px] shadow-[0_25px_70px_-12px_rgba(30,58,138,0.18),0_10px_25px_-5px_rgba(15,23,42,0.08)] border border-white/80 ring-1 ring-blue-900/5 overflow-hidden flex flex-col md:flex-row">
 
-      {/* ─── LEFT panel ─────────────────────────────────────────────────────── */}
-      <div className="md:w-[40%] bg-gradient-to-br from-sky-400 via-blue-400 to-indigo-400 p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
+        {/* ─── LEFT panel ─────────────────────────────────────────────────────── */}
+        <div className="md:w-[40%] bg-linear-to-br from-sky-400 via-blue-400 to-indigo-400 p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
         {/* Ambient glowing orbs */}
         <div className="absolute top-0 right-0 w-80 h-80 bg-white/20 rounded-full blur-3xl pointer-events-none -translate-y-1/3 translate-x-1/3" />
         <div className="absolute bottom-0 left-0 w-72 h-72 bg-sky-200/30 rounded-full blur-3xl pointer-events-none translate-y-1/3 -translate-x-1/3" />
@@ -678,7 +680,7 @@ export function RegisterPage() {
             </span>
           </div>
           <h1 className="text-3xl font-black tracking-tight text-slate-950 mb-2">StockPilot</h1>
-          <p className="text-xs font-bold text-slate-900 max-w-[230px] leading-relaxed">
+          <p className="text-xs font-bold text-slate-900 max-w-57.5 leading-relaxed">
             Bắt đầu 30 ngày dùng thử miễn phí – Không cần thẻ tín dụng
           </p>
         </div>
@@ -765,7 +767,7 @@ export function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => { setStep(1); setErrors({}); }}
-                  className="flex-shrink-0 px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-all cursor-pointer"
+                  className="shrink-0 px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-all cursor-pointer"
                 >
                   ← Quay lại
                 </button>
@@ -801,10 +803,11 @@ export function RegisterPage() {
           Phiên bản 1.0 • © 2026 StockPilot Vietnam
         </div>
       </div>
+      </div>
 
-      {/* ─── MODAL NHẬP MÃ OTP XÁC THỰC ĐĂNG KÝ ─── */}
-      {showOtpModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      {/* ─── MODAL NHẬP MÃ OTP XÁC THỰC ĐĂNG KÝ (Render via Portal to cover entire viewport) ─── */}
+      {showOtpModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 relative animate-in zoom-in-95 duration-200">
             {/* Close / Go back button */}
             <button
@@ -897,8 +900,9 @@ export function RegisterPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
