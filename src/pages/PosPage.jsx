@@ -1313,7 +1313,7 @@ export function PosPage() {
 
       {/* ─── RIGHT COLUMN: CATALOG + CHECKOUT (45%) ─── */}
       <div
-        className="w-full lg:w-[520px] xl:w-[600px] 2xl:w-[660px] flex flex-col overflow-hidden shrink-0 rounded-2xl border border-white/80"
+        className="w-full lg:w-130 xl:w-150 2xl:w-165 flex flex-col overflow-hidden shrink-0 rounded-2xl border border-white/80"
         style={{ background: '#fff', boxShadow: '0 2px 12px rgb(0 0 0 / 0.06), 0 0 0 1px rgb(0 0 0 / 0.04)' }}
       >
         {/* Product Search */}
@@ -1507,7 +1507,7 @@ export function PosPage() {
       {isCheckoutOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-end" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)' }}>
           <div
-            className="w-full max-w-[420px] h-full border-l flex flex-col p-6 overflow-y-auto animate-in slide-in-from-right-full"
+            className="w-full max-w-105 h-full border-l flex flex-col p-6 overflow-y-auto animate-in slide-in-from-right-full"
             style={{
               background: '#fff',
               borderColor: 'hsl(214 25% 88%)',
@@ -1882,9 +1882,9 @@ export function PosPage() {
 
       {/* ── Scanner Pairing Modal ──────────────────────────────── */}
       {scannerOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setScannerOpen(false)}>
+        <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setScannerOpen(false)}>
           <div
-            className="bg-white rounded-2xl shadow-2xl w-[360px] p-6 flex flex-col gap-4"
+            className="bg-white rounded-2xl shadow-2xl w-90 p-6 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
@@ -1971,13 +1971,13 @@ export function PosPage() {
 
       {/* ── PayOS VietQR Payment Realtime Modal ──────────────── */}
       {payosModalOpen && payosData && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-90 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="w-full max-w-[440px] bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200 flex flex-col"
+            className="w-full max-w-110 bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-linear-to-r from-blue-50/70 via-indigo-50/40 to-white">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs font-black text-sm">
                   P
@@ -2027,7 +2027,7 @@ export function PosPage() {
                     />
 
                     {/* Scanning radar indicator line */}
-                    <div className="absolute inset-x-4 top-4 h-0.5 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-pulse opacity-70" />
+                    <div className="absolute inset-x-4 top-4 h-0.5 bg-linear-to-r from-transparent via-blue-500 to-transparent animate-pulse opacity-70" />
                   </div>
 
                   {/* Transfer Details Card */}
@@ -2158,9 +2158,9 @@ export function PosPage() {
 
       {/* ── MoMo E-Wallet Payment Realtime Modal ──────────────── */}
       {momoModalOpen && momoData && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-90 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className="w-full max-w-[440px] bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200 flex flex-col"
+            className="w-full max-w-110 bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200 flex flex-col"
             style={{ boxShadow: '0 25px 60px -15px rgba(165, 0, 100, 0.25)' }}
           >
             {/* Header with MoMo Brand styling */}
@@ -2336,7 +2336,7 @@ export function PosPage() {
 
       {/* ── MoMo Enterprise Setup Modal ─────────────────── */}
       {momoConfigModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
             <div
               className="px-6 py-4 flex items-center justify-between text-white"
@@ -2436,7 +2436,7 @@ export function PosPage() {
                 <button
                   type="submit"
                   disabled={isSavingMomoConfig}
-                  className="flex-1 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-bold text-xs shadow-md shadow-pink-500/25 transition-all cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-2 rounded-xl bg-linear-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-bold text-xs shadow-md shadow-pink-500/25 transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isSavingMomoConfig ? 'Đang lưu...' : 'Lưu cấu hình Doanh Nghiệp'}
                 </button>
