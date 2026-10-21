@@ -7,8 +7,9 @@ import {
   Sparkles, Package, DollarSign, AlertTriangle, Check,
   ChevronRight, Building2, Tag, KeyRound, RefreshCw, X
 } from 'lucide-react';
-import { useAuthStore } from '../components/store/authStore';
-import { useToast } from '../components/common/Toast';
+import { useAuthStore } from '../../components/store/authStore';
+import { useToast } from '../../components/common/Toast';
+import { useTranslation } from '../../i18n/useTranslation';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -22,7 +23,7 @@ function slugify(str) {
     .replace(/\s+/g, '-');
 }
 
-function getPasswordStrength(pw) {
+function getPasswordStrength(pw, isEn) {
   if (!pw) return { score: 0, label: '', color: '' };
   let score = 0;
   if (pw.length >= 8)  score++;
@@ -31,11 +32,11 @@ function getPasswordStrength(pw) {
   if (/[0-9]/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
 
-  if (score <= 1) return { score, label: 'Quá yếu', color: 'bg-red-500' };
-  if (score === 2) return { score, label: 'Yếu',    color: 'bg-orange-400' };
-  if (score === 3) return { score, label: 'Trung bình', color: 'bg-yellow-400' };
-  if (score === 4) return { score, label: 'Mạnh',   color: 'bg-emerald-400' };
-  return { score, label: 'Rất mạnh', color: 'bg-emerald-600' };
+  if (score <= 1) return { score, label: isEn ? 'Very weak' : 'Quá yếu', color: 'bg-red-500' };
+  if (score === 2) return { score, label: isEn ? 'Weak' : 'Yếu', color: 'bg-orange-400' };
+  if (score === 3) return { score, label: isEn ? 'Medium' : 'Trung bình', color: 'bg-yellow-400' };
+  if (score === 4) return { score, label: isEn ? 'Strong' : 'Mạnh', color: 'bg-emerald-400' };
+  return { score, label: isEn ? 'Very strong' : 'Rất mạnh', color: 'bg-emerald-600' };
 }
 
 // ─── Reusable form field ────────────────────────────────────────────────────────
@@ -104,23 +105,23 @@ function PasswordInput({ id, placeholder, value, onChange, showMatch }) {
   );
 }
 
+// ─── STEP 1: Account credentials ────────────────────────────────────────────────
 
-
-function StepAccount({ form, errors, onChange }) {
+function StepAccount({ form, errors, onChange, isEn }) {
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const strength = useMemo(() => getPasswordStrength(form.password), [form.password]);
+  const strength = useMemo(() => getPasswordStrength(form.password, isEn), [form.password, isEn]);
 
   const checks = [
-    { ok: form.password.length >= 8,        text: 'Ít nhất 8 ký tự' },
-    { ok: /[A-Z]/.test(form.password),       text: 'Có chữ hoa (A-Z)' },
-    { ok: /[0-9]/.test(form.password),       text: 'Có chữ số (0-9)' },
-    { ok: /[^A-Za-z0-9]/.test(form.password),text: 'Có ký tự đặc biệt (!@#...)' },
+    { ok: form.password.length >= 8,         text: isEn ? 'At least 8 characters' : 'Ít nhất 8 ký tự' },
+    { ok: /[A-Z]/.test(form.password),        text: isEn ? 'Uppercase letter (A-Z)' : 'Có chữ hoa (A-Z)' },
+    { ok: /[0-9]/.test(form.password),        text: isEn ? 'Number (0-9)' : 'Có chữ số (0-9)' },
+    { ok: /[^A-Za-z0-9]/.test(form.password), text: isEn ? 'Special symbol (!@#...)' : 'Có ký tự đặc biệt (!@#...)' },
   ];
 
   return (
     <div className="space-y-4">
-      {/* Honeypot inputs ẩn để đánh lừa trình duyệt tự điền vào đây thay vì form thật */}
+      {/* Honeypot inputs hidden */}
       <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: 0, height: 0, overflow: 'hidden', opacity: 0, pointerEvents: 'none' }}>
         <input type="text" name="username" tabIndex={-1} />
         <input type="email" name="email" tabIndex={-1} />
@@ -129,20 +130,29 @@ function StepAccount({ form, errors, onChange }) {
 
       {/* Row: Name + Phone */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Họ và tên chủ cửa hàng" required error={errors.name} icon={User}>
+        <Field
+          label={isEn ? 'Store owner full name' : 'Họ và tên chủ cửa hàng'}
+          required
+          error={errors.name}
+          icon={User}
+        >
           <TextInput
             id="reg-fullname"
             name="sp_owner_name_x7k"
             autoComplete="new-password"
             icon
             type="text"
-            placeholder="Nguyễn Văn A"
+            placeholder={isEn ? 'John Doe' : 'Nguyễn Văn A'}
             value={form.name}
             onChange={(e) => onChange('name', e.target.value)}
           />
         </Field>
 
-        <Field label="Số điện thoại liên hệ" error={errors.phone} icon={Phone}>
+        <Field
+          label={isEn ? 'Contact phone number' : 'Số điện thoại liên hệ'}
+          error={errors.phone}
+          icon={Phone}
+        >
           <TextInput
             id="reg-phonenumber"
             name="sp_owner_phone_x7k"
@@ -158,26 +168,35 @@ function StepAccount({ form, errors, onChange }) {
 
       {/* Row: Email + Password */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Email đăng nhập" required error={errors.email} icon={Mail}>
+        <Field
+          label={isEn ? 'Login email address' : 'Email đăng nhập'}
+          required
+          error={errors.email}
+          icon={Mail}
+        >
           <TextInput
             id="reg-emailaddress"
             name="sp_owner_email_x7k"
             autoComplete="new-password"
             icon
             type="text"
-            placeholder="chushop@cuahang.vn"
+            placeholder={isEn ? 'owner@store.com' : 'chushop@cuahang.vn'}
             value={form.email}
             onChange={(e) => onChange('email', e.target.value)}
           />
         </Field>
 
-        <Field label="Mật khẩu khởi tạo" required error={errors.password}>
+        <Field
+          label={isEn ? 'Account password' : 'Mật khẩu khởi tạo'}
+          required
+          error={errors.password}
+        >
           <input
             id="reg-passwordfield"
             name="sp_owner_pw_x7k"
             autoComplete="new-password"
             type={showPw ? 'text' : 'password'}
-            placeholder="Tối thiểu 8 ký tự"
+            placeholder={isEn ? 'At least 8 characters' : 'Tối thiểu 8 ký tự'}
             value={form.password}
             onChange={(e) => onChange('password', e.target.value)}
             className="w-full pl-10 pr-10 py-2.5 bg-slate-50 text-slate-900 text-sm rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-400 font-medium"
@@ -199,7 +218,9 @@ function StepAccount({ form, errors, onChange }) {
       {form.password.length > 0 && (
         <div className="space-y-2 p-3.5 rounded-xl border border-slate-100 bg-slate-50">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500">Độ mạnh mật khẩu:</span>
+            <span className="text-[11px] font-semibold text-slate-500">
+              {isEn ? 'Password strength:' : 'Độ mạnh mật khẩu:'}
+            </span>
             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full text-white ${strength.color}`}>
               {strength.label}
             </span>
@@ -235,7 +256,11 @@ function StepAccount({ form, errors, onChange }) {
       )}
 
       {/* Confirm Password */}
-      <Field label="Xác nhận mật khẩu" required error={errors.confirmPassword}>
+      <Field
+        label={isEn ? 'Confirm password' : 'Xác nhận mật khẩu'}
+        required
+        error={errors.confirmPassword}
+      >
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <Shield className="w-4 h-4" />
@@ -245,7 +270,7 @@ function StepAccount({ form, errors, onChange }) {
             name="sp_confirm_pw_x7k"
             autoComplete="new-password"
             type={showConfirm ? 'text' : 'password'}
-            placeholder="Nhập lại mật khẩu để xác nhận"
+            placeholder={isEn ? 'Re-enter password to confirm' : 'Nhập lại mật khẩu để xác nhận'}
             value={form.confirmPassword}
             onChange={(e) => onChange('confirmPassword', e.target.value)}
             className="w-full pl-10 pr-10 py-2.5 bg-slate-50 text-slate-900 text-sm rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-400 font-medium"
@@ -270,9 +295,7 @@ function StepAccount({ form, errors, onChange }) {
 
 // ─── STEP 2: Store info ─────────────────────────────────────────────────────────
 
-function StepStore({ form, errors, onChange }) {
-  const autoSlug = useMemo(() => slugify(form.storeName), [form.storeName]);
-
+function StepStore({ form, errors, onChange, isEn }) {
   const handleStoreNameChange = (val) => {
     onChange('storeName', val);
     if (!form.storeSlugManual) {
@@ -284,23 +307,32 @@ function StepStore({ form, errors, onChange }) {
     <div className="space-y-4">
       {/* Row: Store name + Slug */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Tên cửa hàng" required error={errors.storeName} icon={Building2}>
+        <Field
+          label={isEn ? 'Store name' : 'Tên cửa hàng'}
+          required
+          error={errors.storeName}
+          icon={Building2}
+        >
           <TextInput
             id="reg-storename"
             icon
             type="text"
-            placeholder="Thời Trang An Phát"
+            placeholder={isEn ? 'An Phat Retail' : 'Thời Trang An Phát'}
             value={form.storeName}
             onChange={(e) => handleStoreNameChange(e.target.value)}
           />
         </Field>
 
         <Field
-          label="Mã định danh Slug cửa hàng"
+          label={isEn ? 'Store URL Slug' : 'Mã định danh Slug cửa hàng'}
           required
           error={errors.storeSlug}
           icon={Globe2}
-          hint={`Được dùng trong URL: stockpilot.vn/${form.storeSlug || 'ten-cua-hang'}`}
+          hint={
+            isEn
+              ? `Used in URL: stockpilot.vn/${form.storeSlug || 'store-name'}`
+              : `Được dùng trong URL: stockpilot.vn/${form.storeSlug || 'ten-cua-hang'}`
+          }
         >
           <TextInput
             id="reg-slug"
@@ -318,23 +350,31 @@ function StepStore({ form, errors, onChange }) {
 
       {/* Address */}
       <Field
-        label="Địa chỉ cửa hàng / Kho hàng"
+        label={isEn ? 'Store / Warehouse Address' : 'Địa chỉ cửa hàng / Kho hàng'}
         error={errors.storeAddress}
         icon={MapPin}
-        hint="Dùng để in trên phiếu giao hàng và phiếu kho"
+        hint={
+          isEn
+            ? 'Printed on packing slips & warehouse delivery notes'
+            : 'Dùng để in trên phiếu giao hàng và phiếu kho'
+        }
       >
         <TextInput
           id="reg-address"
           icon
           type="text"
-          placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố"
+          placeholder={
+            isEn
+              ? 'Street address, ward/district, province/city'
+              : 'Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố'
+          }
           value={form.storeAddress}
           onChange={(e) => onChange('storeAddress', e.target.value)}
         />
       </Field>
 
       {/* Industry category */}
-      <Field label="Ngành hàng kinh doanh chính" icon={Tag}>
+      <Field label={isEn ? 'Primary Business Category' : 'Ngành hàng kinh doanh chính'} icon={Tag}>
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
             <Tag className="w-4 h-4" />
@@ -345,15 +385,15 @@ function StepStore({ form, errors, onChange }) {
             onChange={(e) => onChange('industry', e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 text-slate-900 text-sm rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium appearance-none cursor-pointer"
           >
-            <option value="">-- Chọn ngành hàng --</option>
-            <option value="tap-hoa">Tạp hóa / Bán lẻ đa ngành</option>
-            <option value="thoi-trang">Thời trang / Quần áo / Phụ kiện</option>
-            <option value="thuc-pham">Thực phẩm / Đồ uống / F&B</option>
-            <option value="dien-tu">Điện tử / Điện thoại / Máy tính</option>
-            <option value="my-pham">Mỹ phẩm / Chăm sóc cá nhân</option>
-            <option value="gia-dung">Đồ gia dụng / Nội thất</option>
-            <option value="van-phong">Văn phòng phẩm / Học tập</option>
-            <option value="khac">Ngành hàng khác</option>
+            <option value="">{isEn ? '-- Select business category --' : '-- Chọn ngành hàng --'}</option>
+            <option value="tap-hoa">{isEn ? 'Grocery / Multi-category Retail' : 'Tạp hóa / Bán lẻ đa ngành'}</option>
+            <option value="thoi-trang">{isEn ? 'Fashion / Apparel / Accessories' : 'Thời trang / Quần áo / Phụ kiện'}</option>
+            <option value="thuc-pham">{isEn ? 'Food / Beverage / F&B' : 'Thực phẩm / Đồ uống / F&B'}</option>
+            <option value="dien-tu">{isEn ? 'Electronics / Phones / Computers' : 'Điện tử / Điện thoại / Máy tính'}</option>
+            <option value="my-pham">{isEn ? 'Cosmetics / Personal Care' : 'Mỹ phẩm / Chăm sóc cá nhân'}</option>
+            <option value="gia-dung">{isEn ? 'Home Goods / Furniture' : 'Đồ gia dụng / Nội thất'}</option>
+            <option value="van-phong">{isEn ? 'Stationery / Education' : 'Văn phòng phẩm / Học tập'}</option>
+            <option value="khac">{isEn ? 'Other Industries' : 'Ngành hàng khác'}</option>
           </select>
         </div>
       </Field>
@@ -368,15 +408,17 @@ function StepStore({ form, errors, onChange }) {
           className="mt-0.5 w-4 h-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500 cursor-pointer shrink-0"
         />
         <span className="text-xs leading-relaxed text-slate-600">
-          Tôi đã đọc và đồng ý với{' '}
+          {isEn ? 'I have read and agree to the ' : 'Tôi đã đọc và đồng ý với '}
           <a href="#" className="text-blue-600 font-semibold hover:underline" onClick={(e) => e.preventDefault()}>
-            Điều khoản Dịch vụ
+            {isEn ? 'Terms of Service' : 'Điều khoản Dịch vụ'}
           </a>{' '}
-          và{' '}
+          {isEn ? 'and ' : 'và '}
           <a href="#" className="text-blue-600 font-semibold hover:underline" onClick={(e) => e.preventDefault()}>
-            Chính sách Bảo mật Dữ liệu
+            {isEn ? 'Privacy Policy' : 'Chính sách Bảo mật Dữ liệu'}
           </a>{' '}
-          của StockPilot. Dữ liệu cửa hàng của bạn luôn được bảo mật tuyệt đối.
+          {isEn
+            ? 'of StockPilot. Your business data is always strictly secured.'
+            : 'của StockPilot. Dữ liệu cửa hàng của bạn luôn được bảo mật tuyệt đối.'}
         </span>
       </label>
       {errors.agreeTerms && (
@@ -388,13 +430,14 @@ function StepStore({ form, errors, onChange }) {
   );
 }
 
-
 // ─── Main Component ─────────────────────────────────────────────────────────────
 
 export function RegisterPage() {
   const navigate = useNavigate();
   const { login } = useAuthStore();
   const { toast } = useToast();
+  const { language } = useTranslation();
+  const isEn = language === 'en';
 
   const [step, setStep] = useState(1); // 1 | 2
   const [isLoading, setIsLoading] = useState(false);
@@ -424,12 +467,20 @@ export function RegisterPage() {
   // Validate step 1
   const validateStep1 = () => {
     const errs = {};
-    if (!form.name.trim()) errs.name = 'Vui lòng nhập họ và tên đầy đủ';
-    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) errs.email = 'Địa chỉ email không hợp lệ';
-    if (form.password.length < 8) errs.password = 'Mật khẩu phải có ít nhất 8 ký tự';
-    if (form.password !== form.confirmPassword) errs.confirmPassword = 'Mật khẩu xác nhận chưa khớp';
+    if (!form.name.trim()) {
+      errs.name = isEn ? 'Please enter your full name' : 'Vui lòng nhập họ và tên đầy đủ';
+    }
+    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) {
+      errs.email = isEn ? 'Invalid email address' : 'Địa chỉ email không hợp lệ';
+    }
+    if (form.password.length < 8) {
+      errs.password = isEn ? 'Password must be at least 8 characters' : 'Mật khẩu phải có ít nhất 8 ký tự';
+    }
+    if (form.password !== form.confirmPassword) {
+      errs.confirmPassword = isEn ? 'Passwords do not match' : 'Mật khẩu xác nhận chưa khớp';
+    }
     if (form.phone && !/^(0|\+84)[0-9]{9}$/.test(form.phone.replace(/\s/g, ''))) {
-      errs.phone = 'Số điện thoại không đúng định dạng (10 chữ số)';
+      errs.phone = isEn ? 'Phone number must be 10 digits' : 'Số điện thoại không đúng định dạng (10 chữ số)';
     }
     return errs;
   };
@@ -437,10 +488,22 @@ export function RegisterPage() {
   // Validate step 2
   const validateStep2 = () => {
     const errs = {};
-    if (!form.storeName.trim()) errs.storeName = 'Vui lòng nhập tên cửa hàng';
-    if (!form.storeSlug.trim()) errs.storeSlug = 'Vui lòng nhập mã định danh slug';
-    if (!/^[a-z0-9-]+$/.test(form.storeSlug)) errs.storeSlug = 'Slug chỉ được dùng chữ thường, số và dấu gạch ngang';
-    if (!form.agreeTerms) errs.agreeTerms = 'Bạn cần đồng ý với điều khoản dịch vụ để tiếp tục';
+    if (!form.storeName.trim()) {
+      errs.storeName = isEn ? 'Please enter your store name' : 'Vui lòng nhập tên cửa hàng';
+    }
+    if (!form.storeSlug.trim()) {
+      errs.storeSlug = isEn ? 'Please enter store URL slug' : 'Vui lòng nhập mã định danh slug';
+    }
+    if (!/^[a-z0-9-]+$/.test(form.storeSlug)) {
+      errs.storeSlug = isEn
+        ? 'Slug only allows lowercase letters, numbers, and hyphens'
+        : 'Slug chỉ được dùng chữ thường, số và dấu gạch ngang';
+    }
+    if (!form.agreeTerms) {
+      errs.agreeTerms = isEn
+        ? 'You must agree to the Terms of Service to continue'
+        : 'Bạn cần đồng ý với điều khoản dịch vụ để tiếp tục';
+    }
     return errs;
   };
 
@@ -506,7 +569,11 @@ export function RegisterPage() {
       const digits = pasted.split('');
       setOtp(digits);
       otpInputsRef.current[5]?.focus();
-      toast({ type: 'success', title: 'Đã dán mã OTP', message: `Mã xác nhận: ${pasted}` });
+      toast({
+        type: 'success',
+        title: isEn ? 'OTP Pasted' : 'Đã dán mã OTP',
+        message: isEn ? `Verification code: ${pasted}` : `Mã xác nhận: ${pasted}`,
+      });
     }
   };
 
@@ -521,7 +588,7 @@ export function RegisterPage() {
 
     setIsLoading(true);
     try {
-      const { apiSendRegisterOtp } = await import('../services/authService');
+      const { apiSendRegisterOtp } = await import('../../services/authService');
       await apiSendRegisterOtp({
         fullName: form.name.trim(),
         email: form.email.trim(),
@@ -536,13 +603,19 @@ export function RegisterPage() {
 
       toast({
         type: 'success',
-        title: 'Đã gửi mã OTP về Gmail!',
-        message: `Mã xác thực gồm 6 chữ số đã được gửi tới ${form.email.trim()}. Vui lòng kiểm tra hộp thư để hoàn tất đăng ký!`,
+        title: isEn ? 'OTP Code Sent to Email!' : 'Đã gửi mã OTP về Gmail!',
+        message: isEn
+          ? `A 6-digit verification code has been sent to ${form.email.trim()}. Please check your inbox to complete registration!`
+          : `Mã xác thực gồm 6 chữ số đã được gửi tới ${form.email.trim()}. Vui lòng kiểm tra hộp thư để hoàn tất đăng ký!`,
       });
     } catch (err) {
-      const { getApiError } = await import('../services/authService');
+      const { getApiError } = await import('../../services/authService');
       const msg = getApiError(err);
-      toast({ type: 'error', title: 'Không thể gửi mã OTP', message: msg });
+      toast({
+        type: 'error',
+        title: isEn ? 'Unable to send OTP' : 'Không thể gửi mã OTP',
+        message: msg,
+      });
       setIsLoading(false);
     }
   };
@@ -555,7 +628,7 @@ export function RegisterPage() {
     setOtp(['', '', '', '', '', '']);
 
     try {
-      const { apiSendRegisterOtp } = await import('../services/authService');
+      const { apiSendRegisterOtp } = await import('../../services/authService');
       await apiSendRegisterOtp({
         fullName: form.name.trim(),
         email: form.email.trim(),
@@ -564,12 +637,18 @@ export function RegisterPage() {
 
       toast({
         type: 'success',
-        title: 'Đã gửi lại mã OTP!',
-        message: `Hệ thống đã gửi lại mã xác thực mới đến ${form.email.trim()}.`,
+        title: isEn ? 'Resent OTP code!' : 'Đã gửi lại mã OTP!',
+        message: isEn
+          ? `A new verification code has been sent to ${form.email.trim()}.`
+          : `Hệ thống đã gửi lại mã xác thực mới đến ${form.email.trim()}.`,
       });
     } catch (err) {
-      const { getApiError } = await import('../services/authService');
-      toast({ type: 'error', title: 'Không thể gửi lại mã', message: getApiError(err) });
+      const { getApiError } = await import('../../services/authService');
+      toast({
+        type: 'error',
+        title: isEn ? 'Unable to resend code' : 'Không thể gửi lại mã',
+        message: getApiError(err),
+      });
     }
   };
 
@@ -578,13 +657,17 @@ export function RegisterPage() {
     e.preventDefault();
     const enteredCode = otp.join('');
     if (enteredCode.length < 6) {
-      toast({ type: 'error', title: 'Chưa đủ 6 số', message: 'Vui lòng nhập đầy đủ 6 chữ số mã OTP!' });
+      toast({
+        type: 'error',
+        title: isEn ? '6 digits required' : 'Chưa đủ 6 số',
+        message: isEn ? 'Please enter all 6 digits of the OTP code!' : 'Vui lòng nhập đầy đủ 6 chữ số mã OTP!',
+      });
       return;
     }
 
     setIsVerifyingOtp(true);
     try {
-      const { apiRegister } = await import('../services/authService');
+      const { apiRegister } = await import('../../services/authService');
       await apiRegister({
         fullName: form.name.trim(),
         email: form.email.trim(),
@@ -601,17 +684,21 @@ export function RegisterPage() {
 
       toast({
         type: 'success',
-        title: 'Đăng ký thành công!',
-        message: `Chào mừng ${form.name} đến với StockPilot!`,
+        title: isEn ? 'Registration successful!' : 'Đăng ký thành công!',
+        message: isEn ? `Welcome ${form.name} to StockPilot!` : `Chào mừng ${form.name} đến với StockPilot!`,
       });
 
       setIsVerifyingOtp(false);
       setShowOtpModal(false);
       navigate('/dashboard');
     } catch (err) {
-      const { getApiError } = await import('../services/authService');
+      const { getApiError } = await import('../../services/authService');
       const msg = getApiError(err);
-      toast({ type: 'error', title: 'Xác thực OTP thất bại', message: msg });
+      toast({
+        type: 'error',
+        title: isEn ? 'OTP verification failed' : 'Xác thực OTP thất bại',
+        message: msg,
+      });
       setIsVerifyingOtp(false);
     }
   };
@@ -630,7 +717,7 @@ export function RegisterPage() {
           {step > 1 ? <Check className="w-3.5 h-3.5" /> : '1'}
         </div>
         <span className={`text-xs font-semibold hidden sm:inline ${step >= 1 ? 'text-blue-600' : 'text-slate-400'}`}>
-          Tài khoản
+          {isEn ? 'Account' : 'Tài khoản'}
         </span>
       </div>
 
@@ -646,7 +733,7 @@ export function RegisterPage() {
           2
         </div>
         <span className={`text-xs font-semibold hidden sm:inline ${step >= 2 ? 'text-blue-600' : 'text-slate-400'}`}>
-          Cửa hàng
+          {isEn ? 'Store' : 'Cửa hàng'}
         </span>
       </div>
     </div>
@@ -659,150 +746,168 @@ export function RegisterPage() {
       <div className="w-full bg-white rounded-[28px] shadow-[0_25px_70px_-12px_rgba(30,58,138,0.18),0_10px_25px_-5px_rgba(15,23,42,0.08)] border border-white/80 ring-1 ring-blue-900/5 overflow-hidden flex flex-col md:flex-row">
 
         {/* ─── LEFT panel ─────────────────────────────────────────────────────── */}
-        <div className="md:w-[40%] bg-linear-to-br from-sky-400 via-blue-400 to-indigo-400 p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
-        {/* Ambient glowing orbs */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-white/20 rounded-full blur-3xl pointer-events-none -translate-y-1/3 translate-x-1/3" />
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-sky-200/30 rounded-full blur-3xl pointer-events-none translate-y-1/3 -translate-x-1/3" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="md:w-[40%] bg-gradient-to-br from-sky-400 via-blue-400 to-indigo-400 p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
+          {/* Ambient glowing orbs */}
+          <div className="absolute top-0 right-0 w-80 h-80 bg-white/20 rounded-full blur-3xl pointer-events-none -translate-y-1/3 translate-x-1/3" />
+          <div className="absolute bottom-0 left-0 w-72 h-72 bg-sky-200/30 rounded-full blur-3xl pointer-events-none translate-y-1/3 -translate-x-1/3" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-        {/* Logo + Title */}
-        <div className="relative z-10 flex flex-col items-center text-center pt-2">
-          <div className="relative mb-5">
-            <div className="w-20 h-20 rounded-2xl bg-white/40 backdrop-blur-md border border-white/60 flex items-center justify-center shadow-lg">
-              <svg className="w-11 h-11 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                <line x1="12" y1="22.08" x2="12" y2="12" />
-              </svg>
-            </div>
-            <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[9px] font-black px-2.5 py-0.5 rounded-full bg-white/70 text-slate-950 border border-slate-900/20 whitespace-nowrap uppercase tracking-wider shadow-sm">
-              AI Pilot
-            </span>
-          </div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-950 mb-2">StockPilot</h1>
-          <p className="text-xs font-bold text-slate-900 max-w-57.5 leading-relaxed">
-            Bắt đầu 30 ngày dùng thử miễn phí – Không cần thẻ tín dụng
-          </p>
-        </div>
-
-        {/* Feature cards */}
-        <div className="relative z-10 space-y-2.5 my-8">
-          {[
-            { icon: Package,        text: 'Quản lý sản phẩm & phân loại danh mục' },
-            { icon: AlertTriangle,  text: 'Cảnh báo thông minh nguy cơ hết / tồn hàng' },
-            { icon: DollarSign,     text: 'AI gợi ý giá tối ưu với giải thích rõ ràng' },
-            { icon: Sparkles,       text: 'Trợ lý AI Pilot phân tích kinh doanh 24/7' },
-          ].map((item, idx) => {
-            const Icon = item.icon;
-            return (
-              <div key={idx} className="flex items-center gap-3.5 px-4 py-2.5 rounded-xl bg-white/35 border border-white/50 backdrop-blur-sm hover:bg-white/45 transition-all">
-                <div className="w-8 h-8 rounded-lg bg-white/55 flex items-center justify-center shrink-0">
-                  <Icon className="w-4 h-4 text-slate-950 stroke-[2.2]" />
-                </div>
-                <span className="text-xs font-bold text-slate-950">{item.text}</span>
+          {/* Logo + Title */}
+          <div className="relative z-10 flex flex-col items-center text-center pt-2">
+            <div className="relative mb-5">
+              <div className="w-20 h-20 rounded-2xl bg-white/40 backdrop-blur-md border border-white/60 flex items-center justify-center shadow-lg">
+                <svg className="w-11 h-11 text-slate-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                  <line x1="12" y1="22.08" x2="12" y2="12" />
+                </svg>
               </div>
-            );
-          })}
-        </div>
-
-        {/* Bottom disclaimer */}
-        <div className="relative z-10 space-y-2">
-          <div className="flex items-center gap-2 justify-center">
-            {[
-              { text: '✓ Bảo mật SSL' },
-              { text: '✓ GDPR ready' },
-              { text: '✓ Backup hàng ngày' },
-            ].map((b, i) => (
-              <span key={i} className="text-[10px] font-bold text-slate-950/70 bg-white/30 px-2 py-0.5 rounded-full">
-                {b.text}
+              <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[9px] font-black px-2.5 py-0.5 rounded-full bg-white/70 text-slate-950 border border-slate-900/20 whitespace-nowrap uppercase tracking-wider shadow-sm">
+                AI Pilot
               </span>
-            ))}
-          </div>
-          <p className="text-center text-[11px] font-bold text-slate-900">
-            Hệ thống chỉ gợi ý • Chủ shop toàn quyền quyết định
-          </p>
-        </div>
-      </div>
-
-      {/* ─── RIGHT panel ─────────────────────────────────────────────────────── */}
-      <div className="md:w-[60%] p-8 sm:p-10 flex flex-col justify-between bg-white">
-        <div className="max-w-lg w-full mx-auto">
-
-          {/* Header */}
-          <div className="mb-5">
-            <h2 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight">
-              {step === 1 ? 'Tạo tài khoản StockPilot' : 'Thiết lập cửa hàng của bạn'}
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">
-              {step === 1
-                ? 'Bước 1 / 2 — Điền thông tin cá nhân và mật khẩu đăng nhập'
-                : 'Bước 2 / 2 — Thiết lập hồ sơ và thông tin cửa hàng'}
+            </div>
+            <h1 className="text-3xl font-black tracking-tight text-slate-950 mb-2">StockPilot</h1>
+            <p className="text-xs font-bold text-slate-900 max-w-[260px] leading-relaxed">
+              {isEn
+                ? 'Start 30-day free trial – No credit card required'
+                : 'Bắt đầu 30 ngày dùng thử miễn phí – Không cần thẻ tín dụng'}
             </p>
           </div>
 
-          {/* Step indicator */}
-          <StepIndicator />
+          {/* Feature cards */}
+          <div className="relative z-10 space-y-2.5 my-8">
+            {[
+              {
+                icon: Package,
+                text: isEn ? 'Product catalog & category organization' : 'Quản lý sản phẩm & phân loại danh mục',
+              },
+              {
+                icon: AlertTriangle,
+                text: isEn ? 'Smart alerts for stockouts & dead inventory' : 'Cảnh báo thông minh nguy cơ hết / tồn hàng',
+              },
+              {
+                icon: DollarSign,
+                text: isEn ? 'AI price suggestions with transparent rationale' : 'AI gợi ý giá tối ưu với giải thích rõ ràng',
+              },
+              {
+                icon: Sparkles,
+                text: isEn ? 'AI Pilot assistant for 24/7 business analytics' : 'Trợ lý AI Pilot phân tích kinh doanh 24/7',
+              },
+            ].map((item, idx) => {
+              const Icon = item.icon;
+              return (
+                <div key={idx} className="flex items-center gap-3.5 px-4 py-2.5 rounded-xl bg-white/35 border border-white/50 backdrop-blur-sm hover:bg-white/45 transition-all">
+                  <div className="w-8 h-8 rounded-lg bg-white/55 flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4 text-slate-950 stroke-[2.2]" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-950">{item.text}</span>
+                </div>
+              );
+            })}
+          </div>
 
-          {/* Step 1 form */}
-          {step === 1 && (
-            <form onSubmit={handleStep1Next} className="space-y-5" autoComplete="off">
-              <StepAccount form={form} errors={errors} onChange={onChange} />
-
-              <button
-                type="submit"
-                className="w-full mt-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-xl shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                <span>Tiếp tục &rarr; Thiết lập cửa hàng</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </form>
-          )}
-
-          {/* Step 2 form */}
-          {step === 2 && (
-            <form onSubmit={handleFinalSubmit} className="space-y-5" autoComplete="off">
-              <StepStore form={form} errors={errors} onChange={onChange} />
-
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setStep(1); setErrors({}); }}
-                  className="shrink-0 px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-all cursor-pointer"
-                >
-                  ← Quay lại
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-xl shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-70"
-                >
-                  {isLoading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <span>Đăng ký</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-
-          {/* Login link */}
-          <div className="mt-6 text-center text-xs text-slate-400">
-            Đã có tài khoản cửa hàng?{' '}
-            <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline">
-              Đăng nhập ngay
-            </Link>
+          {/* Bottom disclaimer */}
+          <div className="relative z-10 space-y-2">
+            <div className="flex items-center gap-2 justify-center">
+              {[
+                { text: isEn ? '✓ SSL Encrypted' : '✓ Bảo mật SSL' },
+                { text: '✓ GDPR ready' },
+                { text: isEn ? '✓ Daily backups' : '✓ Backup hàng ngày' },
+              ].map((b, i) => (
+                <span key={i} className="text-[10px] font-bold text-slate-950/70 bg-white/30 px-2 py-0.5 rounded-full">
+                  {b.text}
+                </span>
+              ))}
+            </div>
+            <p className="text-center text-[11px] font-bold text-slate-900">
+              {isEn
+                ? 'AI suggestions only • Shop owners hold full control'
+                : 'Hệ thống chỉ gợi ý • Chủ shop toàn quyền quyết định'}
+            </p>
           </div>
         </div>
 
-        <div className="pt-6 text-center text-xs text-slate-400">
-          Phiên bản 1.0 • © 2026 StockPilot Vietnam
+        {/* ─── RIGHT panel ─────────────────────────────────────────────────────── */}
+        <div className="md:w-[60%] p-8 sm:p-10 flex flex-col justify-between bg-white">
+          <div className="max-w-lg w-full mx-auto">
+
+            {/* Header */}
+            <div className="mb-5">
+              <h2 className="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight">
+                {step === 1
+                  ? (isEn ? 'Create StockPilot Account' : 'Tạo tài khoản StockPilot')
+                  : (isEn ? 'Set Up Your Store' : 'Thiết lập cửa hàng của bạn')}
+              </h2>
+              <p className="text-sm text-slate-500 mt-1">
+                {step === 1
+                  ? (isEn ? 'Step 1 / 2 — Personal info & account credentials' : 'Bước 1 / 2 — Điền thông tin cá nhân và mật khẩu đăng nhập')
+                  : (isEn ? 'Step 2 / 2 — Store profile & configuration' : 'Bước 2 / 2 — Thiết lập hồ sơ và thông tin cửa hàng')}
+              </p>
+            </div>
+
+            {/* Step indicator */}
+            <StepIndicator />
+
+            {/* Step 1 form */}
+            {step === 1 && (
+              <form onSubmit={handleStep1Next} className="space-y-5" autoComplete="off">
+                <StepAccount form={form} errors={errors} onChange={onChange} isEn={isEn} />
+
+                <button
+                  type="submit"
+                  className="w-full mt-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-xl shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <span>{isEn ? 'Continue → Store Setup' : 'Tiếp tục → Thiết lập cửa hàng'}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </form>
+            )}
+
+            {/* Step 2 form */}
+            {step === 2 && (
+              <form onSubmit={handleFinalSubmit} className="space-y-5" autoComplete="off">
+                <StepStore form={form} errors={errors} onChange={onChange} isEn={isEn} />
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setStep(1); setErrors({}); }}
+                    className="shrink-0 px-5 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition-all cursor-pointer"
+                  >
+                    {isEn ? '← Back' : '← Quay lại'}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold text-sm rounded-xl shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-70"
+                  >
+                    {isLoading ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <span>{isEn ? 'Create Account' : 'Đăng ký'}</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Login link */}
+            <div className="mt-6 text-center text-xs text-slate-400">
+              {isEn ? 'Already have a store account?' : 'Đã có tài khoản cửa hàng?'}{' '}
+              <Link to="/login" className="font-semibold text-blue-600 hover:text-blue-700 hover:underline">
+                {isEn ? 'Sign in now' : 'Đăng nhập ngay'}
+              </Link>
+            </div>
+          </div>
+
+          <div className="pt-6 text-center text-xs text-slate-400">
+            {isEn ? 'Version 1.0 • © 2026 StockPilot Vietnam' : 'Phiên bản 1.0 • © 2026 StockPilot Vietnam'}
+          </div>
         </div>
-      </div>
       </div>
 
       {/* ─── MODAL NHẬP MÃ OTP XÁC THỰC ĐĂNG KÝ (Render via Portal to cover entire viewport) ─── */}
@@ -823,9 +928,13 @@ export function RegisterPage() {
               <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-inner">
                 <KeyRound className="w-7 h-7" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900">Xác thực đăng ký tài khoản</h3>
+              <h3 className="text-xl font-bold text-slate-900">
+                {isEn ? 'Verify Account Registration' : 'Xác thực đăng ký tài khoản'}
+              </h3>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Mã OTP gồm 6 chữ số đã được gửi đến email đăng nhập của bạn:
+                {isEn
+                  ? 'A 6-digit OTP code has been sent to your email:'
+                  : 'Mã OTP gồm 6 chữ số đã được gửi đến email đăng nhập của bạn:'}
                 <br />
                 <strong className="text-blue-600 font-semibold">{form.email}</strong>
               </p>
@@ -835,7 +944,7 @@ export function RegisterPage() {
             <form onSubmit={handleVerifyAndRegister} className="space-y-5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-2.5 text-center">
-                  Nhập mã OTP 6 chữ số trong hộp thư Gmail:
+                  {isEn ? 'Enter the 6-digit OTP code from your inbox:' : 'Nhập mã OTP 6 chữ số trong hộp thư Gmail:'}
                 </label>
 
                 {/* 6 Digits Inputs */}
@@ -867,11 +976,15 @@ export function RegisterPage() {
                     className="text-blue-600 hover:text-blue-700 font-semibold flex items-center gap-1.5 cursor-pointer hover:underline"
                   >
                     <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Gửi lại mã OTP mới</span>
+                    <span>{isEn ? 'Resend new OTP code' : 'Gửi lại mã OTP mới'}</span>
                   </button>
                 ) : (
                   <span className="text-slate-400">
-                    Gửi lại mã sau <strong className="text-blue-600">{resendCooldown}s</strong>
+                    {isEn ? (
+                      <>Resend code in <strong className="text-blue-600">{resendCooldown}s</strong></>
+                    ) : (
+                      <>Gửi lại mã sau <strong className="text-blue-600">{resendCooldown}s</strong></>
+                    )}
                   </span>
                 )}
               </div>
@@ -883,7 +996,7 @@ export function RegisterPage() {
                   onClick={() => setShowOtpModal(false)}
                   className="flex-1 py-3 px-4 border border-slate-200 text-slate-600 font-semibold text-sm rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
                 >
-                  Quay về
+                  {isEn ? 'Back' : 'Quay về'}
                 </button>
 
                 <button
@@ -894,7 +1007,7 @@ export function RegisterPage() {
                   {isVerifyingOtp ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
-                    <span>Xác nhận & Hoàn tất</span>
+                    <span>{isEn ? 'Verify & Finish' : 'Xác nhận & Hoàn tất'}</span>
                   )}
                 </button>
               </div>

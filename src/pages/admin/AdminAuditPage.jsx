@@ -3,8 +3,8 @@ import {
   FileText, Search, Filter, ShieldCheck, Download,
   Eye, Clock, User, CheckCircle2, AlertTriangle, X, RefreshCw
 } from 'lucide-react';
-import { useToast } from '../components/common/Toast';
-import { apiGetAuditLogs } from '../services/analyticsService';
+import { useToast } from '../../components/common/Toast';
+import { apiGetAuditLogs } from '../../services/analyticsService';
 
 const INITIAL_LOGS = [
   {

@@ -4,23 +4,33 @@ import { useUIStore } from './components/store/uiStore';
 import { useAuthStore } from './components/store/authStore';
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
+// Landing Page
 import { LandingPage } from './pages/LandingPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { ProductsPage } from './pages/ProductsPage';
-import { CategoriesPage } from './pages/CategoriesPage';
-import { PosPage } from './pages/PosPage';
-import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
-import { AIAssistantPage } from './pages/AIAssistantPage';
-import { OrdersPage } from './pages/OrdersPage';
-import { InventoryPage } from './pages/InventoryPage';
-import { AlertsPage } from './pages/AlertsPage';
-import { PricingPage } from './pages/PricingPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { AdminUsersPage } from './pages/AdminUsersPage';
-import { AdminAuditPage } from './pages/AdminAuditPage';
+
+// Shared Pages (Dùng chung / Auth)
+import { LoginPage } from './pages/shared/LoginPage';
+import { RegisterPage } from './pages/shared/RegisterPage';
+import { ForgotPasswordPage } from './pages/shared/ForgotPasswordPage';
+import { DashboardPage } from './pages/shared/DashboardPage';
+import { ProductsPage } from './pages/shared/ProductsPage';
+import { CategoriesPage } from './pages/shared/CategoriesPage';
+import { AlertsPage } from './pages/shared/AlertsPage';
+import { AIAssistantPage } from './pages/shared/AIAssistantPage';
+
+// Owner Pages (Chủ shop)
+import { OrdersPage } from './pages/owner/OrdersPage';
+import { PricingPage } from './pages/owner/PricingPage';
+import { AnalyticsPage } from './pages/owner/AnalyticsPage';
+import { SettingsPage } from './pages/owner/SettingsPage';
+import { StaffPage } from './pages/owner/StaffPage';
+
+// Staff Pages (Nhân viên)
+import { PosPage } from './pages/staff/PosPage';
+import { InventoryPage } from './pages/staff/InventoryPage';
+
+// Admin Pages (Quản trị hệ thống)
+import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { AdminAuditPage } from './pages/admin/AdminAuditPage';
 import { ToastContainer } from './components/common/Toast';
 
 // ─── Error Boundary: bắt lỗi render, hiển thị thông báo thay vì màn trắng ───
@@ -183,6 +193,14 @@ export default function App() {
               element={
                 <RequireRole roles={['store_owner', 'admin']}>
                   <ErrorBoundary><SettingsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/staff"
+              element={
+                <RequireRole roles={['store_owner', 'admin']}>
+                  <ErrorBoundary><StaffPage /></ErrorBoundary>
                 </RequireRole>
               }
             />

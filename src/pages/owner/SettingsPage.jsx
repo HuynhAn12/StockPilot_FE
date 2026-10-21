@@ -9,8 +9,9 @@ import {
   AlertTriangle, Info, Loader2, User,
   Users, UserPlus, UserCheck, UserX, Plus
 } from 'lucide-react';
-import { useToast } from '../components/common/Toast';
-import { useAuthStore } from '../components/store/authStore';
+import { useToast } from '../../components/common/Toast';
+import { useAuthStore } from '../../components/store/authStore';
+import { useTranslation } from '../../i18n/useTranslation';
 import {
   apiGetDecisionConfig,
   apiUpdateDecisionConfig,
@@ -21,8 +22,8 @@ import {
   apiUpdateNotificationSettings,
   apiUpdateStoreProfile,
   apiChangePassword,
-} from '../services/analyticsService';
-import { apiClient } from '../lib/apiClient';
+} from '../../services/analyticsService';
+import { apiClient } from '../../lib/apiClient';
 
 /* ─── Inline CSS ─── */
 const CSS = `
@@ -262,9 +263,8 @@ const CSS = `
 .st-fade { animation:st-fadeIn .2s ease; }
 `;
 
-function SliderField({ label, value, min, max, unit = ' ngày', desc, onChange }) {
+function SliderField({ label, value, min, max, unit, desc, onChange }) {
   const pct = Math.round(((value - min) / (max - min)) * 100);
-  // gradient: xanh lợt (#bae6fd) bên trái → xanh đậm (#0369a1) bên phải
   const trackBg = `linear-gradient(to right, #bae6fd, #0284c7 ${pct}%, #e2e8f0 ${pct}%)`;
   return (
     <div>
@@ -296,6 +296,9 @@ function Toggle({ checked, onChange }) {
 export function SettingsPage() {
   const { toast } = useToast();
   const { user, fetchMe } = useAuthStore();
+  const { language } = useTranslation();
+  const isEn = language === 'en';
+
   const [activeTab, setActiveTab] = useState('store');
   const [saving, setSaving] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -408,14 +411,16 @@ export function SettingsPage() {
       const nextStatus = !staff.isActive;
       await apiClient.patch(`/users/${staff.id}`, { isActive: nextStatus });
       toast({
-        title: nextStatus ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản nhân viên',
-        description: `Tài khoản ${staff.email} đã được ${nextStatus ? 'kích hoạt' : 'khóa thành công và thu hồi phiên đăng nhập'}.`,
+        title: nextStatus ? (isEn ? 'Account Unlocked' : 'Đã mở khóa tài khoản') : (isEn ? 'Account Locked' : 'Đã khóa tài khoản nhân viên'),
+        description: isEn
+          ? `Account ${staff.email} has been ${nextStatus ? 'activated' : 'locked and session revoked'}.`
+          : `Tài khoản ${staff.email} đã được ${nextStatus ? 'kích hoạt' : 'khóa thành công và thu hồi phiên đăng nhập'}.`,
         type: nextStatus ? 'success' : 'info',
       });
       await fetchStaff();
     } catch (err) {
       toast({
-        title: 'Lỗi cập nhật trạng thái',
+        title: isEn ? 'Failed to update status' : 'Lỗi cập nhật trạng thái',
         description: err?.response?.data?.error?.message || err?.message,
         type: 'error',
       });
@@ -427,11 +432,11 @@ export function SettingsPage() {
   const handleCreateStaff = async (e) => {
     e.preventDefault();
     if (!newStaffName.trim() || !newStaffEmail.trim() || !newStaffPassword) {
-      toast({ title: 'Thiếu thông tin', description: 'Vui lòng nhập họ tên, email và mật khẩu khởi tạo.', type: 'error' });
+      toast({ title: isEn ? 'Missing Information' : 'Thiếu thông tin', description: isEn ? 'Please enter staff full name, email and initial password.' : 'Vui lòng nhập họ tên, email và mật khẩu khởi tạo.', type: 'error' });
       return;
     }
     if (newStaffPassword.length < 6) {
-      toast({ title: 'Mật khẩu quá ngắn', description: 'Mật khẩu phải có tối thiểu 6 ký tự.', type: 'error' });
+      toast({ title: isEn ? 'Password Too Short' : 'Mật khẩu quá ngắn', description: isEn ? 'Password must be at least 6 characters.' : 'Mật khẩu phải có tối thiểu 6 ký tự.', type: 'error' });
       return;
     }
     setCreatingStaff(true);
@@ -442,8 +447,10 @@ export function SettingsPage() {
         password: newStaffPassword,
       });
       toast({
-        title: 'Tạo tài khoản nhân viên thành công',
-        description: `Nhân viên ${newStaffEmail} đã được cấp vai trò WAREHOUSE_STAFF cho cửa hàng của bạn.`,
+        title: isEn ? 'Staff Created Successfully' : 'Tạo tài khoản nhân viên thành công',
+        description: isEn
+          ? `Staff account ${newStaffEmail} granted WAREHOUSE_STAFF role.`
+          : `Nhân viên ${newStaffEmail} đã được cấp vai trò WAREHOUSE_STAFF cho cửa hàng của bạn.`,
         type: 'success',
       });
       setNewStaffName('');
@@ -453,7 +460,7 @@ export function SettingsPage() {
       await fetchStaff();
     } catch (err) {
       toast({
-        title: 'Lỗi tạo nhân viên',
+        title: isEn ? 'Failed to Create Staff' : 'Lỗi tạo nhân viên',
         description: err?.response?.data?.error?.message || err?.message,
         type: 'error',
       });
@@ -462,32 +469,39 @@ export function SettingsPage() {
     }
   };
 
-  const handleSaveStore = async (e) => {
+  const handleUpdateProfile = async (e) => {
     e.preventDefault();
-    setSaving(true);
+    if (!fullName.trim()) {
+      toast({ title: isEn ? 'Missing Name' : 'Thiếu họ tên', description: isEn ? 'Please enter your full name.' : 'Vui lòng nhập họ tên.', type: 'error' });
+      return;
+    }
+    setSavingProfile(true);
     try {
-      await apiUpdateStoreProfile({ storeName, phone: storePhone, address: storeAddress });
-      if (fetchMe) await fetchMe();
-      toast({ title: 'Đã lưu thông tin cửa hàng', description: 'Dữ liệu cửa hàng đã được cập nhật vào database thành công.', type: 'success' });
+      await apiClient.put('/auth/profile', { fullName: fullName.trim() });
+      toast({ title: isEn ? 'Profile Updated' : 'Cập nhật thành công', description: isEn ? 'Your full name has been saved.' : 'Họ tên của bạn đã được cập nhật.', type: 'success' });
+      if (fetchMe) fetchMe();
     } catch (err) {
-      toast({ title: 'Lỗi lưu thông tin', description: err?.response?.data?.error?.message || err?.message, type: 'error' });
+      toast({ title: isEn ? 'Update Failed' : 'Lỗi cập nhật', description: err?.response?.data?.error?.message || err?.message, type: 'error' });
     } finally {
-      setSaving(false);
+      setSavingProfile(false);
     }
   };
 
-  const handleUpdateProfile = async (e) => {
+  const handleSaveStore = async (e) => {
     e.preventDefault();
-    if (!fullName.trim()) return;
-    setSavingProfile(true);
+    if (!storeName.trim()) {
+      toast({ title: isEn ? 'Missing Information' : 'Thiếu thông tin', description: isEn ? 'Please enter store name.' : 'Vui lòng nhập tên cửa hàng.', type: 'error' });
+      return;
+    }
+    setSaving(true);
     try {
-      await apiClient.patch('/auth/me', { fullName: fullName.trim() });
-      if (fetchMe) await fetchMe();
-      toast({ title: 'Cập nhật thành công', description: 'Họ tên tài khoản đã được lưu vào database.', type: 'success' });
+      await apiUpdateStoreProfile({ name: storeName.trim(), phone: storePhone.trim(), address: storeAddress.trim() });
+      toast({ title: isEn ? 'Saved' : 'Đã lưu', description: isEn ? 'Store profile updated successfully.' : 'Thông tin cửa hàng đã được cập nhật thành công.', type: 'success' });
+      if (fetchMe) fetchMe();
     } catch (err) {
-      toast({ title: 'Lỗi cập nhật', description: err?.response?.data?.error?.message || err?.message, type: 'error' });
+      toast({ title: isEn ? 'Save Failed' : 'Lỗi lưu dữ liệu', description: err?.response?.data?.error?.message || (isEn ? 'Could not save store info.' : 'Không thể lưu thông tin cửa hàng.'), type: 'error' });
     } finally {
-      setSavingProfile(false);
+      setSaving(false);
     }
   };
 
@@ -504,58 +518,51 @@ export function SettingsPage() {
         maxMarkdownPct: maxPriceChange / 100,
       });
       setEngineDirty(false);
-      toast({ title: 'Đã lưu tham số Decision Engine', description: 'Cấu hình tham số đã được lưu vào database thành công.', type: 'success' });
+      toast({ title: isEn ? 'Engine Parameters Saved' : 'Đã lưu tham số', description: isEn ? 'Decision engine settings updated and synchronized.' : 'Cấu hình AI Decision Engine đã được cập nhật và đồng bộ.', type: 'success' });
     } catch (err) {
-      toast({ title: 'Lỗi cập nhật', description: err?.response?.data?.error?.message || err?.message, type: 'error' });
+      toast({ title: isEn ? 'Save Failed' : 'Lỗi lưu tham số', description: err?.response?.data?.error?.message || (isEn ? 'Could not save parameters.' : 'Không thể lưu tham số.'), type: 'error' });
     } finally {
       setSaving(false);
     }
   };
 
-  const handleResetEngine = async () => {
-    setSalesWindow(7); setMinDOI(3); setMaxDOI(45); setSlowDays(14); setMinMargin(10); setMaxPriceChange(15);
-    setSaving(true);
-    try {
-      await apiUpdateDecisionConfig({
-        leadTimeDays: 7,
-        safetyDays: 3,
-        targetCoverageDays: 45,
-        slowMovingDays: 14,
-        minimumMarginPct: 0.1,
-        maxMarkdownPct: 0.15,
-      });
-      setEngineDirty(false);
-      toast({ title: 'Đã khôi phục mặc định', description: 'Đã đồng bộ giá trị mặc định vào database.', type: 'info' });
-    } catch (err) {
-      toast({ title: 'Lỗi khôi phục', description: err?.response?.data?.error?.message || err?.message, type: 'error' });
-    } finally {
-      setSaving(false);
-    }
+  const handleResetEngine = () => {
+    setSalesWindow(7);
+    setMinDOI(3);
+    setMaxDOI(45);
+    setSlowDays(14);
+    setMinMargin(10);
+    setMaxPriceChange(15);
+    setEngineDirty(true);
   };
 
-  const eChange = (setter) => (v) => { setter(v); setEngineDirty(true); };
+  const eChange = (setter) => (val) => {
+    setter(val);
+    setEngineDirty(true);
+  };
 
   const handleSavePayos = async (e) => {
     e.preventDefault();
     if (!payosClientId || !payosApiKey || !payosChecksumKey) {
-      toast({ title: 'Thiếu thông tin', description: 'Vui lòng nhập đầy đủ Client ID, API Key và Checksum Key.', type: 'error' });
+      toast({ title: isEn ? 'Missing Information' : 'Thiếu thông tin', description: isEn ? 'Please enter Client ID, API Key, and Checksum Key.' : 'Vui lòng nhập đầy đủ Client ID, API Key và Checksum Key.', type: 'error' });
       return;
     }
     setSaving(true);
     try {
       const res = await apiUpdatePaymentConfig({
-        clientId: payosClientId,
-        apiKey: payosApiKey,
-        checksumKey: payosChecksumKey,
-        isActive: true,
+        clientId: payosClientId.trim(),
+        apiKey: payosApiKey.trim(),
+        checksumKey: payosChecksumKey.trim(),
       });
       setPayosConfigured(true);
       setPayosActive(true);
-      setPayosClientIdMasked(res?.clientIdMasked || payosClientId.slice(0, 6) + '••••••••');
-      setPayosClientId(''); setPayosApiKey(''); setPayosChecksumKey('');
-      toast({ title: 'Đã kết nối PayOS', description: 'Cổng thanh toán QR đã được lưu vào database và kích hoạt.', type: 'success' });
+      setPayosClientIdMasked(res.clientIdMasked || payosClientId.slice(0, 8) + '...');
+      setPayosClientId('');
+      setPayosApiKey('');
+      setPayosChecksumKey('');
+      toast({ title: isEn ? 'Connected' : 'Đã kết nối', description: isEn ? 'PayOS connected successfully. VietQR is now available.' : 'Cổng PayOS đã được kết nối thành công. Quét mã VietQR đã sẵn sàng.', type: 'success' });
     } catch (err) {
-      toast({ title: 'Lỗi kết nối PayOS', description: err?.response?.data?.error?.message || err?.message, type: 'error' });
+      toast({ title: isEn ? 'Connection Failed' : 'Lỗi kết nối', description: err?.response?.data?.error?.message || (isEn ? 'Invalid credentials or connection error.' : 'Không thể lưu cấu hình PayOS. Kiểm tra lại thông tin.'), type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -563,12 +570,15 @@ export function SettingsPage() {
 
   const handleTogglePayos = async () => {
     try {
-      const nextActive = !payosActive;
-      await apiTogglePaymentConfig(nextActive);
-      setPayosActive(nextActive);
-      toast({ title: nextActive ? 'Đã kích hoạt PayOS' : 'Đã tạm dừng PayOS', description: 'Trạng thái đã được cập nhật trong database.', type: nextActive ? 'success' : 'info' });
+      const res = await apiTogglePaymentConfig();
+      setPayosActive(res.active);
+      toast({
+        title: res.active ? (isEn ? 'PayOS Activated' : 'Đã kích hoạt PayOS') : (isEn ? 'PayOS Deactivated' : 'Đã tắt PayOS'),
+        description: res.active ? (isEn ? 'VietQR active on POS.' : 'Phương thức VietQR tự động đã được bật tại màn hình POS.') : (isEn ? 'VietQR disabled on POS.' : 'Phương thức VietQR tạm thời tắt, hệ thống sẽ ẩn mã QR tự động.'),
+        type: res.active ? 'success' : 'info',
+      });
     } catch (err) {
-      toast({ title: 'Lỗi cập nhật PayOS', description: err?.response?.data?.error?.message || err?.message, type: 'error' });
+      toast({ title: isEn ? 'Error' : 'Lỗi', description: isEn ? 'Could not toggle PayOS status.' : 'Không thể thay đổi trạng thái PayOS.', type: 'error' });
     }
   };
 
@@ -576,9 +586,9 @@ export function SettingsPage() {
     setSaving(true);
     try {
       await apiUpdateNotificationSettings(notif);
-      toast({ title: 'Đã lưu cài đặt thông báo', description: 'Cấu hình thông báo đã được lưu vào database thành công.', type: 'success' });
+      toast({ title: isEn ? 'Saved' : 'Đã lưu', description: isEn ? 'Notification settings updated.' : 'Cài đặt nhận thông báo đã được lưu thành công.', type: 'success' });
     } catch (err) {
-      toast({ title: 'Lỗi lưu thông báo', description: err?.response?.data?.error?.message || err?.message, type: 'error' });
+      toast({ title: isEn ? 'Error' : 'Lỗi', description: isEn ? 'Could not save notifications.' : 'Không thể lưu cài đặt thông báo.', type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -586,32 +596,43 @@ export function SettingsPage() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    if (!oldPwd || !newPwd || !confirmPwd) { toast({ title: 'Thiếu thông tin', description: 'Vui lòng nhập đầy đủ các trường mật khẩu.', type: 'error' }); return; }
-    if (newPwd !== confirmPwd) { toast({ title: 'Mật khẩu không khớp', description: 'Mật khẩu mới và xác nhận mật khẩu không trùng khớp.', type: 'error' }); return; }
-    if (newPwd.length < 8) { toast({ title: 'Mật khẩu quá ngắn', description: 'Mật khẩu mới phải có tối thiểu 8 ký tự.', type: 'error' }); return; }
+    if (!oldPwd || !newPwd || !confirmPwd) {
+      toast({ title: isEn ? 'Missing Information' : 'Thiếu thông tin', description: isEn ? 'Please fill in all password fields.' : 'Vui lòng điền đầy đủ các trường mật khẩu.', type: 'error' });
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      toast({ title: isEn ? 'Mismatch' : 'Mật khẩu không khớp', description: isEn ? 'New password and confirmation do not match.' : 'Mật khẩu mới và xác nhận mật khẩu không giống nhau.', type: 'error' });
+      return;
+    }
+    if (newPwd.length < 8) {
+      toast({ title: isEn ? 'Too Short' : 'Mật khẩu quá ngắn', description: isEn ? 'Password must be at least 8 characters.' : 'Mật khẩu mới phải có ít nhất 8 ký tự.', type: 'error' });
+      return;
+    }
     setSaving(true);
     try {
-      const res = await apiChangePassword({ oldPassword: oldPwd, newPassword: newPwd });
-      setOldPwd(''); setNewPwd(''); setConfirmPwd('');
-      toast({ title: 'Đổi mật khẩu thành công', description: res?.message || 'Mật khẩu mới đã được lưu vào database.', type: 'success' });
+      await apiChangePassword({ oldPassword: oldPwd, newPassword: newPwd });
+      setOldPwd('');
+      setNewPwd('');
+      setConfirmPwd('');
+      toast({ title: isEn ? 'Password Changed' : 'Đổi mật khẩu thành công', description: isEn ? 'Password updated. Please use new password next login.' : 'Mật khẩu của bạn đã được cập nhật. Hãy dùng mật khẩu mới từ lần đăng nhập sau.', type: 'success' });
     } catch (err) {
-      toast({ title: 'Lỗi đổi mật khẩu', description: err?.response?.data?.error?.message || err?.message, type: 'error' });
+      toast({ title: isEn ? 'Change Password Failed' : 'Đổi mật khẩu thất bại', description: err?.response?.data?.error?.message || (isEn ? 'Current password is incorrect.' : 'Mật khẩu hiện tại không đúng hoặc có lỗi xảy ra.'), type: 'error' });
     } finally {
       setSaving(false);
     }
   };
 
   const TABS = [
-    { id: 'store', label: 'Thông tin cửa hàng', icon: <Store size={14} /> },
-    { id: 'engine', label: 'Decision Engine', icon: <Sparkles size={14} /> },
-    { id: 'payment', label: 'Thanh toán', icon: <CreditCard size={14} /> },
-    { id: 'notifications', label: 'Thông báo', icon: <Bell size={14} /> },
-    { id: 'account', label: 'Tài khoản & Bảo mật', icon: <Shield size={14} /> },
+    { id: 'store', label: isEn ? 'Store Profile' : 'Thông tin cửa hàng', icon: <Store size={14} /> },
+    { id: 'engine', label: isEn ? 'Decision Engine' : 'Decision Engine', icon: <Sparkles size={14} /> },
+    { id: 'payment', label: isEn ? 'Payment Gateway' : 'Thanh toán', icon: <CreditCard size={14} /> },
+    { id: 'notifications', label: isEn ? 'Notifications' : 'Thông báo', icon: <Bell size={14} /> },
+    { id: 'account', label: isEn ? 'Account & Security' : 'Tài khoản & Bảo mật', icon: <Shield size={14} /> },
   ];
 
   const pwdStr = newPwd.length === 0 ? 0 : newPwd.length < 8 ? 1 : newPwd.length < 12 ? 2 : 3;
   const pwdColors = ['#e2e8f0', '#ef4444', '#f59e0b', '#059669'];
-  const pwdLabels = ['', 'Yếu', 'Trung bình', 'Mạnh'];
+  const pwdLabels = ['', isEn ? 'Weak' : 'Yếu', isEn ? 'Medium' : 'Trung bình', isEn ? 'Strong' : 'Mạnh'];
 
   return (
     <>
@@ -626,9 +647,13 @@ export function SettingsPage() {
             </div>
             <div>
               <div className="st-header-title-row">
-                <h1>Cài đặt hệ thống</h1>
+                <h1>{isEn ? 'System Settings' : 'Cài đặt hệ thống'}</h1>
               </div>
-              <p>Quản lý hồ sơ cửa hàng, tham số AI Decision Engine, cổng thanh toán và bảo mật tài khoản.</p>
+              <p>
+                {isEn
+                  ? 'Manage store profile, AI Decision Engine parameters, payment gateway and account security.'
+                  : 'Quản lý hồ sơ cửa hàng, tham số AI Decision Engine, cổng thanh toán và bảo mật tài khoản.'}
+              </p>
             </div>
           </div>
 
@@ -643,9 +668,9 @@ export function SettingsPage() {
             </div>
             <div className="st-user-meta">
               <div className="st-user-name-row">
-                <span className="st-user-name">{user?.name || 'Chủ cửa hàng'}</span>
+                <span className="st-user-name">{user?.name || (isEn ? 'Store Owner' : 'Chủ cửa hàng')}</span>
                 <span className="st-role-badge">
-                  {user?.role === 'ADMIN' ? 'Quản trị' : 'Chủ shop'}
+                  {user?.role === 'ADMIN' ? (isEn ? 'Admin' : 'Quản trị') : (isEn ? 'Store Owner' : 'Chủ shop')}
                 </span>
               </div>
               <span className="st-user-email">{user?.email || '—'}</span>
@@ -668,38 +693,38 @@ export function SettingsPage() {
             <form onSubmit={handleSaveStore}>
               <div className="st-card" style={{ padding: 26 }}>
                 <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #f1f5f9' }}>
-                  <div className="st-section-title"><Store size={16} color="#0284c7" /> Hồ sơ cửa hàng</div>
-                  <div className="st-section-desc">Thông tin hiển thị trên hóa đơn và toàn bộ giao diện hệ thống.</div>
+                  <div className="st-section-title"><Store size={16} color="#0284c7" /> {isEn ? 'Store Profile' : 'Hồ sơ cửa hàng'}</div>
+                  <div className="st-section-desc">{isEn ? 'Information displayed on invoices, receipts, and system interfaces.' : 'Thông tin hiển thị trên hóa đơn và toàn bộ giao diện hệ thống.'}</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))', gap: 18 }}>
                   <div>
-                    <label className="st-label">Tên cửa hàng</label>
-                    <input className="st-input" value={storeName} onChange={e => setStoreName(e.target.value)} placeholder="Tạp hóa Minh Phát" required />
+                    <label className="st-label">{isEn ? 'Store Name' : 'Tên cửa hàng'}</label>
+                    <input className="st-input" value={storeName} onChange={e => setStoreName(e.target.value)} placeholder={isEn ? "Minh Phat Grocery" : "Tạp hóa Minh Phát"} required />
                   </div>
                   <div>
-                    <label className="st-label">Số điện thoại / Hotline</label>
+                    <label className="st-label">{isEn ? 'Phone / Hotline' : 'Số điện thoại / Hotline'}</label>
                     <input className="st-input" value={storePhone} onChange={e => setStorePhone(e.target.value)} placeholder="0908 123 456" />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <label className="st-label">Địa chỉ kho hàng chính</label>
-                    <input className="st-input" value={storeAddress} onChange={e => setStoreAddress(e.target.value)} placeholder="Số nhà, đường, phường, quận, thành phố" />
+                    <label className="st-label">{isEn ? 'Main Warehouse Address' : 'Địa chỉ kho hàng chính'}</label>
+                    <input className="st-input" value={storeAddress} onChange={e => setStoreAddress(e.target.value)} placeholder={isEn ? "Address, street, ward, city" : "Số nhà, đường, phường, quận, thành phố"} />
                   </div>
                   <div>
-                    <label className="st-label">Mã cửa hàng (không thể thay đổi)</label>
+                    <label className="st-label">{isEn ? 'Store Code (immutable)' : 'Mã cửa hàng (không thể thay đổi)'}</label>
                     <input className="st-input" value={storeCode} disabled />
                   </div>
                   <div>
-                    <label className="st-label">Đơn vị tiền tệ</label>
+                    <label className="st-label">{isEn ? 'Currency' : 'Đơn vị tiền tệ'}</label>
                     <input className="st-input" value="VND (₫)" disabled />
                   </div>
                   <div>
-                    <label className="st-label">Múi giờ hệ thống</label>
+                    <label className="st-label">{isEn ? 'System Timezone' : 'Múi giờ hệ thống'}</label>
                     <input className="st-input" value="Asia/Ho_Chi_Minh (GMT+7)" disabled />
                   </div>
                 </div>
                 <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
                   <button type="submit" className="st-btn-primary" disabled={saving}>
-                    {saving ? <Loader2 size={14} className="st-spinning" /> : <Save size={14} />} Lưu thông tin cửa hàng
+                    {saving ? <Loader2 size={14} className="st-spinning" /> : <Save size={14} />} {isEn ? 'Save Store Profile' : 'Lưu thông tin cửa hàng'}
                   </button>
                 </div>
               </div>
@@ -714,33 +739,81 @@ export function SettingsPage() {
               <div className="st-card" style={{ padding: 26 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap', gap: 10 }}>
                   <div>
-                    <div className="st-section-title"><Sparkles size={16} color="#7c3aed" /> Tham số AI Decision Engine</div>
-                    <div className="st-section-desc">Điều chỉnh các ngưỡng ảnh hưởng trực tiếp đến cảnh báo tồn kho và đề xuất giá bán.</div>
+                    <div className="st-section-title"><Sparkles size={16} color="#7c3aed" /> {isEn ? 'AI Decision Engine Parameters' : 'Tham số AI Decision Engine'}</div>
+                    <div className="st-section-desc">{isEn ? 'Fine-tune threshold levels affecting inventory risk alerts and pricing algorithms.' : 'Điều chỉnh các ngưỡng ảnh hưởng trực tiếp đến cảnh báo tồn kho và đề xuất giá bán.'}</div>
                   </div>
                   <button type="button" onClick={handleResetEngine} className="st-btn-secondary" style={{ fontSize: 12, padding: '7px 14px' }}>
-                    <RefreshCw size={13} /> Mặc định
+                    <RefreshCw size={13} /> {isEn ? 'Defaults' : 'Mặc định'}
                   </button>
                 </div>
                 {engineDirty && (
                   <div className="st-warn-box" style={{ marginBottom: 20 }}>
                     <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-                    <span>Bạn có thay đổi chưa được lưu. Nhấn <strong>Lưu cấu hình</strong> để áp dụng.</span>
+                    <span>{isEn ? 'You have unsaved changes. Click Save Parameters to apply.' : 'Bạn có thay đổi chưa được lưu. Nhấn Lưu cấu hình để áp dụng.'}</span>
                   </div>
                 )}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 26 }}>
-                  <SliderField label="Cửa sổ tính tốc độ bán (Moving Average)" value={salesWindow} min={3} max={30} desc="Số ngày gần nhất dùng để tính tốc độ tiêu thụ trung bình (sp/ngày)." onChange={eChange(setSalesWindow)} />
-                  <SliderField label="Ngưỡng cảnh báo hết hàng (Min DOI)" value={minDOI} min={1} max={10} desc="Kích hoạt cảnh báo khi số ngày tồn kho còn lại ≤ giá trị này." onChange={eChange(setMinDOI)} />
-                  <SliderField label="Ngưỡng cảnh báo tồn quá nhiều (Overstock)" value={maxDOI} min={20} max={90} desc="Kích hoạt cảnh báo ứ đọng khi tồn kho vượt quá mức này." onChange={eChange(setMaxDOI)} />
-                  <SliderField label="Số ngày không bán để coi là bán chậm" value={slowDays} min={7} max={60} desc="Hệ thống đề xuất xả hàng khi không có đơn trong khoảng thời gian này." onChange={eChange(setSlowDays)} />
-                  <SliderField label="Biên lợi nhuận an toàn tối thiểu (Min Margin)" value={minMargin} min={5} max={30} unit="%" desc="Giá gợi ý từ AI không bao giờ thấp hơn ngưỡng này." onChange={eChange(setMinMargin)} />
-                  <SliderField label="Biên độ biến động giá tối đa mỗi lần gợi ý" value={maxPriceChange} min={5} max={30} unit="%" desc="Giới hạn tăng/giảm tối đa để tránh gây sốc tâm lý người tiêu dùng." onChange={eChange(setMaxPriceChange)} />
+                  <SliderField
+                    label={isEn ? "Sales Velocity Window (Moving Average)" : "Cửa sổ tính tốc độ bán (Moving Average)"}
+                    value={salesWindow}
+                    min={3}
+                    max={30}
+                    unit={isEn ? " days" : " ngày"}
+                    desc={isEn ? "Number of past days used to calculate average consumption rate (SP/day)." : "Số ngày gần nhất dùng để tính tốc độ tiêu thụ trung bình (sp/ngày)."}
+                    onChange={eChange(setSalesWindow)}
+                  />
+                  <SliderField
+                    label={isEn ? "Stockout Alert Threshold (Min DOI)" : "Ngưỡng cảnh báo hết hàng (Min DOI)"}
+                    value={minDOI}
+                    min={1}
+                    max={10}
+                    unit={isEn ? " days" : " ngày"}
+                    desc={isEn ? "Trigger alert when remaining days of inventory ≤ this value." : "Kích hoạt cảnh báo khi số ngày tồn kho còn lại ≤ giá trị này."}
+                    onChange={eChange(setMinDOI)}
+                  />
+                  <SliderField
+                    label={isEn ? "Overstock Alert Threshold (Max DOI)" : "Ngưỡng cảnh báo tồn quá nhiều (Overstock)"}
+                    value={maxDOI}
+                    min={20}
+                    max={90}
+                    unit={isEn ? " days" : " ngày"}
+                    desc={isEn ? "Trigger tied capital alert when stock exceeds this threshold." : "Kích hoạt cảnh báo ứ đọng khi tồn kho vượt quá mức này."}
+                    onChange={eChange(setMaxDOI)}
+                  />
+                  <SliderField
+                    label={isEn ? "Slow-Moving Threshold (Days without sale)" : "Số ngày không bán để coi là bán chậm"}
+                    value={slowDays}
+                    min={7}
+                    max={60}
+                    unit={isEn ? " days" : " ngày"}
+                    desc={isEn ? "System recommends clearance markdown when no sales in this duration." : "Hệ thống đề xuất xả hàng khi không có đơn trong khoảng thời gian này."}
+                    onChange={eChange(setSlowDays)}
+                  />
+                  <SliderField
+                    label={isEn ? "Minimum Safety Margin (Min Margin)" : "Biên lợi nhuận an toàn tối thiểu (Min Margin)"}
+                    value={minMargin}
+                    min={5}
+                    max={30}
+                    unit="%"
+                    desc={isEn ? "AI recommended price will never fall below this threshold." : "Giá gợi ý từ AI không bao giờ thấp hơn ngưỡng này."}
+                    onChange={eChange(setMinMargin)}
+                  />
+                  <SliderField
+                    label={isEn ? "Max Price Adjustment Magnitude" : "Biên độ biến động giá tối đa mỗi lần gợi ý"}
+                    value={maxPriceChange}
+                    min={5}
+                    max={30}
+                    unit="%"
+                    desc={isEn ? "Limit price changes per suggestion to avoid consumer price shock." : "Giới hạn tăng/giảm tối đa để tránh gây sốc tâm lý người tiêu dùng."}
+                    onChange={eChange(setMaxPriceChange)}
+                  />
                 </div>
                 <div style={{ marginTop: 22, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {[
-                    { l: 'Velocity', v: `${salesWindow} ngày` },
-                    { l: 'Min DOI', v: `${minDOI} ngày` },
-                    { l: 'Max DOI', v: `${maxDOI} ngày` },
-                    { l: 'Slow', v: `${slowDays} ngày` },
+                    { l: 'Velocity', v: `${salesWindow} ${isEn ? 'days' : 'ngày'}` },
+                    { l: 'Min DOI', v: `${minDOI} ${isEn ? 'days' : 'ngày'}` },
+                    { l: 'Max DOI', v: `${maxDOI} ${isEn ? 'days' : 'ngày'}` },
+                    { l: 'Slow', v: `${slowDays} ${isEn ? 'days' : 'ngày'}` },
                     { l: 'Min Margin', v: `${minMargin}%` },
                     { l: 'Max ΔPrice', v: `±${maxPriceChange}%` },
                   ].map(ch => (
@@ -751,7 +824,7 @@ export function SettingsPage() {
                 </div>
                 <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
                   <button type="submit" className="st-btn-primary" disabled={saving || !engineDirty}>
-                    {saving ? <Loader2 size={14} className="st-spinning" /> : <Save size={14} />} Lưu cấu hình tham số
+                    {saving ? <Loader2 size={14} className="st-spinning" /> : <Save size={14} />} {isEn ? 'Save Engine Parameters' : 'Lưu cấu hình tham số'}
                   </button>
                 </div>
               </div>
@@ -769,11 +842,13 @@ export function SettingsPage() {
                     <CreditCard size={22} color={payosConfigured ? '#16a34a' : '#94a3b8'} />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>PayOS — Thanh toán QR Code</div>
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>Cổng thanh toán chuyển khoản tự động qua VietQR</div>
+                    <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>PayOS — VietQR Code Payment</div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{isEn ? 'Automated bank transfer via VietQR dynamic QR code' : 'Cổng thanh toán chuyển khoản tự động qua VietQR'}</div>
                     {payosConfigured && (
                       <div style={{ marginTop: 5, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: payosActive ? '#dcfce7' : '#f1f5f9', color: payosActive ? '#16a34a' : '#64748b' }}>{payosActive ? '● Đang hoạt động' : '○ Đã tắt'}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: payosActive ? '#dcfce7' : '#f1f5f9', color: payosActive ? '#16a34a' : '#64748b' }}>
+                          {payosActive ? (isEn ? '● Active' : '● Đang hoạt động') : (isEn ? '○ Inactive' : '○ Đã tắt')}
+                        </span>
                         {payosClientIdMasked && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 99, background: '#eff6ff', color: '#0284c7' }}>Client: {payosClientIdMasked}</span>}
                       </div>
                     )}
@@ -781,7 +856,7 @@ export function SettingsPage() {
                 </div>
                 {payosConfigured && (
                   <button type="button" onClick={handleTogglePayos} className={payosActive ? 'st-btn-danger' : 'st-btn-secondary'} style={{ fontSize: 12 }}>
-                    {payosActive ? <X size={14} /> : <Check size={14} />} {payosActive ? 'Vô hiệu hóa' : 'Kích hoạt lại'}
+                    {payosActive ? <X size={14} /> : <Check size={14} />} {payosActive ? (isEn ? 'Deactivate' : 'Vô hiệu hóa') : (isEn ? 'Reactivate' : 'Kích hoạt lại')}
                   </button>
                 )}
               </div>
@@ -789,49 +864,49 @@ export function SettingsPage() {
 
             <div className="st-card" style={{ padding: 26 }}>
               <div style={{ marginBottom: 18, paddingBottom: 16, borderBottom: '1px solid #f1f5f9' }}>
-                <div className="st-section-title"><Zap size={16} color="#f59e0b" />{payosConfigured ? 'Cập nhật thông tin PayOS' : 'Kết nối PayOS'}</div>
-                <div className="st-section-desc">Nhập thông tin từ trang quản trị PayOS tại <strong>business.payos.vn</strong></div>
+                <div className="st-section-title"><Zap size={16} color="#f59e0b" />{payosConfigured ? (isEn ? 'Update PayOS Credentials' : 'Cập nhật thông tin PayOS') : (isEn ? 'Connect PayOS' : 'Kết nối PayOS')}</div>
+                <div className="st-section-desc">{isEn ? 'Enter API keys from your PayOS Dashboard at' : 'Nhập thông tin từ trang quản trị PayOS tại'} <strong>business.payos.vn</strong></div>
               </div>
               <div className="st-info-box" style={{ marginBottom: 18 }}>
                 <Info size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-                <span>Thông tin được mã hóa AES-256 trước khi lưu. Key đầy đủ sẽ không hiển thị lại sau khi lưu.</span>
+                <span>{isEn ? 'Credentials are encrypted with AES-256 before saving. Full keys are never exposed again.' : 'Thông tin được mã hóa AES-256 trước khi lưu. Key đầy đủ sẽ không hiển thị lại sau khi lưu.'}</span>
               </div>
               <form onSubmit={handleSavePayos}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div>
                     <label className="st-label">Client ID</label>
-                    <input className="st-input" value={payosClientId} onChange={e => setPayosClientId(e.target.value)} placeholder={payosConfigured ? `Hiện tại: ${payosClientIdMasked} — nhập để thay đổi` : 'Dán Client ID từ PayOS Dashboard'} />
+                    <input className="st-input" value={payosClientId} onChange={e => setPayosClientId(e.target.value)} placeholder={payosConfigured ? (isEn ? `Current: ${payosClientIdMasked} — enter to change` : `Hiện tại: ${payosClientIdMasked} — nhập để thay đổi`) : (isEn ? 'Paste Client ID from PayOS Dashboard' : 'Dán Client ID từ PayOS Dashboard')} />
                   </div>
                   <div>
                     <label className="st-label">API Key</label>
                     <div className="st-input-wrap">
-                      <input className="st-input" type={showApiKey ? 'text' : 'password'} value={payosApiKey} onChange={e => setPayosApiKey(e.target.value)} placeholder="Dán API Key từ PayOS Dashboard" />
+                      <input className="st-input" type={showApiKey ? 'text' : 'password'} value={payosApiKey} onChange={e => setPayosApiKey(e.target.value)} placeholder={isEn ? "Paste API Key from PayOS Dashboard" : "Dán API Key từ PayOS Dashboard"} />
                       <button type="button" className="st-eye-btn" onClick={() => setShowApiKey(v => !v)}>{showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                     </div>
                   </div>
                   <div>
                     <label className="st-label">Checksum Key</label>
                     <div className="st-input-wrap">
-                      <input className="st-input" type={showChecksumKey ? 'text' : 'password'} value={payosChecksumKey} onChange={e => setPayosChecksumKey(e.target.value)} placeholder="Dán Checksum Key từ PayOS Dashboard" />
+                      <input className="st-input" type={showChecksumKey ? 'text' : 'password'} value={payosChecksumKey} onChange={e => setPayosChecksumKey(e.target.value)} placeholder={isEn ? "Paste Checksum Key from PayOS Dashboard" : "Dán Checksum Key từ PayOS Dashboard"} />
                       <button type="button" className="st-eye-btn" onClick={() => setShowChecksumKey(v => !v)}>{showChecksumKey ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                     </div>
                   </div>
                 </div>
                 <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
                   <button type="submit" className="st-btn-primary" disabled={saving || (!payosClientId && !payosApiKey && !payosChecksumKey)}>
-                    {saving ? <Loader2 size={14} className="st-spinning" /> : <Zap size={14} />} {payosConfigured ? 'Cập nhật PayOS' : 'Kết nối PayOS'}
+                    {saving ? <Loader2 size={14} className="st-spinning" /> : <Zap size={14} />} {payosConfigured ? (isEn ? 'Update PayOS' : 'Cập nhật PayOS') : (isEn ? 'Connect PayOS' : 'Kết nối PayOS')}
                   </button>
                 </div>
               </form>
             </div>
 
             <div className="st-card" style={{ padding: 22 }}>
-              <div className="st-section-title" style={{ marginBottom: 14 }}><CheckCircle2 size={16} color="#059669" /> Phương thức thanh toán hỗ trợ</div>
+              <div className="st-section-title" style={{ marginBottom: 14 }}><CheckCircle2 size={16} color="#059669" /> {isEn ? 'Supported Payment Methods' : 'Phương thức thanh toán hỗ trợ'}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {[
-                  { label: 'Tiền mặt', desc: 'Luôn hoạt động, không cần cấu hình', active: true, fixed: true },
-                  { label: 'Chuyển khoản ngân hàng (thủ công)', desc: 'Xác nhận thủ công bởi nhân viên', active: true, fixed: true },
-                  { label: 'QR VietQR qua PayOS', desc: 'Yêu cầu kết nối PayOS ở trên', active: payosActive, fixed: false },
+                  { label: isEn ? 'Cash' : 'Tiền mặt', desc: isEn ? 'Always active, zero setup required' : 'Luôn hoạt động, không cần cấu hình', active: true, fixed: true },
+                  { label: isEn ? 'Manual Bank Transfer' : 'Chuyển khoản ngân hàng (thủ công)', desc: isEn ? 'Cashier manually confirms receipt' : 'Xác nhận thủ công bởi nhân viên', active: true, fixed: true },
+                  { label: isEn ? 'VietQR automated via PayOS' : 'QR VietQR qua PayOS', desc: isEn ? 'Requires PayOS credentials connected above' : 'Yêu cầu kết nối PayOS ở trên', active: payosActive, fixed: false },
                 ].map((m, i) => (
                   <div key={i} className="st-toggle-wrapper" onClick={() => !m.fixed && handleTogglePayos()} style={{ cursor: m.fixed ? 'default' : 'pointer' }}>
                     <div>
@@ -851,16 +926,51 @@ export function SettingsPage() {
           <div className="st-fade">
             <div className="st-card" style={{ padding: 26 }}>
               <div style={{ marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #f1f5f9' }}>
-                <div className="st-section-title"><Bell size={16} color="#7c3aed" /> Cấu hình kênh nhận cảnh báo</div>
-                <div className="st-section-desc">Chọn các sự kiện cần nhận thông báo trong hệ thống.</div>
+                <div className="st-section-title"><Bell size={16} color="#7c3aed" /> {isEn ? 'Alert Notification Channels' : 'Cấu hình kênh nhận cảnh báo'}</div>
+                <div className="st-section-desc">{isEn ? 'Choose system trigger events to receive alerts.' : 'Chọn các sự kiện cần nhận thông báo trong hệ thống.'}</div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {[
-                  { key: 'criticalStockout', label: 'Cảnh báo hết hàng nguy cơ cao', desc: 'Gửi thông báo ngay khi sản phẩm chạm mức 0 hoặc DOI < 2 ngày.', icon: <AlertTriangle size={16} color="#dc2626" />, bg: '#fef2f2', border: '#fca5a5' },
-                  { key: 'aiPriceSuggestion', label: 'Gợi ý giá mới từ AI Decision Engine', desc: 'Thông báo hàng ngày khi có đề xuất giá mới cần phê duyệt.', icon: <Sparkles size={16} color="#7c3aed" />, bg: '#faf5ff', border: '#c4b5fd' },
-                  { key: 'overstockAlert', label: 'Cảnh báo tồn kho ứ đọng', desc: 'Thông báo khi sản phẩm vượt ngưỡng Overstock DOI đã thiết lập.', icon: <Package size={16} color="#d97706" />, bg: '#fffbeb', border: '#fde68a' },
-                  { key: 'slowMoving', label: 'Cảnh báo hàng bán chậm (Slow-moving)', desc: 'Tổng hợp hàng tuần các mặt hàng đọng vốn lâu ngày.', icon: <TrendingUp size={16} color="#64748b" />, bg: '#f8fafc', border: '#e2e8f0' },
-                  { key: 'dailySalesReport', label: 'Báo cáo doanh số cuối ngày', desc: 'Tự động gửi thống kê doanh thu và đơn hàng mỗi 22:00 tối.', icon: <Percent size={16} color="#0284c7" />, bg: '#eff6ff', border: '#bae6fd' },
+                  {
+                    key: 'criticalStockout',
+                    label: isEn ? 'Critical Stockout Alerts' : 'Cảnh báo hết hàng nguy cơ cao',
+                    desc: isEn ? 'Immediate alert when product stock reaches 0 or DOI < 2 days.' : 'Gửi thông báo ngay khi sản phẩm chạm mức 0 hoặc DOI < 2 ngày.',
+                    icon: <AlertTriangle size={16} color="#dc2626" />,
+                    bg: '#fef2f2',
+                    border: '#fca5a5'
+                  },
+                  {
+                    key: 'aiPriceSuggestion',
+                    label: isEn ? 'AI Pricing Suggestions' : 'Gợi ý giá mới từ AI Decision Engine',
+                    desc: isEn ? 'Daily notification when new price recommendations are ready for review.' : 'Thông báo hàng ngày khi có đề xuất giá mới cần phê duyệt.',
+                    icon: <Sparkles size={16} color="#7c3aed" />,
+                    bg: '#faf5ff',
+                    border: '#c4b5fd'
+                  },
+                  {
+                    key: 'overstockAlert',
+                    label: isEn ? 'Overstock & Tied Capital Alerts' : 'Cảnh báo tồn kho ứ đọng',
+                    desc: isEn ? 'Notify when stock exceeds configured Overstock DOI limit.' : 'Thông báo khi sản phẩm vượt ngưỡng Overstock DOI đã thiết lập.',
+                    icon: <Package size={16} color="#d97706" />,
+                    bg: '#fffbeb',
+                    border: '#fde68a'
+                  },
+                  {
+                    key: 'slowMoving',
+                    label: isEn ? 'Slow-Moving Goods Weekly Digest' : 'Cảnh báo hàng bán chậm (Slow-moving)',
+                    desc: isEn ? 'Weekly summary of slow-moving inventory tying up capital.' : 'Tổng hợp hàng tuần các mặt hàng đọng vốn lâu ngày.',
+                    icon: <TrendingUp size={16} color="#64748b" />,
+                    bg: '#f8fafc',
+                    border: '#e2e8f0'
+                  },
+                  {
+                    key: 'dailySalesReport',
+                    label: isEn ? 'End-of-Day Sales Report' : 'Báo cáo doanh số cuối ngày',
+                    desc: isEn ? 'Automated summary of revenue and orders sent every evening at 22:00.' : 'Tự động gửi thống kê doanh thu và đơn hàng mỗi 22:00 tối.',
+                    icon: <Percent size={16} color="#0284c7" />,
+                    bg: '#eff6ff',
+                    border: '#bae6fd'
+                  },
                 ].map(item => (
                   <div key={item.key} className="st-toggle-wrapper" onClick={() => setNotif(p => ({ ...p, [item.key]: !p[item.key] }))}>
                     <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -878,7 +988,7 @@ export function SettingsPage() {
               </div>
               <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
                 <button type="button" className="st-btn-primary" onClick={handleSaveNotif} disabled={saving}>
-                  {saving ? <Loader2 size={14} className="st-spinning" /> : <Save size={14} />} Lưu cài đặt thông báo
+                  {saving ? <Loader2 size={14} className="st-spinning" /> : <Save size={14} />} {isEn ? 'Save Notification Settings' : 'Lưu cài đặt thông báo'}
                 </button>
               </div>
             </div>
@@ -897,7 +1007,14 @@ export function SettingsPage() {
                   <div style={{ fontSize: 17, fontWeight: 900, color: '#0f172a' }}>{user?.name || user?.fullName || '—'}</div>
                   <div style={{ fontSize: 12, color: '#64748b', marginTop: 4, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                     <span><Mail size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />{user?.email || '—'}</span>
-                    <span><Shield size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />{{ ADMIN: 'Quản trị viên', SHOP_OWNER: 'Chủ cửa hàng', WAREHOUSE_STAFF: 'Nhân viên kho' }[user?.role] || user?.role || '—'}</span>
+                    <span>
+                      <Shield size={12} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                      {{
+                        ADMIN: isEn ? 'Administrator' : 'Quản trị viên',
+                        SHOP_OWNER: isEn ? 'Store Owner' : 'Chủ cửa hàng',
+                        WAREHOUSE_STAFF: isEn ? 'Warehouse Staff' : 'Nhân viên kho',
+                      }[user?.role] || user?.role || '—'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -906,35 +1023,43 @@ export function SettingsPage() {
             {/* Form chỉnh sửa thông tin cá nhân */}
             <div className="st-card" style={{ padding: 26 }}>
               <div style={{ marginBottom: 18, paddingBottom: 16, borderBottom: '1px solid #f1f5f9' }}>
-                <div className="st-section-title"><User size={16} color="#0284c7" /> Thông tin cá nhân</div>
-                <div className="st-section-desc">Cập nhật họ tên hiển thị trong toàn bộ hoạt động của hệ thống.</div>
+                <div className="st-section-title"><User size={16} color="#0284c7" /> {isEn ? 'Personal Information' : 'Thông tin cá nhân'}</div>
+                <div className="st-section-desc">{isEn ? 'Update full name displayed across system.' : 'Cập nhật họ tên hiển thị trong toàn bộ hoạt động của hệ thống.'}</div>
               </div>
               <form onSubmit={handleUpdateProfile}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 16, maxWidth: 600 }}>
                   <div>
-                    <label className="st-label">Họ và tên</label>
-                    <input className="st-input" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Nhập họ và tên của bạn" required />
+                    <label className="st-label">{isEn ? 'Full Name' : 'Họ và tên'}</label>
+                    <input className="st-input" value={fullName} onChange={e => setFullName(e.target.value)} placeholder={isEn ? "Enter your full name" : "Nhập họ và tên của bạn"} required />
                   </div>
                   <div>
-                    <label className="st-label">Email tài khoản (không thể đổi)</label>
+                    <label className="st-label">{isEn ? 'Account Email (immutable)' : 'Email tài khoản (không thể đổi)'}</label>
                     <input className="st-input" value={user?.email || ''} disabled />
                   </div>
                 </div>
                 <div style={{ marginTop: 18, display: 'flex', justifyContent: 'flex-end' }}>
                   <button type="submit" className="st-btn-primary" disabled={savingProfile}>
-                    {savingProfile ? <Loader2 size={14} className="st-spinning" /> : <Save size={14} />} Lưu họ tên
+                    {savingProfile ? <Loader2 size={14} className="st-spinning" /> : <Save size={14} />} {isEn ? 'Save Name' : 'Lưu họ tên'}
                   </button>
                 </div>
               </form>
             </div>
 
             <div className="st-card" style={{ padding: 22 }}>
-              <div className="st-section-title" style={{ marginBottom: 14 }}><Shield size={16} color="#0284c7" /> Phiên đăng nhập & Thông tin tài khoản</div>
+              <div className="st-section-title" style={{ marginBottom: 14 }}><Shield size={16} color="#0284c7" /> {isEn ? 'Active Session & Credentials' : 'Phiên đăng nhập & Thông tin tài khoản'}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
                 {[
-                  { label: 'Vai trò', value: { ADMIN: 'Quản trị viên', SHOP_OWNER: 'Chủ cửa hàng', WAREHOUSE_STAFF: 'Nhân viên kho' }[user?.role] || user?.role || '—', icon: <Shield size={14} color="#7c3aed" /> },
-                  { label: 'Cửa hàng', value: user?.storeName || user?.store?.name || '—', icon: <Store size={14} color="#0284c7" /> },
-                  { label: 'Mã cửa hàng', value: user?.storeCode || user?.store?.code || '—', icon: <Building2 size={14} color="#059669" /> },
+                  {
+                    label: isEn ? 'Role' : 'Vai trò',
+                    value: {
+                      ADMIN: isEn ? 'Administrator' : 'Quản trị viên',
+                      SHOP_OWNER: isEn ? 'Store Owner' : 'Chủ cửa hàng',
+                      WAREHOUSE_STAFF: isEn ? 'Staff' : 'Nhân viên kho',
+                    }[user?.role] || user?.role || '—',
+                    icon: <Shield size={14} color="#7c3aed" />
+                  },
+                  { label: isEn ? 'Store' : 'Cửa hàng', value: user?.storeName || user?.store?.name || '—', icon: <Store size={14} color="#0284c7" /> },
+                  { label: isEn ? 'Store Code' : 'Mã cửa hàng', value: user?.storeCode || user?.store?.code || '—', icon: <Building2 size={14} color="#059669" /> },
                   { label: 'Email', value: user?.email || '—', icon: <Mail size={14} color="#f59e0b" /> },
                 ].map((item, i) => (
                   <div key={i} className="st-kpi-card">
@@ -955,8 +1080,8 @@ export function SettingsPage() {
               <div className="st-card" style={{ padding: 26 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, paddingBottom: 16, borderBottom: '1px solid #f1f5f9', flexWrap: 'wrap', gap: 12 }}>
                   <div>
-                    <div className="st-section-title"><Users size={16} color="#0284c7" /> Quản lý nhân viên cửa hàng (WAREHOUSE_STAFF)</div>
-                    <div className="st-section-desc">Chủ shop chủ động Tạo & Khóa tài khoản nhân viên kho/thu ngân thuộc cửa hàng của mình, không phụ thuộc Admin hệ thống.</div>
+                    <div className="st-section-title"><Users size={16} color="#0284c7" /> {isEn ? 'Store Staff Management (WAREHOUSE_STAFF)' : 'Quản lý nhân viên cửa hàng (WAREHOUSE_STAFF)'}</div>
+                    <div className="st-section-desc">{isEn ? 'Store owners can create and manage cashier/warehouse staff accounts directly.' : 'Chủ shop chủ động Tạo & Khóa tài khoản nhân viên kho/thu ngân thuộc cửa hàng của mình, không phụ thuộc Admin hệ thống.'}</div>
                   </div>
                   <button
                     type="button"
@@ -964,31 +1089,31 @@ export function SettingsPage() {
                     className="st-btn-primary"
                     style={{ fontSize: 12, padding: '8px 16px' }}
                   >
-                    <Plus size={14} /> Thêm nhân viên mới
+                    <Plus size={14} /> {isEn ? '+ Add New Staff' : 'Thêm nhân viên mới'}
                   </button>
                 </div>
 
                 {loadingStaff ? (
                   <div style={{ textAlign: 'center', padding: '24px 0', color: '#64748b', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                    <Loader2 size={16} className="st-spinning" /> Đang tải danh sách nhân viên cửa hàng...
+                    <Loader2 size={16} className="st-spinning" /> {isEn ? 'Loading store staff members...' : 'Đang tải danh sách nhân viên cửa hàng...'}
                   </div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, textAlign: 'left' }}>
                       <thead>
                         <tr style={{ borderBottom: '1px solid #e2e8f0', color: '#64748b', fontWeight: 700, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                          <th style={{ padding: '10px 12px' }}>Nhân viên</th>
-                          <th style={{ padding: '10px 12px' }}>Vai trò</th>
-                          <th style={{ padding: '10px 12px' }}>Trạng thái</th>
-                          <th style={{ padding: '10px 12px' }}>Ngày tạo</th>
-                          <th style={{ padding: '10px 12px', textAlign: 'right' }}>Thao tác</th>
+                          <th style={{ padding: '10px 12px' }}>{isEn ? 'Staff' : 'Nhân viên'}</th>
+                          <th style={{ padding: '10px 12px' }}>{isEn ? 'Role' : 'Vai trò'}</th>
+                          <th style={{ padding: '10px 12px' }}>{isEn ? 'Status' : 'Trạng thái'}</th>
+                          <th style={{ padding: '10px 12px' }}>{isEn ? 'Created At' : 'Ngày tạo'}</th>
+                          <th style={{ padding: '10px 12px', textAlign: 'right' }}>{isEn ? 'Actions' : 'Thao tác'}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {staffList.filter(u => u.role === 'WAREHOUSE_STAFF' || u.role === 'SHOP_OWNER').length === 0 ? (
                           <tr>
                             <td colSpan={5} style={{ padding: '24px 12px', textAlign: 'center', color: '#94a3b8' }}>
-                              Chưa có tài khoản nhân viên nào được tạo cho cửa hàng này. Bấm nút <strong>"Thêm nhân viên mới"</strong> ở trên để bắt đầu!
+                              {isEn ? 'No staff members created yet. Click "+ Add New Staff" above to start!' : 'Chưa có tài khoản nhân viên nào được tạo cho cửa hàng này. Bấm nút "Thêm nhân viên mới" ở trên để bắt đầu!'}
                             </td>
                           </tr>
                         ) : (
@@ -1006,7 +1131,7 @@ export function SettingsPage() {
                                     {(member.fullName || member.email || 'U')[0].toUpperCase()}
                                   </div>
                                   <div>
-                                    <div style={{ fontWeight: 700, color: '#0f172a' }}>{member.fullName || 'Nhân viên'}</div>
+                                    <div style={{ fontWeight: 700, color: '#0f172a' }}>{member.fullName || (isEn ? 'Staff' : 'Nhân viên')}</div>
                                     <div style={{ fontSize: 11, color: '#64748b' }}>{member.email}</div>
                                   </div>
                                 </div>
@@ -1019,7 +1144,7 @@ export function SettingsPage() {
                                   color: member.role === 'WAREHOUSE_STAFF' ? '#166534' : '#1d4ed8',
                                   border: member.role === 'WAREHOUSE_STAFF' ? '1px solid #bbf7d0' : '1px solid #bfdbfe',
                                 }}>
-                                  {member.role === 'WAREHOUSE_STAFF' ? 'Nhân viên kho / Thu ngân' : 'Chủ shop'}
+                                  {member.role === 'WAREHOUSE_STAFF' ? (isEn ? 'Staff / Cashier' : 'Nhân viên kho / Thu ngân') : (isEn ? 'Store Owner' : 'Chủ shop')}
                                 </span>
                               </td>
                               <td style={{ padding: '12px' }}>
@@ -1031,11 +1156,11 @@ export function SettingsPage() {
                                   border: member.isActive ? '1px solid #bbf7d0' : '1px solid #fecaca',
                                 }}>
                                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: member.isActive ? '#22c55e' : '#ef4444' }} />
-                                  {member.isActive ? 'Đang hoạt động' : 'Đã khóa'}
+                                  {member.isActive ? (isEn ? 'Active' : 'Đang hoạt động') : (isEn ? 'Locked' : 'Đã khóa')}
                                 </span>
                               </td>
                               <td style={{ padding: '12px', color: '#64748b', fontSize: 11 }}>
-                                {member.createdAt ? new Date(member.createdAt).toLocaleDateString('vi-VN') : '—'}
+                                {member.createdAt ? new Date(member.createdAt).toLocaleDateString(isEn ? 'en-US' : 'vi-VN') : '—'}
                               </td>
                               <td style={{ padding: '12px', textAlign: 'right' }}>
                                 {member.role === 'WAREHOUSE_STAFF' ? (
@@ -1054,13 +1179,13 @@ export function SettingsPage() {
                                     {updatingStaffId === member.id ? (
                                       <Loader2 size={12} className="st-spinning" />
                                     ) : member.isActive ? (
-                                      'Khóa tài khoản'
+                                      isEn ? 'Lock Account' : 'Khóa tài khoản'
                                     ) : (
-                                      'Mở khóa'
+                                      isEn ? 'Unlock' : 'Mở khóa'
                                     )}
                                   </button>
                                 ) : (
-                                  <span style={{ color: '#94a3b8', fontSize: 11, fontStyle: 'italic' }}>Tài khoản chính</span>
+                                  <span style={{ color: '#94a3b8', fontSize: 11, fontStyle: 'italic' }}>{isEn ? 'Primary Account' : 'Tài khoản chính'}</span>
                                 )}
                               </td>
                             </tr>
@@ -1075,43 +1200,43 @@ export function SettingsPage() {
 
             <div className="st-card" style={{ padding: 26 }}>
               <div style={{ marginBottom: 18, paddingBottom: 16, borderBottom: '1px solid #f1f5f9' }}>
-                <div className="st-section-title"><Lock size={16} color="#dc2626" /> Đổi mật khẩu</div>
-                <div className="st-section-desc">Sử dụng mật khẩu mạnh với ít nhất 8 ký tự để bảo vệ tài khoản.</div>
+                <div className="st-section-title"><Lock size={16} color="#dc2626" /> {isEn ? 'Change Password' : 'Đổi mật khẩu'}</div>
+                <div className="st-section-desc">{isEn ? 'Use a strong password with at least 8 characters to protect your account.' : 'Sử dụng mật khẩu mạnh với ít nhất 8 ký tự để bảo vệ tài khoản.'}</div>
               </div>
               <form onSubmit={handleChangePassword}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 440 }}>
                   <div>
-                    <label className="st-label">Mật khẩu hiện tại</label>
+                    <label className="st-label">{isEn ? 'Current Password' : 'Mật khẩu hiện tại'}</label>
                     <div className="st-input-wrap">
-                      <input className="st-input" type={showOld ? 'text' : 'password'} value={oldPwd} onChange={e => setOldPwd(e.target.value)} placeholder="Nhập mật khẩu hiện tại" autoComplete="current-password" />
+                      <input className="st-input" type={showOld ? 'text' : 'password'} value={oldPwd} onChange={e => setOldPwd(e.target.value)} placeholder={isEn ? "Enter current password" : "Nhập mật khẩu hiện tại"} autoComplete="current-password" />
                       <button type="button" className="st-eye-btn" onClick={() => setShowOld(v => !v)}>{showOld ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                     </div>
                   </div>
                   <div>
-                    <label className="st-label">Mật khẩu mới</label>
+                    <label className="st-label">{isEn ? 'New Password' : 'Mật khẩu mới'}</label>
                     <div className="st-input-wrap">
-                      <input className="st-input" type={showNew ? 'text' : 'password'} value={newPwd} onChange={e => setNewPwd(e.target.value)} placeholder="Tối thiểu 8 ký tự" autoComplete="new-password" />
+                      <input className="st-input" type={showNew ? 'text' : 'password'} value={newPwd} onChange={e => setNewPwd(e.target.value)} placeholder={isEn ? "Minimum 8 characters" : "Tối thiểu 8 ký tự"} autoComplete="new-password" />
                       <button type="button" className="st-eye-btn" onClick={() => setShowNew(v => !v)}>{showNew ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                     </div>
                     {newPwd && (
                       <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {[1,2,3].map(i => <div key={i} style={{ flex: 1, height: 4, borderRadius: 99, background: pwdStr >= i ? pwdColors[pwdStr] : '#e2e8f0', transition: 'background .25s' }} />)}
+                        {[1, 2, 3].map(i => <div key={i} style={{ flex: 1, height: 4, borderRadius: 99, background: pwdStr >= i ? pwdColors[pwdStr] : '#e2e8f0', transition: 'background .25s' }} />)}
                         <span style={{ fontSize: 11, fontWeight: 700, color: pwdColors[pwdStr], flexShrink: 0, minWidth: 60 }}>{pwdLabels[pwdStr]}</span>
                       </div>
                     )}
                   </div>
                   <div>
-                    <label className="st-label">Xác nhận mật khẩu mới</label>
+                    <label className="st-label">{isEn ? 'Confirm New Password' : 'Xác nhận mật khẩu mới'}</label>
                     <div className="st-input-wrap">
-                      <input className="st-input" type={showConfirm ? 'text' : 'password'} value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} placeholder="Nhập lại mật khẩu mới" autoComplete="new-password" style={confirmPwd && newPwd !== confirmPwd ? { borderColor: '#ef4444' } : {}} />
+                      <input className="st-input" type={showConfirm ? 'text' : 'password'} value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} placeholder={isEn ? "Re-enter new password" : "Nhập lại mật khẩu mới"} autoComplete="new-password" style={confirmPwd && newPwd !== confirmPwd ? { borderColor: '#ef4444' } : {}} />
                       <button type="button" className="st-eye-btn" onClick={() => setShowConfirm(v => !v)}>{showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                     </div>
-                    {confirmPwd && newPwd !== confirmPwd && <p style={{ color: '#dc2626', fontSize: 11, marginTop: 5, fontWeight: 600 }}>⚠ Mật khẩu không khớp</p>}
+                    {confirmPwd && newPwd !== confirmPwd && <p style={{ color: '#dc2626', fontSize: 11, marginTop: 5, fontWeight: 600 }}>{isEn ? '⚠ Passwords do not match' : '⚠ Mật khẩu không khớp'}</p>}
                   </div>
                 </div>
                 <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
                   <button type="submit" className="st-btn-primary" disabled={saving}>
-                    {saving ? <Loader2 size={14} className="st-spinning" /> : <Lock size={14} />} Đổi mật khẩu
+                    {saving ? <Loader2 size={14} className="st-spinning" /> : <Lock size={14} />} {isEn ? 'Change Password' : 'Đổi mật khẩu'}
                   </button>
                 </div>
               </form>
@@ -1129,8 +1254,8 @@ export function SettingsPage() {
                     <UserPlus size={18} />
                   </div>
                   <div>
-                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Tạo tài khoản Nhân viên</h3>
-                    <p style={{ margin: 0, fontSize: 11.5, color: '#64748b' }}>Phân quyền Nhân viên kho / Thu ngân cho cửa hàng</p>
+                    <h3 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{isEn ? 'Create Staff Account' : 'Tạo tài khoản Nhân viên'}</h3>
+                    <p style={{ margin: 0, fontSize: 11.5, color: '#64748b' }}>{isEn ? 'Assign Warehouse Staff / Cashier permissions' : 'Phân quyền Nhân viên kho / Thu ngân cho cửa hàng'}</p>
                   </div>
                 </div>
                 <button
@@ -1144,18 +1269,18 @@ export function SettingsPage() {
 
               <form onSubmit={handleCreateStaff} style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
-                  <label className="st-label">Họ và tên nhân viên</label>
+                  <label className="st-label">{isEn ? 'Staff Full Name' : 'Họ và tên nhân viên'}</label>
                   <input
                     className="st-input"
                     value={newStaffName}
                     onChange={e => setNewStaffName(e.target.value)}
-                    placeholder="Ví dụ: Nguyễn Văn Kho"
+                    placeholder={isEn ? "E.g.: John Doe" : "Ví dụ: Nguyễn Văn Kho"}
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="st-label">Email đăng nhập</label>
+                  <label className="st-label">{isEn ? 'Login Email' : 'Email đăng nhập'}</label>
                   <input
                     className="st-input"
                     type="email"
@@ -1167,19 +1292,19 @@ export function SettingsPage() {
                 </div>
 
                 <div>
-                  <label className="st-label">Mật khẩu khởi tạo</label>
+                  <label className="st-label">{isEn ? 'Initial Password' : 'Mật khẩu khởi tạo'}</label>
                   <input
                     className="st-input"
                     type="password"
                     value={newStaffPassword}
                     onChange={e => setNewStaffPassword(e.target.value)}
-                    placeholder="Tối thiểu 6 ký tự"
+                    placeholder={isEn ? "Minimum 6 characters" : "Tối thiểu 6 ký tự"}
                     required
                   />
                 </div>
 
                 <div className="st-info-box" style={{ marginTop: 4 }}>
-                  <span>Tài khoản mới sẽ tự động được gán quyền <strong>WAREHOUSE_STAFF</strong> thuộc cửa hàng của bạn. Nhân viên có thể đăng nhập ngay để bán hàng POS và quản lý kho vận.</span>
+                  <span>{isEn ? 'New account will automatically receive WAREHOUSE_STAFF permissions for your store. Staff can log in immediately for POS checkout and inventory operations.' : 'Tài khoản mới sẽ tự động được gán quyền WAREHOUSE_STAFF thuộc cửa hàng của bạn. Nhân viên có thể đăng nhập ngay để bán hàng POS và quản lý kho vận.'}</span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
@@ -1188,14 +1313,14 @@ export function SettingsPage() {
                     onClick={() => setIsAddStaffModalOpen(false)}
                     className="st-btn-secondary"
                   >
-                    Hủy bỏ
+                    {isEn ? 'Cancel' : 'Hủy bỏ'}
                   </button>
                   <button
                     type="submit"
                     className="st-btn-primary"
                     disabled={creatingStaff}
                   >
-                    {creatingStaff ? <Loader2 size={14} className="st-spinning" /> : <UserPlus size={14} />} Tạo nhân viên
+                    {creatingStaff ? <Loader2 size={14} className="st-spinning" /> : <UserPlus size={14} />} {isEn ? 'Create Staff' : 'Tạo nhân viên'}
                   </button>
                 </div>
               </form>

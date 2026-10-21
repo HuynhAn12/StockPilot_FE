@@ -6,9 +6,10 @@ import {
   Camera, Hash, Layers, TrendingUp, ShoppingBag, Plus,
   Loader2, CloudUpload, ScanLine
 } from "lucide-react";
-import { useProductStore, CATEGORIES, UNITS } from "./store/productStore";
+import { useProductStore, CATEGORIES, UNITS, formatUnit } from "./store/productStore";
 import { uploadImageToCloudinary } from "../services/uploadService";
 import { BarcodeImageDecoder } from "./BarcodeImageDecoder";
+import { useTranslation } from "../i18n/useTranslation";
 
 const initialForm = {
   name: "",
@@ -67,6 +68,8 @@ export function getNextAvailableSku(products = []) {
 }
 
 export function AddProduct({ onBack }) {
+  const { language } = useTranslation();
+  const isEn = language === 'en';
   const { addProduct, products, fetchProducts } = useProductStore();
 
   // Tập hợp tất cả mã sản phẩm / SKU hiện có trong hệ thống
@@ -330,17 +333,17 @@ export function AddProduct({ onBack }) {
             <button
               onClick={onBack}
               className="p-2 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer border border-slate-200"
-              title="Quay lại danh sách"
+              title={isEn ? "Back to list" : "Quay lại danh sách"}
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
           )}
           <div>
             <h1 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-              <Package className="w-6 h-6 text-blue-600" /> Thêm sản phẩm mới
+              <Package className="w-6 h-6 text-blue-600" /> {isEn ? "Add New Product" : "Thêm sản phẩm mới"}
             </h1>
             <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-              Điền đầy đủ thông tin để thêm sản phẩm vào hệ thống kho hàng
+              {isEn ? "Fill in all details to add the product to the inventory system" : "Điền đầy đủ thông tin để thêm sản phẩm vào hệ thống kho hàng"}
             </p>
           </div>
         </div>
@@ -352,7 +355,7 @@ export function AddProduct({ onBack }) {
               onClick={onBack}
               className="px-3.5 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
             >
-              Hủy bỏ
+              {isEn ? "Cancel" : "Hủy bỏ"}
             </button>
           )}
           <button
@@ -363,15 +366,15 @@ export function AddProduct({ onBack }) {
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Đang lưu...
+                <Loader2 className="w-4 h-4 animate-spin" /> {isEn ? "Saving..." : "Đang lưu..."}
               </>
             ) : isUploading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Đang tải ảnh...
+                <Loader2 className="w-4 h-4 animate-spin" /> {isEn ? "Uploading image..." : "Đang tải ảnh..."}
               </>
             ) : (
               <>
-                <Save className="w-4 h-4" /> Lưu sản phẩm
+                <Save className="w-4 h-4" /> {isEn ? "Save Product" : "Lưu sản phẩm"}
               </>
             )}
           </button>
@@ -392,16 +395,18 @@ export function AddProduct({ onBack }) {
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
               <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
                 <FileText className="w-4 h-4 text-blue-600" />
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Thông tin cơ bản</h2>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                  {isEn ? "Basic Information" : "Thông tin cơ bản"}
+                </h2>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tên sản phẩm <span className="text-rose-500">*</span>
+                  {isEn ? "Product Name" : "Tên sản phẩm"} <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Mì tôm Hảo Hảo tôm chua cay, Nước ngọt Coca-Cola..."
+                  placeholder={isEn ? "E.g., Hao Hao shrimp instant noodles, Coca-Cola..." : "Ví dụ: Mì tôm Hảo Hảo tôm chua cay, Nước ngọt Coca-Cola..."}
                   value={form.name}
                   onChange={(e) => handleChange("name", e.target.value)}
                   className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${errors.name ? "border-rose-400 bg-rose-50/30" : "border-slate-200 bg-slate-50/50"
@@ -413,7 +418,7 @@ export function AddProduct({ onBack }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Danh mục hàng <span className="text-rose-500">*</span>
+                    {isEn ? "Category" : "Danh mục hàng"} <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={form.category}
@@ -421,10 +426,10 @@ export function AddProduct({ onBack }) {
                     className={`w-full px-3.5 py-2.5 text-sm rounded-xl border ${errors.category ? "border-rose-400 bg-rose-50/30" : "border-slate-200 bg-slate-50/50"
                       } focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer`}
                   >
-                    <option value="">-- Chọn danh mục ngành hàng --</option>
+                    <option value="">{isEn ? "-- Select category --" : "-- Chọn danh mục ngành hàng --"}</option>
                     {CATEGORIES.map((cat) => (
                       <option key={cat.value} value={cat.value}>
-                        {cat.icon} {cat.label}
+                        {cat.icon} {isEn ? (cat.labelEn || cat.label) : cat.label}
                       </option>
                     ))}
                   </select>
@@ -432,7 +437,7 @@ export function AddProduct({ onBack }) {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Đơn vị tính</label>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">{isEn ? "Unit" : "Đơn vị tính"}</label>
                   <select
                     value={form.unit}
                     onChange={(e) => handleChange("unit", e.target.value)}
@@ -440,7 +445,7 @@ export function AddProduct({ onBack }) {
                   >
                     {UNITS.map((u) => (
                       <option key={u} value={u}>
-                        {u}
+                        {formatUnit(u, isEn)}
                       </option>
                     ))}
                   </select>
@@ -451,7 +456,7 @@ export function AddProduct({ onBack }) {
                 <div>
                   <div className="flex items-center justify-between mb-1 h-7">
                     <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                      <span>Mã sản phẩm</span>
+                      <span>{isEn ? "Product Code" : "Mã sản phẩm"}</span>
                       <span className="text-rose-500">*</span>
                     </label>
                     {nextAutoSku && (
@@ -459,16 +464,16 @@ export function AddProduct({ onBack }) {
                         type="button"
                         onClick={() => handleChange("sku", nextAutoSku)}
                         className="text-[11px] text-blue-600 hover:text-blue-700 font-semibold hover:underline cursor-pointer flex items-center gap-1"
-                        title={`Chọn mã gợi ý ${nextAutoSku}`}
+                        title={isEn ? `Select suggested SKU ${nextAutoSku}` : `Chọn mã gợi ý ${nextAutoSku}`}
                       >
-                        Gợi ý: <span className="font-bold">{nextAutoSku}</span>
+                        {isEn ? "Suggested:" : "Gợi ý:"} <span className="font-bold">{nextAutoSku}</span>
                       </button>
                     )}
                   </div>
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="VD: SP1, SP2"
+                      placeholder={isEn ? "E.g., SP1, SP2" : "VD: SP1, SP2"}
                       value={form.sku}
                       onChange={(e) => handleChange("sku", e.target.value.toUpperCase())}
                       className={`w-full pl-3.5 pr-9 py-2.5 text-sm font-mono font-bold tracking-wide rounded-xl border transition-all ${isInvalidSkuFormat || isDuplicateSku || errors.sku
@@ -479,11 +484,11 @@ export function AddProduct({ onBack }) {
                         } focus:outline-hidden focus:ring-2`}
                     />
                     {isInvalidSkuFormat || isDuplicateSku ? (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 flex items-center" title="Mã không hợp lệ">
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 flex items-center" title={isEn ? "Invalid SKU" : "Mã không hợp lệ"}>
                         <AlertTriangle className="w-4 h-4" />
                       </span>
                     ) : form.sku ? (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 flex items-center" title="Mã hợp lệ">
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 flex items-center" title={isEn ? "Valid SKU" : "Mã hợp lệ"}>
                         <CheckCircle2 className="w-4 h-4" />
                       </span>
                     ) : null}
@@ -491,13 +496,13 @@ export function AddProduct({ onBack }) {
                   {isInvalidSkuFormat ? (
                     <p className="text-xs text-rose-600 font-semibold mt-1.5 flex items-center gap-1">
                       <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                      <span>Mã sản phẩm chỉ được có định dạng SP kèm số (VD:SP1, SP2...)</span>
+                      <span>{isEn ? "Product code must be format SP followed by number (e.g. SP1, SP2...)" : "Mã sản phẩm chỉ được có định dạng SP kèm số (VD:SP1, SP2...)"}</span>
                     </p>
                   ) : isDuplicateSku ? (
                     <p className="text-xs text-rose-600 font-semibold mt-1.5 flex items-center gap-1">
                       <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                       <span>
-                        Mã <strong>"{normalizedInputSku}"</strong> đã gắn với sản phẩm khác. Không thể dùng!
+                        {isEn ? `Code "${normalizedInputSku}" is already in use by another product!` : `Mã "${normalizedInputSku}" đã gắn với sản phẩm khác. Không thể dùng!`}
                       </span>
                     </p>
                   ) : errors.sku ? (
@@ -505,31 +510,31 @@ export function AddProduct({ onBack }) {
                   ) : form.sku ? (
                     <p className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Mã khả dụng</span>
+                      <span>{isEn ? "Available code" : "Mã khả dụng"}</span>
                     </p>
                   ) : (
                     <p className="text-[11px] text-slate-400 mt-1">
-                      Định dạng bắt buộc: SP kèm số (VD: SP1, SP2)
+                      {isEn ? "Required format: SP followed by number (e.g. SP1, SP2)" : "Định dạng bắt buộc: SP kèm số (VD: SP1, SP2)"}
                     </p>
                   )}
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1 h-7">
-                    <label className="text-xs font-semibold text-slate-700">Mã vạch</label>
+                    <label className="text-xs font-semibold text-slate-700">{isEn ? "Barcode" : "Mã vạch"}</label>
                     <button
                       type="button"
                       onClick={() => setShowBarcodeDecoder(true)}
                       className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold transition-colors cursor-pointer border border-blue-200"
-                      title="Đọc mã vạch từ ảnh"
+                      title={isEn ? "Scan barcode from image" : "Đọc mã vạch từ ảnh"}
                     >
-                      <ScanLine className="w-3 h-3" /> Đọc từ ảnh
+                      <ScanLine className="w-3 h-3" /> {isEn ? "Scan from image" : "Đọc từ ảnh"}
                     </button>
                   </div>
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Quét hoặc nhập mã vạch..."
+                      placeholder={isEn ? "Scan or enter barcode..." : "Quét hoặc nhập mã vạch..."}
                       value={form.barcode}
                       onChange={(e) => handleChange("barcode", e.target.value)}
                       className={`w-full pl-3.5 pr-9 py-2.5 text-sm font-mono rounded-xl border transition-all ${isDuplicateBarcode || errors.barcode
@@ -540,11 +545,11 @@ export function AddProduct({ onBack }) {
                         } focus:outline-hidden focus:ring-2`}
                     />
                     {isDuplicateBarcode ? (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 flex items-center" title="Mã vạch đã tồn tại">
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-rose-500 flex items-center" title={isEn ? "Barcode already exists" : "Mã vạch đã tồn tại"}>
                         <AlertTriangle className="w-4 h-4" />
                       </span>
                     ) : form.barcode ? (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 flex items-center" title="Mã vạch khả dụng">
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600 flex items-center" title={isEn ? "Valid barcode" : "Mã vạch khả dụng"}>
                         <CheckCircle2 className="w-4 h-4" />
                       </span>
                     ) : null}
@@ -553,7 +558,7 @@ export function AddProduct({ onBack }) {
                     <p className="text-xs text-rose-600 font-semibold mt-1.5 flex items-center gap-1">
                       <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                       <span>
-                        Mã vạch <strong>"{normalizedInputBarcode}"</strong> đã gắn với sản phẩm <strong>"{duplicateBarcodeProductName}"</strong>. Không thể lưu!
+                        {isEn ? `Barcode "${normalizedInputBarcode}" is assigned to "${duplicateBarcodeProductName}". Cannot save!` : `Mã vạch "${normalizedInputBarcode}" đã gắn với sản phẩm "${duplicateBarcodeProductName}". Không thể lưu!`}
                       </span>
                     </p>
                   ) : errors.barcode ? (
@@ -561,17 +566,17 @@ export function AddProduct({ onBack }) {
                   ) : form.barcode ? (
                     <p className="text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>Mã vạch hợp lệ</span>
+                      <span>{isEn ? "Valid barcode" : "Mã vạch hợp lệ"}</span>
                     </p>
                   ) : null}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Mô tả sản phẩm</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">{isEn ? "Product Description" : "Mô tả sản phẩm"}</label>
                 <textarea
                   rows={3}
-                  placeholder="Ghi chú thêm về quy cách đóng gói, xuất xứ, vị trí để hàng..."
+                  placeholder={isEn ? "Additional notes on packaging, origin, storage location..." : "Ghi chú thêm về quy cách đóng gói, xuất xứ, vị trí để hàng..."}
                   value={form.description}
                   onChange={(e) => handleChange("description", e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all resize-none"
@@ -583,13 +588,15 @@ export function AddProduct({ onBack }) {
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
               <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
                 <DollarSign className="w-4 h-4 text-emerald-600" />
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Giá cả & Biên lợi nhuận</h2>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                  {isEn ? "Pricing & Margin" : "Giá cả & Biên lợi nhuận"}
+                </h2>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Giá vốn nhập kho (VNĐ) <span className="text-rose-500">*</span>
+                    {isEn ? "Cost Price (VND)" : "Giá vốn nhập kho (VNĐ)"} <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <input
@@ -607,7 +614,7 @@ export function AddProduct({ onBack }) {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Giá bán lẻ đề xuất (VNĐ) <span className="text-rose-500">*</span>
+                    {isEn ? "Suggested Retail Price (VND)" : "Giá bán lẻ đề xuất (VNĐ)"} <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
                     <input
@@ -635,16 +642,18 @@ export function AddProduct({ onBack }) {
                   <div className="flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 shrink-0" />
                     <div>
-                      <span className="font-bold">Biên lợi nhuận gộp: </span>
+                      <span className="font-bold">{isEn ? "Gross Margin: " : "Biên lợi nhuận gộp: "}</span>
                       <span className="font-extrabold text-sm">+{margin}%</span>
                       <span className="text-[11px] block text-slate-500 mt-0.5">
-                        Lãi {(parseInt(form.salePrice) - parseInt(form.costPrice)).toLocaleString("vi-VN")} đ trên mỗi {form.unit}
+                        {isEn
+                          ? `Profit ${(parseInt(form.salePrice) - parseInt(form.costPrice)).toLocaleString("vi-VN")} đ per ${formatUnit(form.unit, isEn)}`
+                          : `Lãi ${(parseInt(form.salePrice) - parseInt(form.costPrice)).toLocaleString("vi-VN")} đ trên mỗi ${form.unit}`}
                       </span>
                     </div>
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${Number(margin) >= 25 ? "bg-emerald-200/80 text-emerald-900" : "bg-amber-200/80 text-amber-900"
                     }`}>
-                    {Number(margin) >= 25 ? "Tỷ suất tốt" : "Biên độ thấp"}
+                    {Number(margin) >= 25 ? (isEn ? "Good Margin" : "Tỷ suất tốt") : (isEn ? "Low Margin" : "Biên độ thấp")}
                   </span>
                 </div>
               )}
@@ -654,13 +663,15 @@ export function AddProduct({ onBack }) {
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
               <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
                 <Layers className="w-4 h-4 text-blue-600" />
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Tồn kho & Ngưỡng an toàn</h2>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                  {isEn ? "Inventory & Safety Threshold" : "Tồn kho & Ngưỡng an toàn"}
+                </h2>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Số lượng nhập kho ban đầu <span className="text-rose-500">*</span>
+                    {isEn ? "Initial Stock Quantity" : "Số lượng nhập kho ban đầu"} <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -676,7 +687,7 @@ export function AddProduct({ onBack }) {
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Ngưỡng cảnh báo sắp hết hàng
+                    {isEn ? "Low Stock Alert Threshold" : "Ngưỡng cảnh báo sắp hết hàng"}
                   </label>
                   <input
                     type="number"
@@ -686,15 +697,19 @@ export function AddProduct({ onBack }) {
                     onChange={(e) => handleChange("alertThreshold", e.target.value)}
                     className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">Khi tồn kho nhỏ hơn mức này hệ thống sẽ cảnh báo</p>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    {isEn ? "System alerts when stock falls below this level" : "Khi tồn kho nhỏ hơn mức này hệ thống sẽ cảnh báo"}
+                  </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Nhà cung cấp / Nguồn hàng</label>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {isEn ? "Supplier / Source" : "Nhà cung cấp / Nguồn hàng"}
+                </label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Đại lý bánh kẹo, Unilever, Thiên Long..."
+                  placeholder={isEn ? "E.g., Confectionery distributor, Unilever, Thien Long..." : "Ví dụ: Đại lý bánh kẹo, Unilever, Thiên Long..."}
                   value={form.supplier}
                   onChange={(e) => handleChange("supplier", e.target.value)}
                   className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50/50 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
@@ -705,8 +720,12 @@ export function AddProduct({ onBack }) {
               <div className="pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between mb-2">
                   <div>
-                    <span className="text-xs font-semibold text-slate-700">Sản phẩm có hạn sử dụng?</span>
-                    <p className="text-[11px] text-slate-400">Áp dụng cho thực phẩm, đồ uống, mỹ phẩm...</p>
+                    <span className="text-xs font-semibold text-slate-700">
+                      {isEn ? "Does product have an expiration date?" : "Sản phẩm có hạn sử dụng?"}
+                    </span>
+                    <p className="text-[11px] text-slate-400">
+                      {isEn ? "Applies to food, beverages, cosmetics..." : "Áp dụng cho thực phẩm, đồ uống, mỹ phẩm..."}
+                    </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -721,7 +740,7 @@ export function AddProduct({ onBack }) {
 
                 {form.hasExpiry && (
                   <div className="mt-3">
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Ngày hết hạn</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">{isEn ? "Expiration Date" : "Ngày hết hạn"}</label>
                     <input
                       type="date"
                       value={form.expiryDate}
@@ -740,7 +759,9 @@ export function AddProduct({ onBack }) {
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4">
               <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
                 <Camera className="w-4 h-4 text-blue-600" />
-                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Ảnh sản phẩm</h2>
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                  {isEn ? "Product Image" : "Ảnh sản phẩm"}
+                </h2>
               </div>
 
               {imagePreview ? (
@@ -750,13 +771,13 @@ export function AddProduct({ onBack }) {
                   {isUploading && (
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-xs flex flex-col items-center justify-center gap-2 text-white p-4 text-center">
                       <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-                      <span className="text-xs font-bold">Đang tải ảnh lên Cloudinary...</span>
+                      <span className="text-xs font-bold">{isEn ? "Uploading to Cloudinary..." : "Đang tải ảnh lên Cloudinary..."}</span>
                     </div>
                   )}
 
                   {!isUploading && uploadedUrl && (
                     <div className="absolute top-2 left-2 bg-emerald-600/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-xs flex items-center gap-1 shadow-xs">
-                      <CheckCircle2 className="w-3 h-3" /> Đã lưu Cloudinary
+                      <CheckCircle2 className="w-3 h-3" /> {isEn ? "Saved to Cloudinary" : "Đã lưu Cloudinary"}
                     </div>
                   )}
 
@@ -767,7 +788,7 @@ export function AddProduct({ onBack }) {
                         onClick={() => fileInputRef.current?.click()}
                         className="px-3 py-1.5 bg-white/90 hover:bg-white text-slate-800 text-xs font-bold rounded-lg shadow-sm cursor-pointer"
                       >
-                        Đổi ảnh
+                        {isEn ? "Change image" : "Đổi ảnh"}
                       </button>
                       <button
                         type="button"
@@ -799,10 +820,10 @@ export function AddProduct({ onBack }) {
                     <Upload className="w-6 h-6" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-blue-600 hover:underline">Tải ảnh lên</span>
-                    <span className="text-xs text-slate-500"> hoặc kéo thả</span>
+                    <span className="text-xs font-bold text-blue-600 hover:underline">{isEn ? "Upload image" : "Tải ảnh lên"}</span>
+                    <span className="text-xs text-slate-500">{isEn ? " or drag and drop" : " hoặc kéo thả"}</span>
                   </div>
-                  <p className="text-[11px] text-slate-400">PNG, JPG, WEBP tối đa 10MB</p>
+                  <p className="text-[11px] text-slate-400">{isEn ? "PNG, JPG, WEBP up to 10MB" : "PNG, JPG, WEBP tối đa 10MB"}</p>
                 </div>
               )}
 
@@ -824,7 +845,9 @@ export function AddProduct({ onBack }) {
 
             {/* TRẠNG THÁI HOẠT ĐỘNG */}
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-3">
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Trạng thái kinh doanh</h2>
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wide">
+                {isEn ? "Business Status" : "Trạng thái kinh doanh"}
+              </h2>
               <div className="space-y-2">
                 <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200/80 hover:bg-slate-50 cursor-pointer transition-colors">
                   <input
@@ -836,8 +859,10 @@ export function AddProduct({ onBack }) {
                     className="text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <div>
-                    <div className="text-xs font-bold text-slate-800">Đang bán</div>
-                    <div className="text-[11px] text-slate-500">Sản phẩm sẵn sàng xuất bán tại quầy</div>
+                    <div className="text-xs font-bold text-slate-800">{isEn ? "Active / Ready" : "Đang bán"}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {isEn ? "Product is active and ready for POS sales" : "Sản phẩm sẵn sàng xuất bán tại quầy"}
+                    </div>
                   </div>
                 </label>
 
@@ -851,8 +876,10 @@ export function AddProduct({ onBack }) {
                     className="text-blue-600 focus:ring-blue-500 cursor-pointer"
                   />
                   <div>
-                    <div className="text-xs font-bold text-slate-800">Tạm ngưng</div>
-                    <div className="text-[11px] text-slate-500">Ẩn khỏi danh mục bán lẻ</div>
+                    <div className="text-xs font-bold text-slate-800">{isEn ? "Suspended" : "Tạm ngưng"}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {isEn ? "Hidden from counter retail catalog" : "Ẩn khỏi danh mục bán lẻ"}
+                    </div>
                   </div>
                 </label>
               </div>

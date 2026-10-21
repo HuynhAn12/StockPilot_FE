@@ -2,7 +2,7 @@ import { apiClient } from '../lib/apiClient';
 
 // GET /inventory/balances (tồn kho hiện tại)
 // Backend trả về { success, items, pagination }
-export async function apiGetInventoryBalances({ page = 1, limit = 100, productId = '' } = {}) {
+export async function apiGetInventoryBalances({ page = 1, limit = 500, productId = '' } = {}) {
   const params = { page, limit };
   if (productId) params.productId = productId;
   const { data } = await apiClient.get('/inventory/balances', { params });
