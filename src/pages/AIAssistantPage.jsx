@@ -655,7 +655,7 @@ export function AIAssistantPage() {
             )}
 
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#a50064] to-[#d82d8b] text-white flex items-center justify-center shadow-xs">
+              <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-[#a50064] to-[#d82d8b] text-white flex items-center justify-center shadow-xs">
                 <Bot className="w-4 h-4" />
               </div>
               <div>
@@ -691,7 +691,7 @@ export function AIAssistantPage() {
             {(!activeChat?.messages || activeChat.messages.length === 0) && (
               <div className="py-6 sm:py-10 flex flex-col items-center text-center animate-in fade-in duration-300">
                 <div className="relative mb-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#a50064] to-[#d82d8b] text-white flex items-center justify-center shadow-lg shadow-pink-500/25">
+                  <div className="w-16 h-16 rounded-2xl bg-linear-to-tr from-[#a50064] to-[#d82d8b] text-white flex items-center justify-center shadow-lg shadow-pink-500/25">
                     <Bot className="w-9 h-9" />
                   </div>
                   <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 border-2 border-white rounded-full animate-ping" />
@@ -744,7 +744,7 @@ export function AIAssistantPage() {
                 >
                   {/* AI Avatar */}
                   {!isUser && (
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#a50064] to-[#d82d8b] text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                    <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-[#a50064] to-[#d82d8b] text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
                       <Bot className="w-4 h-4" />
                     </div>
                   )}
@@ -754,7 +754,7 @@ export function AIAssistantPage() {
                     <div
                       className={`p-4 text-xs sm:text-sm leading-relaxed rounded-2xl shadow-xs ${
                         isUser
-                          ? 'bg-gradient-to-r from-[#a50064] to-[#c1177c] text-white rounded-tr-xs font-medium shadow-pink-600/10'
+                          ? 'bg-linear-to-r from-[#a50064] to-[#c1177c] text-white rounded-tr-xs font-medium shadow-pink-600/10'
                           : 'bg-white text-[#303233] rounded-tl-xs border border-slate-200/80 shadow-2xs'
                       }`}
                     >
@@ -818,7 +818,7 @@ export function AIAssistantPage() {
             {/* AI Typing Indicator */}
             {isTyping && (
               <div className="flex items-center gap-3 my-4">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#a50064] to-[#d82d8b] text-white flex items-center justify-center shrink-0 shadow-xs">
+                <div className="w-8 h-8 rounded-xl bg-linear-to-tr from-[#a50064] to-[#d82d8b] text-white flex items-center justify-center shrink-0 shadow-xs">
                   <Bot className="w-4 h-4 animate-spin" />
                 </div>
                 <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-xs px-4 py-3 flex items-center gap-1.5 shadow-2xs">
@@ -835,7 +835,7 @@ export function AIAssistantPage() {
         </div>
 
         {/* Input Bar */}
-        <div className="p-4 bg-gradient-to-t from-white via-white to-white/80 border-t border-slate-100">
+        <div className="p-4 bg-linear-to-t from-white via-white to-white/80 border-t border-slate-100">
           <div className="max-w-3xl mx-auto w-full">
             <div className="relative bg-white border border-slate-300 rounded-3xl shadow-sm focus-within:border-[#a50064] focus-within:ring-2 focus-within:ring-[#a50064]/20 transition-all p-2 flex items-end gap-2">
               <textarea

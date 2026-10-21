@@ -1,37 +1,77 @@
-import { cn } from '../lib/utils';
+/**
+ * StockPilot Official Brand Identity Logo
+ * Source: Official SP Monogram (Isometric Cube + Upward Directional Chevron in Blue & Navy)
+ * Uploaded by user: /stockpilot-mark.png & /stockpilot-full.png
+ * Typography: StockPilot DECISION ENGINE
+ */
 
-export function StockPilotLogoIcon({ size = 'md', className }) {
-  const sizes = {
-    sm: 'w-6 h-6',
-    md: 'w-8 h-8',
-    lg: 'w-10 h-10',
-  };
-
-  const iconSizes = {
-    sm: 'w-3.5 h-3.5',
-    md: 'w-4.5 h-4.5',
-    lg: 'w-5.5 h-5.5',
-  };
+export function StockPilotIcon({ className = '', size = 32 }) {
+  const pixelSize = typeof size === 'number'
+    ? size
+    : size === 'sm'
+    ? 24
+    : size === 'lg'
+    ? 44
+    : size === 'md'
+    ? 32
+    : 32;
 
   return (
-    <div
-      className={cn(
-        'rounded-xl bg-gradient-to-br from-blue-600 via-blue-500 to-sky-400 flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0 border border-blue-400/40',
-        sizes[size],
-        className
+    <img
+      src="/stockpilot-mark.png"
+      alt="StockPilot Logo"
+      width={pixelSize}
+      height={pixelSize}
+      className={`object-contain shrink-0 ${className}`}
+      style={{ width: `${pixelSize}px`, height: `${pixelSize}px` }}
+      loading="eager"
+    />
+  );
+}
+
+export function StockPilotLogo({
+  className = '',
+  iconSize = 36,
+  iconOnly = false,
+  theme = 'light', 
+  variant = 'split' 
+}) {
+  const isDark = theme === 'dark';
+
+  if (variant === 'full' && !isDark) {
+    return (
+      <img
+        src="/stockpilot-full.png"
+        alt="StockPilot Decision Engine"
+        className={`h-9 w-auto object-contain select-none ${className}`}
+        loading="eager"
+      />
+    );
+  }
+
+  return (
+    <div className={`inline-flex items-center gap-2.5 select-none ${className}`}>
+      {/* Official SP Monogram sent by user */}
+      <div className="shrink-0 transition-transform duration-200 hover:scale-[1.03]">
+        <StockPilotIcon size={iconSize} />
+      </div>
+
+      {/* Official Typography: StockPilot DECISION ENGINE */}
+      {!iconOnly && (
+        <div className="flex flex-col text-left justify-center">
+          <div className="flex items-center tracking-tight leading-none">
+            <span className={`text-[21px] font-black tracking-tight ${isDark ? 'text-white' : 'text-[#0F172A]'}`}>
+              StockPilot
+            </span>
+          </div>
+          <span className={`text-[9.5px] font-extrabold tracking-[0.22em] uppercase leading-none mt-1 ${isDark ? 'text-slate-400' : 'text-[#475569]'}`}>
+            DECISION ENGINE
+          </span>
+        </div>
       )}
-    >
-      <svg
-        className={cn('text-white', iconSizes[size])}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-        <line x1="12" y1="22.08" x2="12" y2="12" />
-      </svg>
     </div>
   );
 }
+
+export const StockPilotLogoIcon = StockPilotIcon;
+export default StockPilotLogo;

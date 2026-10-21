@@ -149,6 +149,14 @@
     0%, 100% { transform: translateY(0px); }
     50%       { transform: translateY(-3px); }
   }
+  @keyframes float-gentle {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-8px); }
+  }
+  @keyframes float-delayed {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-8px); }
+  }
 
   /* Animation classes */
   .animate-in               { animation: fade-in 0.22s ease-out forwards; }
@@ -161,6 +169,8 @@
   .animate-bounce-in        { animation: bounce-in 0.3s ease-out; }
   .animate-pulse-soft       { animation: pulse-soft 2s ease-in-out infinite; }
   .animate-float            { animation: float 3s ease-in-out infinite; }
+  .animate-float-gentle     { animation: float-gentle 4s ease-in-out infinite; }
+  .animate-float-delayed    { animation: float-delayed 4.5s ease-in-out 1.2s infinite; }
 
   /* ─── Skeleton ─── */
   .skeleton {
@@ -260,6 +270,41 @@
   .badge-red   { background: hsl(0 86% 93%);  color: hsl(0 84% 43%);   border: 1px solid hsl(0 86% 85%); }
   .badge-amber { background: hsl(38 100% 91%); color: hsl(38 92% 32%);  border: 1px solid hsl(38 100% 82%); }
   .badge-gray  { background: hsl(214 25% 92%); color: hsl(215 16% 42%); border: 1px solid hsl(214 25% 84%); }
+
+  /* ─── Floating Animations for Mockup Badges ─── */
+  @keyframes spFloat {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  .sp-float {
+    animation: spFloat 4s ease-in-out infinite;
+  }
+
+  .sp-float-delay {
+    animation: spFloat 4s ease-in-out 2s infinite;
+  }
+
+  /* ─── Partner Marquee Animation ─── */
+  @keyframes spMarquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  .sp-marquee {
+    animation: spMarquee 25s linear infinite;
+  }
+  .sp-marquee:hover {
+    animation-play-state: paused;
+  }
 
   /* ─── Divider ─── */
   .divider-fade {
