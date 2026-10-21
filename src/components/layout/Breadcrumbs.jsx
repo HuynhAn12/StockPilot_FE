@@ -15,6 +15,7 @@ const routeKeyMap = {
   analytics: 'navAnalytics',
   'ai-assistant': 'navAiPilot',
   settings: 'navSettings',
+  staff: 'navStaff',
   admin: 'admin',
   users: 'navUsers',
   'audit-log': 'navAuditLog',

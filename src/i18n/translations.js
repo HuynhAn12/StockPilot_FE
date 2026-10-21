@@ -35,6 +35,7 @@ export const translations = {
     navAiPilot: 'Trợ lý AI Pilot',
     navUsers: 'Người dùng & Quyền',
     navAuditLog: 'Nhật ký kiểm toán',
+    navStaff: 'Nhân viên',
     navSettings: 'Cài đặt hệ thống',
 
     // POS Page
@@ -223,6 +224,7 @@ export const translations = {
     navAiPilot: 'AI Pilot Assistant',
     navUsers: 'Users & Roles',
     navAuditLog: 'Audit Logs',
+    navStaff: 'Staff Management',
     navSettings: 'System Settings',
 
     // POS Page

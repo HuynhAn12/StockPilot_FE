@@ -75,6 +75,7 @@ export const ROUTE_PERMISSIONS = {
   '/pricing': [ROLES.SHOP_OWNER, ROLES.ADMIN],
   '/analytics': [ROLES.SHOP_OWNER, ROLES.ADMIN],
   '/settings': [ROLES.SHOP_OWNER, ROLES.ADMIN],
+  '/staff': [ROLES.SHOP_OWNER, ROLES.ADMIN],
   '/admin/users': [ROLES.ADMIN],
   '/admin/audit-log': [ROLES.ADMIN],
 };

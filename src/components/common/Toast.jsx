@@ -12,8 +12,8 @@ function emitToast(toast) {
 }
 
 export function useToast() {
-  const toast = useCallback(({ type = 'info', title, message, duration = 4000 }) => {
-    emitToast({ id: ++toastIdCounter, type, title, message, duration });
+  const toast = useCallback(({ type = 'info', title, message, description, duration = 4000 }) => {
+    emitToast({ id: ++toastIdCounter, type, title, message: message || description, duration });
   }, []);
   return { toast };
 }

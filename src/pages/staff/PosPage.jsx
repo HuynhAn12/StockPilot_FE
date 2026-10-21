@@ -7,9 +7,10 @@ import {
   Receipt, Zap, Scan, Wifi, WifiOff, Link2, Loader2, Copy, ExternalLink,
   Smartphone, Settings
 } from 'lucide-react';
-import { useToast } from '../components/common/Toast';
-import { useAuthStore } from '../components/store/authStore';
-import { useTranslation } from '../i18n/useTranslation';
+import { useToast } from '../../components/common/Toast';
+import { useAuthStore } from '../../components/store/authStore';
+import { useTranslation } from '../../i18n/useTranslation';
+import { formatCategoryName } from '../../components/store/productStore';
 import {
   apiGetPosProducts,
   apiCreatePosSale,
@@ -20,9 +21,9 @@ import {
   apiConfirmMomoSuccess,
   apiGetMomoConfig,
   apiSaveMomoConfig
-} from '../services/posService';
-import { apiClient } from '../lib/apiClient';
-import { docSoThanhChu } from '../utils/numberToWordsVN';
+} from '../../services/posService';
+import { apiClient } from '../../lib/apiClient';
+import { docSoThanhChu } from '../../utils/numberToWordsVN';
 
 function safeNum(val) {
   if (val === null || val === undefined) return 0;
@@ -124,6 +125,7 @@ export function PosPage() {
   const { toast } = useToast();
   const { user } = useAuthStore();
   const { t, language } = useTranslation();
+  const isEn = language === 'en';
 
   const [products, setProducts] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -984,21 +986,18 @@ export function PosPage() {
       const payload = {
         customerName: activeTab.customer.name || 'Khách lẻ',
         customerPhone: activeTab.customer.phone || undefined,
-        discountAmount,
+        discountAmount: Number(discountAmount) || 0,
         taxAmount: 0,
         note: activeTab.note || undefined,
         paymentMethod: 'CASH',
-        totalAmount: totalPayable,
         items: activeTab.items.map((it) => ({
-          stockItemId: it.stockItemId,
-          quantity: it.quantity,
-          price: it.price,
-          unitPrice: it.price,
+          stockItemId: Number(it.stockItemId),
+          quantity: Number(it.quantity) || 1,
         })),
       };
       const res = await apiCreatePosSale(payload);
       broadcastOrderChange();
-      toast({ title: 'Thanh toán thành công!', description: `Đơn #${res?.order?.orderNumber || 'POS'} đã ghi nhận.`, type: 'success' });
+      toast({ title: 'Thanh toán thành công!', message: `Đơn #${res?.order?.orderNumber || 'POS'} đã ghi nhận.`, description: `Đơn #${res?.order?.orderNumber || 'POS'} đã ghi nhận.`, type: 'success' });
 
       const receipt = {
         orderNumber: res?.order?.orderNumber || `HD-${Date.now().toString().slice(-6)}`,
@@ -1027,7 +1026,14 @@ export function PosPage() {
         setTimeout(() => window.print(), 400);
       }
     } catch (err) {
-      toast({ title: 'Thanh toán thất bại', description: err?.response?.data?.error?.message || err?.message || 'Lỗi khi tạo đơn.', type: 'error' });
+      console.error('[POS Checkout Error]', err);
+      const errDetail = err?.response?.data?.error?.details?.[0];
+      const errMsg = (errDetail ? `${errDetail.field}: ${errDetail.message}` : '')
+        || err?.response?.data?.error?.message
+        || err?.response?.data?.message
+        || err?.message
+        || 'Lỗi khi tạo đơn.';
+      toast({ title: 'Thanh toán thất bại', message: errMsg, description: errMsg, type: 'error' });
     } finally {
       setIsProcessing(false);
     }
@@ -1359,7 +1365,7 @@ export function PosPage() {
                 : 'bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300'
             }`}
           >
-            Tất cả ({products.length})
+            {isEn ? `All (${products.length})` : `Tất cả (${products.length})`}
           </button>
           {categoriesList.map((cat) => (
             <button
@@ -1371,7 +1377,7 @@ export function PosPage() {
                   : 'bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300'
               }`}
             >
-              {cat}
+              {formatCategoryName(cat, isEn)}
             </button>
           ))}
         </div>

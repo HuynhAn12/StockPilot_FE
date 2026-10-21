@@ -4,7 +4,7 @@ import {
   Search, CheckCircle2, MoreVertical, Edit2, ShieldCheck,
   Store, Warehouse, X
 } from 'lucide-react';
-import { useToast } from '../components/common/Toast';
+import { useToast } from '../../components/common/Toast';
 
 const INITIAL_USERS = [
   { id: 'usr-1', fullName: 'Nguyễn Văn Minh', email: 'owner@stockpilot.vn', phone: '0908 123 456', role: 'store_owner', roleLabel: 'Chủ cửa hàng', status: 'ACTIVE', lastLogin: '2026-10-04T13:30:00Z' },

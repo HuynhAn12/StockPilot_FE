@@ -5,10 +5,10 @@ import {
   PackageCheck, ArrowRight, Clock, RefreshCw, CheckCircle2,
   Calendar, Layers, ShieldAlert, Sparkles, CheckSquare, Square
 } from 'lucide-react';
-import { useToast } from './common/Toast';
-import { useProductStore } from './store/productStore';
-import { useAlertsStore } from './store/alertsStore';
-import { apiGetAnalyticsSummary } from '../services/analyticsService';
+import { useToast } from '../../components/common/Toast';
+import { useProductStore } from '../../components/store/productStore';
+import { useAlertsStore } from '../../components/store/alertsStore';
+import { apiGetAnalyticsSummary } from '../../services/analyticsService';
 
 export function StaffOperationalDashboard() {
   const navigate = useNavigate();

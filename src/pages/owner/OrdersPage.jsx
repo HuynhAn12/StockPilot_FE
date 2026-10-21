@@ -8,12 +8,13 @@ import {
   User, Users, Phone, MapPin, AlertTriangle, CheckSquare, Undo2,
   Copy, TrendingUp, ChevronLeft, ChevronRight, Calendar
 } from 'lucide-react';
-import { useOrderStore } from '../components/store/orderStore';
-import { useProductStore } from '../components/store/productStore';
-import { useToast } from '../components/common/Toast';
-import { useAuthStore } from '../store/authStore';
-import { canCancelOrder, canViewOrderFinancialSummary, isStaff } from '../config/permissions.config';
-import { docSoThanhChu } from '../utils/numberToWordsVN';
+import { useOrderStore } from '../../components/store/orderStore';
+import { useProductStore } from '../../components/store/productStore';
+import { useToast } from '../../components/common/Toast';
+import { useAuthStore } from '../../store/authStore';
+import { canCancelOrder, canViewOrderFinancialSummary, isStaff } from '../../config/permissions.config';
+import { docSoThanhChu } from '../../utils/numberToWordsVN';
+import { useTranslation } from '../../i18n/useTranslation';
 
 function safeNum(val) {
   if (val === null || val === undefined) return 0;
@@ -33,11 +34,11 @@ function formatVND(n) {
   return safeNum(n).toLocaleString('vi-VN') + ' đ';
 }
 
-function getPaymentBadge(method) {
+function getPaymentBadge(method, isEn = false) {
   const m = String(method || 'CASH').toUpperCase();
   if (m === 'BANK_TRANSFER') {
     return {
-      label: 'Chuyển khoản',
+      label: isEn ? 'Bank Transfer' : 'Chuyển khoản',
       icon: QrCode,
       className: 'bg-blue-50 text-blue-700 border-blue-200/80',
       dotColor: 'bg-blue-500',
@@ -45,7 +46,7 @@ function getPaymentBadge(method) {
   }
   if (m === 'MOMO') {
     return {
-      label: 'Ví MoMo',
+      label: isEn ? 'MoMo Wallet' : 'Ví MoMo',
       icon: CreditCard,
       className: 'bg-pink-50 text-pink-700 border-pink-200/80',
       dotColor: 'bg-pink-500',
@@ -60,33 +61,33 @@ function getPaymentBadge(method) {
     };
   }
   return {
-    label: 'Tiền mặt',
+    label: isEn ? 'Cash' : 'Tiền mặt',
     icon: Banknote,
     className: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
     dotColor: 'bg-emerald-500',
   };
 }
 
-function getStatusBadge(status) {
+function getStatusBadge(status, isEn = false) {
   switch (status) {
     case 'FULFILLED':
     case 'COMPLETED':
       return {
-        label: 'Hoàn tất / Xuất kho',
+        label: isEn ? 'Completed / Dispatched' : 'Hoàn tất / Xuất kho',
         icon: CheckCircle2,
         className: 'bg-emerald-50/90 text-emerald-700 border-emerald-200/80',
         dotColor: 'bg-emerald-500',
       };
     case 'CONFIRMED':
       return {
-        label: 'Đã xác nhận / Đã trừ kho',
+        label: isEn ? 'Confirmed / Deducted' : 'Đã xác nhận / Đã trừ kho',
         icon: Check,
         className: 'bg-blue-50/90 text-blue-700 border-blue-200/80',
         dotColor: 'bg-blue-500',
       };
     case 'DRAFT':
       return {
-        label: 'Đơn nháp',
+        label: isEn ? 'Draft' : 'Đơn nháp',
         icon: Clock,
         className: 'bg-amber-50/90 text-amber-700 border-amber-200/80',
         dotColor: 'bg-amber-500',
@@ -94,14 +95,14 @@ function getStatusBadge(status) {
     case 'CANCELED':
     case 'CANCELLED':
       return {
-        label: 'Đã hủy',
+        label: isEn ? 'Cancelled' : 'Đã hủy',
         icon: XCircle,
         className: 'bg-rose-50/90 text-rose-700 border-rose-200/80',
         dotColor: 'bg-rose-500',
       };
     default:
       return {
-        label: status || 'Không rõ',
+        label: status || (isEn ? 'Unknown' : 'Không rõ'),
         icon: Clock,
         className: 'bg-slate-50 text-slate-700 border-slate-200/80',
         dotColor: 'bg-slate-400',
@@ -122,6 +123,8 @@ export function OrdersPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuthStore();
+  const { language } = useTranslation();
+  const isEn = language === 'en';
   const staffMode = isStaff(user?.role);
   const canSeeFinancials = canViewOrderFinancialSummary(user?.role);
   const canCancel = canCancelOrder(user?.role);
@@ -446,7 +449,29 @@ export function OrdersPage() {
     });
   }, [normalizedOrders, selectedPaymentMethod]);
 
-  const getTimeframeDescription = (prefix = 'Đơn phát sinh') => {
+  const getTimeframeDescription = (type = 'orders') => {
+    if (isEn) {
+      let typeLabel = 'Orders';
+      if (type === 'revenue' || type === 'Doanh thu') typeLabel = 'Revenue';
+      else if (type === 'sold' || type === 'Xuất bán') typeLabel = 'Sold';
+      
+      if (activeTab === 'TODAY') return `${typeLabel} today`;
+      if (activeTab === '3DAYS') return `${typeLabel} past 3 days`;
+      if (activeTab === '7DAYS') return `${typeLabel} in 7 days`;
+      if (activeTab === '30DAYS') return `${typeLabel} in 30 days`;
+      if (activeTab === 'CUSTOM') {
+        if (customFilterMode === 'day') {
+          const parts = (selectedCustomDate || '').split('-');
+          return `${typeLabel} on ${parts[2] || ''}/${parts[1] || ''}/${parts[0] || ''}`;
+        }
+        if (customFilterMode === 'month') {
+          const parts = (selectedCustomMonth || '').split('-');
+          return `${typeLabel} in ${parts[1] || ''}/${parts[0] || ''}`;
+        }
+      }
+      return `Total all-time ${typeLabel.toLowerCase()}`;
+    }
+    const prefix = type === 'revenue' ? 'Doanh thu' : type === 'sold' ? 'Xuất bán' : type === 'orders' ? 'Đơn phát sinh' : type;
     if (activeTab === 'TODAY') return `${prefix} hôm nay`;
     if (activeTab === '3DAYS') return `${prefix} 3 ngày qua`;
     if (activeTab === '7DAYS') return `${prefix} trong 7 ngày`;
@@ -650,10 +675,12 @@ export function OrdersPage() {
       >
         <div style={{ position: 'relative', zIndex: 1 }}>
           <h1 style={{ fontSize: 22, fontWeight: 900, margin: '0 0 4px', letterSpacing: '-0.4px', color: '#082f49' }}>
-            Đơn hàng & Bán lẻ
+            {isEn ? 'Orders & Retail' : 'Đơn hàng & Bán lẻ'}
           </h1>
           <p style={{ fontSize: 13, color: '#0c4a6e', margin: 0, fontWeight: 500 }} className="whitespace-nowrap sm:whitespace-nowrap max-sm:whitespace-normal">
-            Quản lý toàn diện đơn hàng bán lẻ tại quầy, xuất kho, hủy đơn và theo dõi dòng tiền thanh toán.
+            {isEn
+              ? 'Comprehensive management of retail counter orders, stock issuance, cancellations, and payment cash flow.'
+              : 'Quản lý toàn diện đơn hàng bán lẻ tại quầy, xuất kho, hủy đơn và theo dõi dòng tiền thanh toán.'}
           </p>
         </div>
       </div>
@@ -664,7 +691,9 @@ export function OrdersPage() {
           {/* Card 1: Tổng doanh thu */}
           <div className="bg-gradient-to-br from-emerald-500/[0.06] via-white to-white p-5 rounded-2xl border border-emerald-100/90 shadow-[0_4px_16px_-4px_rgba(16,185,129,0.12)] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Tổng doanh thu đơn hàng</span>
+              <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
+                {isEn ? 'Total Order Revenue' : 'Tổng doanh thu đơn hàng'}
+              </span>
               <div className="w-9 h-9 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-md shadow-emerald-500/25 group-hover:scale-105 transition-transform">
                 <DollarSign className="w-5 h-5" />
               </div>
@@ -678,7 +707,7 @@ export function OrdersPage() {
             <div className="mt-2.5 flex items-center">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[11px] font-semibold">
                 <TrendingUp className="w-3 h-3 text-emerald-600" />
-                {getTimeframeDescription('Doanh thu')}
+                {getTimeframeDescription('revenue')}
               </span>
             </div>
           </div>
@@ -686,7 +715,9 @@ export function OrdersPage() {
           {/* Card 2: Số đơn hàng */}
           <div className="bg-gradient-to-br from-blue-500/[0.06] via-white to-white p-5 rounded-2xl border border-blue-100/90 shadow-[0_4px_16px_-4px_rgba(59,130,246,0.12)] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Số đơn hàng</span>
+              <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
+                {isEn ? 'Total Orders' : 'Số đơn hàng'}
+              </span>
               <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/25 group-hover:scale-105 transition-transform">
                 <ShoppingCart className="w-4 h-4" />
               </div>
@@ -695,12 +726,12 @@ export function OrdersPage() {
               <span className="text-2xl sm:text-[28px] font-black text-slate-900 tracking-tight font-sans">
                 {Number(effectiveMetrics.orderCount || 0).toLocaleString('vi-VN')}
               </span>
-              <span className="text-sm font-bold text-blue-600">đơn</span>
+              <span className="text-sm font-bold text-blue-600">{isEn ? 'orders' : 'đơn'}</span>
             </div>
             <div className="mt-2.5 flex items-center">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60 text-[11px] font-semibold">
                 <Receipt className="w-3 h-3 text-blue-600" />
-                {getTimeframeDescription('Đơn phát sinh')}
+                {getTimeframeDescription('orders')}
               </span>
             </div>
           </div>
@@ -708,7 +739,9 @@ export function OrdersPage() {
           {/* Card 3: Số lượng sản phẩm đã bán */}
           <div className="bg-gradient-to-br from-indigo-500/[0.06] via-white to-white p-5 rounded-2xl border border-indigo-100/90 shadow-[0_4px_16px_-4px_rgba(99,102,241,0.12)] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group">
             <div className="flex items-center justify-between">
-              <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Sản phẩm đã bán</span>
+              <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
+                {isEn ? 'Products Sold' : 'Sản phẩm đã bán'}
+              </span>
               <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/25 group-hover:scale-105 transition-transform">
                 <Package className="w-4 h-4" />
               </div>
@@ -717,12 +750,12 @@ export function OrdersPage() {
               <span className="text-2xl sm:text-[28px] font-black text-slate-900 tracking-tight font-sans">
                 {Number(effectiveMetrics.totalSoldQuantity || 0).toLocaleString('vi-VN')}
               </span>
-              <span className="text-sm font-bold text-indigo-600">sản phẩm</span>
+              <span className="text-sm font-bold text-indigo-600">SP</span>
             </div>
             <div className="mt-2.5 flex items-center">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60 text-[11px] font-semibold">
                 <CheckCircle2 className="w-3 h-3 text-indigo-600" />
-                {getTimeframeDescription('Xuất bán')}
+                {getTimeframeDescription('sold')}
               </span>
             </div>
           </div>
@@ -731,7 +764,9 @@ export function OrdersPage() {
           <div className="bg-gradient-to-br from-purple-500/[0.06] via-white to-white p-5 rounded-2xl border border-purple-100/90 shadow-[0_4px_16px_-4px_rgba(168,85,247,0.12)] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">Phương thức thanh toán</span>
+                <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wider">
+                  {isEn ? 'Payment Methods' : 'Phương thức thanh toán'}
+                </span>
                 <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-500/25 group-hover:scale-105 transition-transform">
                   <CreditCard className="w-4 h-4" />
                 </div>
@@ -748,31 +783,39 @@ export function OrdersPage() {
                 const walletPct = Math.max(0, 100 - cashPct - transferPct);
                 return (
                   <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden flex gap-0.5 mt-3">
-                    {cashPct > 0 && <div style={{ width: `${cashPct}%` }} className="bg-emerald-500 h-full rounded-full transition-all" title={`Tiền mặt: ${cashPct}%`} />}
-                    {transferPct > 0 && <div style={{ width: `${transferPct}%` }} className="bg-blue-500 h-full rounded-full transition-all" title={`Chuyển khoản: ${transferPct}%`} />}
-                    {walletPct > 0 && <div style={{ width: `${walletPct}%` }} className="bg-purple-500 h-full rounded-full transition-all" title={`Ví điện tử: ${walletPct}%`} />}
+                    {cashPct > 0 && <div style={{ width: `${cashPct}%` }} className="bg-emerald-500 h-full rounded-full transition-all" title={`${isEn ? 'Cash' : 'Tiền mặt'}: ${cashPct}%`} />}
+                    {transferPct > 0 && <div style={{ width: `${transferPct}%` }} className="bg-blue-500 h-full rounded-full transition-all" title={`${isEn ? 'Bank Transfer' : 'Chuyển khoản'}: ${transferPct}%`} />}
+                    {walletPct > 0 && <div style={{ width: `${walletPct}%` }} className="bg-purple-500 h-full rounded-full transition-all" title={`${isEn ? 'E-Wallet' : 'Ví điện tử'}: ${walletPct}%`} />}
                   </div>
                 );
               })()}
 
               <div className="grid grid-cols-3 gap-1 pt-2.5 mt-1 text-center">
                 <div>
-                  <span className="text-[10px] text-slate-500 block font-semibold">Tiền mặt</span>
-                  <span className="text-xs font-black text-emerald-600 block">{Number(effectiveMetrics.cashCount || 0).toLocaleString('vi-VN')} lần</span>
+                  <span className="text-[10px] text-slate-500 block font-semibold">{isEn ? 'Cash' : 'Tiền mặt'}</span>
+                  <span className="text-xs font-black text-emerald-600 block">
+                    {Number(effectiveMetrics.cashCount || 0).toLocaleString('vi-VN')} {isEn ? 'times' : 'lần'}
+                  </span>
                 </div>
                 <div className="border-x border-slate-200/70">
-                  <span className="text-[10px] text-slate-500 block font-semibold">Chuyển khoản</span>
-                  <span className="text-xs font-black text-blue-600 block">{Number(effectiveMetrics.transferCount || 0).toLocaleString('vi-VN')} lần</span>
+                  <span className="text-[10px] text-slate-500 block font-semibold">{isEn ? 'Bank Transfer' : 'Chuyển khoản'}</span>
+                  <span className="text-xs font-black text-blue-600 block">
+                    {Number(effectiveMetrics.transferCount || 0).toLocaleString('vi-VN')} {isEn ? 'times' : 'lần'}
+                  </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block font-semibold">Ví điện tử</span>
-                  <span className="text-xs font-black text-purple-600 block">{Number(effectiveMetrics.walletCount || 0).toLocaleString('vi-VN')} lần</span>
+                  <span className="text-[10px] text-slate-500 block font-semibold">{isEn ? 'E-Wallet' : 'Ví điện tử'}</span>
+                  <span className="text-xs font-black text-purple-600 block">
+                    {Number(effectiveMetrics.walletCount || 0).toLocaleString('vi-VN')} {isEn ? 'times' : 'lần'}
+                  </span>
                 </div>
               </div>
             </div>
 
             <span className="text-[10px] text-slate-400 mt-2 block text-center font-medium">
-              Tổng {(Number(effectiveMetrics.cashCount || 0) + Number(effectiveMetrics.transferCount || 0) + Number(effectiveMetrics.walletCount || 0)).toLocaleString('vi-VN')} lượt thanh toán {activeTab === 'TODAY' ? 'hôm nay' : activeTab === '3DAYS' ? '3 ngày qua' : activeTab === '7DAYS' ? '7 ngày qua' : activeTab === '30DAYS' ? '30 ngày qua' : 'toàn bộ'}
+              {isEn
+                ? `Total ${(Number(effectiveMetrics.cashCount || 0) + Number(effectiveMetrics.transferCount || 0) + Number(effectiveMetrics.walletCount || 0)).toLocaleString('en-US')} payments ${activeTab === 'TODAY' ? 'today' : activeTab === '3DAYS' ? 'past 3 days' : activeTab === '7DAYS' ? 'past 7 days' : activeTab === '30DAYS' ? 'past 30 days' : 'all-time'}`
+                : `Tổng ${(Number(effectiveMetrics.cashCount || 0) + Number(effectiveMetrics.transferCount || 0) + Number(effectiveMetrics.walletCount || 0)).toLocaleString('vi-VN')} lượt thanh toán ${activeTab === 'TODAY' ? 'hôm nay' : activeTab === '3DAYS' ? '3 ngày qua' : activeTab === '7DAYS' ? '7 ngày qua' : activeTab === '30DAYS' ? '30 ngày qua' : 'toàn bộ'}`}
             </span>
           </div>
         </div>
@@ -784,16 +827,18 @@ export function OrdersPage() {
             </div>
             <div>
               <div className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-                Chế độ Vận hành Trong Ca Trực (Nhân viên Kho & Thu ngân)
+                {isEn ? 'Shift Operational Mode (Warehouse Staff & Cashier)' : 'Chế độ Vận hành Trong Ca Trực (Nhân viên Kho & Thu ngân)'}
               </div>
               <div className="text-xs text-slate-600 mt-0.5">
-                Tra cứu hóa đơn đã lập, in lại biên lai cho khách và xác nhận <strong>Hoàn tất / Xuất kho</strong>. Số liệu tài chính tổng & quyền hủy đơn thuộc thẩm quyền của Chủ shop.
+                {isEn
+                  ? 'Look up created invoices, reprint receipts for customers, and confirm Completed / Dispatched. Financial totals and order cancellation are reserved for Shop Owner.'
+                  : 'Tra cứu hóa đơn đã lập, in lại biên lai cho khách và xác nhận Hoàn tất / Xuất kho. Số liệu tài chính tổng & quyền hủy đơn thuộc thẩm quyền của Chủ shop.'}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200">
-              Đơn trong ca trực
+              {isEn ? 'Orders in Shift' : 'Đơn trong ca trực'}
             </span>
           </div>
         </div>
@@ -804,12 +849,12 @@ export function OrdersPage() {
         {/* Date Range Segmented Control */}
         <div className="inline-flex items-center gap-1 p-1 bg-slate-100/90 border border-slate-200/80 rounded-xl shadow-inner flex-wrap">
           {[
-            { key: 'TODAY', label: 'Hôm nay' },
-            { key: '3DAYS', label: '3 ngày' },
-            { key: '7DAYS', label: '7 ngày' },
-            { key: '30DAYS', label: '30 ngày' },
-            { key: 'ALL', label: 'Tất cả' },
-            { key: 'CUSTOM', label: 'Tùy chọn' },
+            { key: 'TODAY', label: isEn ? 'Today' : 'Hôm nay' },
+            { key: '3DAYS', label: isEn ? '3 days' : '3 ngày' },
+            { key: '7DAYS', label: isEn ? '7 days' : '7 ngày' },
+            { key: '30DAYS', label: isEn ? '30 days' : '30 ngày' },
+            { key: 'ALL', label: isEn ? 'All' : 'Tất cả' },
+            { key: 'CUSTOM', label: isEn ? 'Custom' : 'Tùy chọn' },
           ].map((tab) => {
             const isActive = activeTab === tab.key;
             return (
@@ -831,11 +876,11 @@ export function OrdersPage() {
         {/* Right Section: Số đơn bên trái phần tìm kiếm + Ô tìm kiếm */}
         <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <div className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-50 border border-slate-200/90 rounded-xl text-xs shadow-sm whitespace-nowrap">
-            <span className="text-slate-500 font-medium">Số đơn:</span>
+            <span className="text-slate-500 font-medium">{isEn ? 'Orders:' : 'Số đơn:'}</span>
             <span className="font-black text-slate-900 text-xs sm:text-[13px]">
               {Number(currentTabCount || 0).toLocaleString('vi-VN')}
             </span>
-            <span className="text-slate-400 text-[11px]">đơn</span>
+            <span className="text-slate-400 text-[11px]">{isEn ? 'orders' : 'đơn'}</span>
           </div>
 
           {/* Search */}
@@ -843,7 +888,7 @@ export function OrdersPage() {
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Tìm mã đơn, tên khách, tổng tiền..."
+              placeholder={isEn ? "Search order code, staff, customer, total..." : "Tìm mã đơn, nhân viên, khách, tổng tiền..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-9 py-2 text-xs bg-white border border-slate-200/90 rounded-xl shadow-sm focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 font-medium placeholder:text-slate-400 transition-all"
@@ -1150,13 +1195,13 @@ export function OrdersPage() {
       {/* Payment Method Filter Pills */}
       <div className="flex items-center gap-2 flex-wrap text-xs">
         <span className="text-slate-500 font-bold flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
-          <Filter className="w-3.5 h-3.5 text-blue-600" /> Hình thức:
+          <Filter className="w-3.5 h-3.5 text-blue-600" /> {isEn ? 'Method:' : 'Hình thức:'}
         </span>
         {[
-          { key: 'ALL', label: 'Tất cả' },
-          { key: 'CASH', label: staffMode ? 'Tiền mặt' : `Tiền mặt (${formatVND(effectiveMetrics.cashTotal)})`, icon: Banknote },
-          { key: 'BANK_TRANSFER', label: staffMode ? 'Chuyển khoản' : `Chuyển khoản (${formatVND(effectiveMetrics.transferTotal)})`, icon: QrCode },
-          { key: 'PAYOS', label: staffMode ? 'Ví điện tử' : `Ví điện tử (${formatVND(effectiveMetrics.walletTotal)})`, icon: CreditCard },
+          { key: 'ALL', label: isEn ? 'All' : 'Tất cả' },
+          { key: 'CASH', label: staffMode ? (isEn ? 'Cash' : 'Tiền mặt') : (isEn ? `Cash (${formatVND(effectiveMetrics.cashTotal)})` : `Tiền mặt (${formatVND(effectiveMetrics.cashTotal)})`), icon: Banknote },
+          { key: 'BANK_TRANSFER', label: staffMode ? (isEn ? 'Bank Transfer' : 'Chuyển khoản') : (isEn ? `Bank Transfer (${formatVND(effectiveMetrics.transferTotal)})` : `Chuyển khoản (${formatVND(effectiveMetrics.transferTotal)})`), icon: QrCode },
+          { key: 'PAYOS', label: staffMode ? (isEn ? 'E-Wallet' : 'Ví điện tử') : (isEn ? `E-Wallet (${formatVND(effectiveMetrics.walletTotal)})` : `Ví điện tử (${formatVND(effectiveMetrics.walletTotal)})`), icon: CreditCard },
         ].map((item) => {
           const Icon = item.icon;
           const isSelected = selectedPaymentMethod === item.key;
@@ -1183,14 +1228,14 @@ export function OrdersPage() {
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50/90 border-b border-slate-200/80 text-slate-500 uppercase font-bold text-[11px] tracking-wider">
               <tr>
-                <th className="py-3.5 px-4">Mã đơn hàng</th>
-                <th className="py-3.5 px-4">Thời gian</th>
-                <th className="py-3.5 px-4">Khách hàng</th>
-                <th className="py-3.5 px-4">Thanh toán</th>
-                <th className="py-3.5 px-4 text-center">Số lượng</th>
-                <th className="py-3.5 px-4 text-right">Tổng tiền</th>
-                <th className="py-3.5 px-4 text-center">Trạng thái</th>
-                <th className="py-3.5 px-4 text-right">Thao tác</th>
+                <th className="py-3.5 px-4">{isEn ? 'Order Code' : 'Mã đơn hàng'}</th>
+                <th className="py-3.5 px-4">{isEn ? 'Time' : 'Thời gian'}</th>
+                <th className="py-3.5 px-4">{isEn ? 'Handler' : 'Nhân viên xử lý'}</th>
+                <th className="py-3.5 px-4">{isEn ? 'Payment' : 'Thanh toán'}</th>
+                <th className="py-3.5 px-4 text-center">{isEn ? 'Quantity' : 'Số lượng'}</th>
+                <th className="py-3.5 px-4 text-right">{isEn ? 'Total' : 'Tổng tiền'}</th>
+                <th className="py-3.5 px-4 text-center">{isEn ? 'Status' : 'Trạng thái'}</th>
+                <th className="py-3.5 px-4 text-right">{isEn ? 'Actions' : 'Thao tác'}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -1200,23 +1245,27 @@ export function OrdersPage() {
                     <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
                       <ShoppingCart className="w-7 h-7" />
                     </div>
-                    <p className="font-bold text-sm text-slate-700">Không tìm thấy đơn hàng nào.</p>
-                    <p className="text-xs text-slate-400 mt-1">Bạn có thể tạo đơn hàng mới hoặc bán tại quầy POS.</p>
+                    <p className="font-bold text-sm text-slate-700">
+                      {isEn ? 'No orders found.' : 'Không tìm thấy đơn hàng nào.'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {isEn ? 'You can create a new order or sell at the POS counter.' : 'Bạn có thể tạo đơn hàng mới hoặc bán tại quầy POS.'}
+                    </p>
                     <div className="mt-4 flex items-center justify-center gap-2">
                       <button
                         onClick={() => navigate('/pos')}
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 shadow-md shadow-blue-500/20 active:scale-95 transition-all"
                       >
-                        <ShoppingCart className="w-3.5 h-3.5" /> Mở quầy POS
+                        <ShoppingCart className="w-3.5 h-3.5" /> {isEn ? 'Open POS Counter' : 'Mở quầy POS'}
                       </button>
                     </div>
                   </td>
                 </tr>
               ) : (
                 filteredOrders.map((ord) => {
-                  const payBadge = getPaymentBadge(ord.paymentMethod);
+                  const payBadge = getPaymentBadge(ord.paymentMethod, isEn);
                   const PayIcon = payBadge.icon;
-                  const statusBadge = getStatusBadge(ord.status);
+                  const statusBadge = getStatusBadge(ord.status, isEn);
                   const StatusIcon = statusBadge.icon;
 
                   return (
@@ -1227,11 +1276,11 @@ export function OrdersPage() {
                           onClick={() => {
                             if (navigator.clipboard?.writeText) {
                               navigator.clipboard.writeText(ord.orderId);
-                              toast.success(`Đã sao chép: ${ord.orderId}`);
+                              toast.success(isEn ? `Copied: ${ord.orderId}` : `Đã sao chép: ${ord.orderId}`);
                             }
                           }}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200/70 text-slate-800 font-mono text-xs font-bold cursor-pointer transition-colors"
-                          title="Click để sao chép mã đơn"
+                          title={isEn ? "Click to copy order code" : "Click để sao chép mã đơn"}
                         >
                           <span>{ord.orderId}</span>
                           <Copy className="w-3 h-3 text-slate-400 group-hover:text-slate-600" />
@@ -1243,29 +1292,19 @@ export function OrdersPage() {
                         <div className="flex flex-col">
                           <span className="font-bold text-slate-800 text-xs flex items-center gap-1">
                             <Clock className="w-3 h-3 text-slate-400" />
-                            {new Date(ord.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(ord.createdAt).toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                           <span className="text-[11px] text-slate-400 font-medium pl-4">
-                            {new Date(ord.createdAt).toLocaleDateString('vi-VN')}
+                            {new Date(ord.createdAt).toLocaleDateString(isEn ? 'en-US' : 'vi-VN')}
                           </span>
                         </div>
                       </td>
 
-                      {/* Khách hàng */}
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200/80 flex items-center justify-center text-[11px] font-bold text-slate-700 flex-shrink-0">
-                            {(ord.customerName || 'K').charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 text-xs">{ord.customerName || 'Khách lẻ'}</p>
-                            {ord.customerPhone && (
-                              <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1 mt-0.5">
-                                <Phone className="w-2.5 h-2.5" /> {ord.customerPhone}
-                              </p>
-                            )}
-                          </div>
-                        </div>
+                      {/* Nhân viên xử lý */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-semibold text-slate-800 text-xs">
+                          {ord.createdBy?.fullName || (isEn ? 'Store Owner' : 'Chủ shop')}
+                        </span>
                       </td>
 
                       {/* Payment Method */}
@@ -1279,7 +1318,7 @@ export function OrdersPage() {
                       {/* Số lượng */}
                       <td className="py-3.5 px-4 text-center">
                         <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
-                          {ord.itemsCount} sp
+                          {ord.itemsCount} SP
                         </span>
                       </td>
 
@@ -1460,11 +1499,12 @@ export function OrdersPage() {
               </button>
             </div>
 
-            {/* Status & Customer Badge */}
-            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+            {/* Status, Customer & Handler Badge */}
+            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Khách hàng</p>
-                <p className="font-bold text-sm text-foreground">{viewOrderDetail.customerName}</p>
+                <p className="text-[11px] uppercase tracking-wide font-bold text-slate-400">Nhân viên xử lý</p>
+                <p className="font-bold text-sm text-slate-900 mb-1.5">{viewOrderDetail.createdBy?.fullName || 'Chủ shop'}</p>
+                <p className="text-xs text-muted-foreground">Khách: <strong className="text-slate-800">{viewOrderDetail.customerName || 'Khách lẻ'}</strong></p>
                 {viewOrderDetail.customerPhone && (
                   <p className="text-xs text-muted-foreground">{viewOrderDetail.customerPhone}</p>
                 )}

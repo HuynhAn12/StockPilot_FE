@@ -1037,7 +1037,7 @@ export function LandingPage() {
                             {language === 'en' ? 'AUDIT' : 'KIỂM KHO'}
                           </span>
                           <span className="font-bold text-slate-900 text-xs sm:text-sm whitespace-nowrap">
-                            {language === 'en' ? '48 SKUs Scanned' : '48 mặt hàng'}
+                            {language === 'en' ? '48 SP Scanned' : '48 mặt hàng'}
                           </span>
                         </div>
                         <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">

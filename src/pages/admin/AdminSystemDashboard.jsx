@@ -5,9 +5,9 @@ import {
   Server, Database, ArrowRight, Eye, RefreshCw, CheckCircle2,
   Lock, Globe, Sparkles, Filter, ChevronRight
 } from 'lucide-react';
-import { useAuthStore } from '../store/authStore';
-import { useToast } from './common/Toast';
-import { apiGetAuditLogs } from '../services/analyticsService';
+import { useAuthStore } from '../../store/authStore';
+import { useToast } from '../../components/common/Toast';
+import { apiGetAuditLogs } from '../../services/analyticsService';
 
 export function AdminSystemDashboard() {
   const navigate = useNavigate();

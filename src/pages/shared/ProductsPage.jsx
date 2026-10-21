@@ -6,13 +6,13 @@ import {
   Calendar, Zap, ShoppingBag, X, ZoomIn, Check, Info,
   Store, ChevronRight, Pencil, Upload, Camera
 } from "lucide-react";
-import { useProductStore, CATEGORIES } from "../components/store/productStore";
-import { useAuthStore } from "../store/authStore";
-import { canViewCostPrice, canDeleteProduct } from "../config/permissions.config";
-import { AddProduct } from "../components/AddProduct";
-import { useToast } from "../components/common/Toast";
-import { useTranslation } from "../i18n/useTranslation";
-import { uploadImageToCloudinary, uploadBase64ToCloudinary } from "../services/uploadService";
+import { useProductStore, CATEGORIES } from "../../components/store/productStore";
+import { useAuthStore } from "../../store/authStore";
+import { canViewCostPrice, canDeleteProduct } from "../../config/permissions.config";
+import { AddProduct } from "../../components/AddProduct";
+import { useToast } from "../../components/common/Toast";
+import { useTranslation } from "../../i18n/useTranslation";
+import { uploadImageToCloudinary, uploadBase64ToCloudinary } from "../../services/uploadService";
 
 function safeNum(val) {
   if (val === null || val === undefined) return 0;

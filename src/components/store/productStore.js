@@ -7,13 +7,13 @@ import { apiGetProducts, apiGetCategories, apiCreateProduct, apiUpdateProduct, a
 
 // ─── Categories matching Database & UI (Chính xác 7 danh mục chuẩn) ───
 export const CATEGORIES = [
-  { value: 'tpcn', id: 'tpcn', label: 'Thực phẩm', icon: '📦', color: 'emerald' },
-  { value: 'drink', id: 'drink', label: 'Đồ uống', icon: '☕', color: 'blue' },
-  { value: 'spice', id: 'spice', label: 'Gia vị & Đồ khô', icon: '🧂', color: 'amber' },
-  { value: 'house', id: 'house', label: 'Đồ dùng gia đình', icon: '🧹', color: 'indigo' },
-  { value: 'care', id: 'care', label: 'Chăm sóc cá nhân', icon: '🧴', color: 'pink' },
-  { value: 'office', id: 'office', label: 'Đồ dùng văn phòng', icon: '📎', color: 'cyan' },
-  { value: 'misc', id: 'misc', label: 'Tiêu dùng khác', icon: '🔋', color: 'slate' },
+  { value: 'tpcn', id: 'tpcn', label: 'Thực phẩm', labelEn: 'Food & Groceries', icon: '📦', color: 'emerald' },
+  { value: 'drink', id: 'drink', label: 'Đồ uống', labelEn: 'Beverages', icon: '☕', color: 'blue' },
+  { value: 'spice', id: 'spice', label: 'Gia vị & Đồ khô', labelEn: 'Spices & Dry Goods', icon: '🧂', color: 'amber' },
+  { value: 'house', id: 'house', label: 'Đồ dùng gia đình', labelEn: 'Household Goods', icon: '🧹', color: 'indigo' },
+  { value: 'care', id: 'care', label: 'Chăm sóc cá nhân', labelEn: 'Personal Care', icon: '🧴', color: 'pink' },
+  { value: 'office', id: 'office', label: 'Đồ dùng văn phòng', labelEn: 'Office Supplies', icon: '📎', color: 'cyan' },
+  { value: 'misc', id: 'misc', label: 'Tiêu dùng khác', labelEn: 'Other Consumables', icon: '🔋', color: 'slate' },
 ];
 
 // Mapping các tên/mã cũ hoặc biến thể về 7 danh mục chính thức
@@ -33,6 +33,44 @@ export function getCategoryCanonical(cat) {
   if (!cat) return 'misc';
   const c = String(cat).toLowerCase().trim();
   return CATEGORY_ALIASES[c] || c;
+}
+
+export const UNIT_TRANSLATIONS = {
+  'Cái': 'Piece',
+  'Hộp': 'Box',
+  'Chai': 'Bottle',
+  'Túi': 'Bag',
+  'Kg': 'Kg',
+  'Gói': 'Pack',
+  'Thùng': 'Carton',
+  'Lọ': 'Jar',
+  'Cuộn': 'Roll',
+  'Đôi': 'Pair',
+  'Bộ': 'Set',
+  'Tờ': 'Sheet',
+};
+
+export function formatUnit(u, isEn) {
+  if (!isEn) return u;
+  return UNIT_TRANSLATIONS[u] || u;
+}
+
+export function formatCategoryName(nameOrValue, isEn) {
+  if (!nameOrValue) return isEn ? 'Uncategorized' : 'Chưa phân loại';
+  if (!isEn) return nameOrValue;
+  const canonical = getCategoryCanonical(nameOrValue);
+  const found = CATEGORIES.find(c => c.value === canonical || c.label.toLowerCase() === String(nameOrValue).toLowerCase());
+  if (found) return found.labelEn;
+  const directMap = {
+    'Thực phẩm': 'Food & Groceries',
+    'Đồ uống': 'Beverages',
+    'Gia vị & Đồ khô': 'Spices & Dry Goods',
+    'Đồ dùng gia đình': 'Household Goods',
+    'Chăm sóc cá nhân': 'Personal Care',
+    'Đồ dùng văn phòng': 'Office Supplies',
+    'Tiêu dùng khác': 'Other Consumables',
+  };
+  return directMap[nameOrValue] || nameOrValue;
 }
 
 export const UNITS = ['Cái', 'Hộp', 'Chai', 'Túi', 'Kg', 'Gói', 'Thùng', 'Lọ', 'Cuộn', 'Đôi', 'Bộ', 'Tờ'];

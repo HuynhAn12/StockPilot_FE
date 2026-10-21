@@ -19,6 +19,7 @@ const NAV_ITEM_CONFIG = [
   { key: 'navProducts', defaultName: 'Sản phẩm', href: '/products', icon: Package, roles: ['store_owner','warehouse_staff','admin'] },
   { key: 'navPos', defaultName: 'Thanh toán', href: '/pos', icon: ShoppingBag, roles: ['store_owner','warehouse_staff','admin'] },
   { key: 'navOrders', defaultName: 'Đơn hàng', href: '/orders', icon: ShoppingCart, roles: ['store_owner','admin'] },
+  { key: 'navStaff', defaultName: 'Nhân viên', href: '/staff', icon: Users, roles: ['store_owner','admin'] },
   { key: 'navInventory', defaultName: 'Quản lý kho', href: '/inventory', icon: Boxes, roles: ['store_owner','warehouse_staff','admin'] },
   // Hỗ trợ quyết định
   { key: 'navAlerts', sectionKey: 'decisionSupportSection', defaultName: 'Cảnh báo rủi ro', defaultSection: 'Hỗ trợ quyết định', href: '/alerts', icon: AlertTriangle, badgeKey: 'alerts', badgeVariant: 'error', roles: ['store_owner','warehouse_staff','admin'] },
@@ -44,7 +45,7 @@ export function Sidebar() {
   const navigate = useNavigate();
   const { user, clearUser } = useAuthStore();
   const { sidebarCollapsed, toggleSidebar, sidebarMobileOpen, setSidebarMobileOpen } = useUIStore();
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const { getOpenCount, fetchAlerts } = useAlertsStore();
   const { getPendingCount, fetchRecommendations } = usePricingStore();
 
@@ -260,7 +261,7 @@ export function Sidebar() {
             {!sidebarCollapsed && (
               <button
                 onClick={handleLogout}
-                title="Đăng xuất"
+                title={language === 'en' ? 'Sign out' : 'Đăng xuất'}
                 className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all shrink-0"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -275,14 +276,14 @@ export function Sidebar() {
                 'flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-all w-full font-medium',
                 sidebarCollapsed ? 'justify-center' : 'justify-start'
               )}
-              title={sidebarCollapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
+              title={sidebarCollapsed ? (language === 'en' ? 'Expand menu' : 'Mở rộng thanh menu') : (language === 'en' ? 'Collapse menu' : 'Thu gọn thanh menu')}
             >
               {sidebarCollapsed ? (
                 <ChevronRight className="w-4 h-4" />
               ) : (
                 <>
                   <ChevronLeft className="w-4 h-4" />
-                  <span>Thu gọn menu</span>
+                  <span>{language === 'en' ? 'Collapse menu' : 'Thu gọn menu'}</span>
                 </>
               )}
             </button>

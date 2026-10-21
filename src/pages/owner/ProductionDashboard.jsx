@@ -10,12 +10,13 @@ import {
   Clock,
   Calendar, ChevronLeft, ChevronDown,
 } from 'lucide-react';
-import { useToast } from './common/Toast';
+import { useToast } from '../../components/common/Toast';
 import {
   FreshProduceBasketIllustration,
   GroceryBagIllustration
-} from './DashboardIllustrations';
-import { apiGetAnalyticsSummary } from '../services/analyticsService';
+} from '../../components/DashboardIllustrations';
+import { apiGetAnalyticsSummary } from '../../services/analyticsService';
+import { useTranslation } from '../../i18n/useTranslation';
 
 function getDaysInMonth(year, monthIndex) {
   return new Date(year, monthIndex + 1, 0).getDate();
@@ -32,43 +33,45 @@ const formatVND = (n) =>
 
 const formatMillions = (n) => {
   const val = (n ?? 0) / 1_000_000;
-  return val >= 1000 ? `${(val / 1000).toFixed(1)} tỷ` : `${val.toFixed(1)} tr`;
+  return val >= 1000 ? `${(val / 1000).toFixed(3)} tỷ` : `${val.toFixed(3)} tr`;
 };
 
-// Compact VND formatting (e.g. 72k, 1.2tr, 15 tỷ)
+// Compact VND formatting (e.g. 72k, 1.200tr, 1.200 tỷ)
 const formatCompactVND = (n) => {
   const val = Number(n) || 0;
   if (val === 0) return '0 ₫';
-  if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(1)} tỷ ₫`;
-  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)} tr ₫`;
+  if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(3)} tỷ ₫`;
+  if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(3)} tr ₫`;
   if (val >= 1_000) return `${(val / 1_000).toFixed(0)}k ₫`;
   return `${val.toLocaleString('vi-VN')} ₫`;
 };
 
 // Split value and unit for top KPI cards
-const formatKPIValue = (n) => {
+const formatKPIValue = (n, isEn = false) => {
   const val = Number(n) || 0;
   if (val === 0) return { val: '0', unit: '₫' };
-  if (val >= 1_000_000_000) return { val: (val / 1_000_000_000).toFixed(1), unit: 'tỷ ₫' };
-  if (val >= 1_000_000) return { val: (val / 1_000_000).toFixed(1), unit: 'tr ₫' };
+  if (val >= 1_000_000_000) return { val: (val / 1_000_000_000).toFixed(3), unit: isEn ? 'B ₫' : 'tỷ ₫' };
+  if (val >= 1_000_000) return { val: (val / 1_000_000).toFixed(3), unit: isEn ? 'M ₫' : 'tr ₫' };
   return { val: val.toLocaleString('vi-VN'), unit: '₫' };
 };
 
 const BAR_SOLID = '#2563eb'; // Classic flat blue — no gradient
 
 const STANDARD_CATEGORIES = [
-  { name: 'Thực phẩm', lines: ['Thực phẩm'], match: ['thực phẩm', 'thuc pham', 'tpcn', 'thuc-pham', 'do-an'] },
-  { name: 'Đồ uống', lines: ['Đồ uống'], match: ['đồ uống', 'do uong', 'drink', 'do-uong'] },
-  { name: 'Gia vị & Đồ khô', lines: ['Gia vị &', 'Đồ khô'], match: ['gia vị', 'gia vi', 'đồ khô', 'do kho', 'spice', 'gia-vi'] },
-  { name: 'Đồ dùng gia đình', lines: ['Đồ dùng', 'gia đình'], match: ['gia đình', 'gia dinh', 'đồ dùng gia đình', 'house', 'gia-dinh', 'gia-dung'] },
-  { name: 'Chăm sóc cá nhân', lines: ['Chăm sóc', 'cá nhân'], match: ['cá nhân', 'ca nhan', 'chăm sóc cá nhân', 'care', 'ca-nhan'] },
-  { name: 'Đồ dùng văn phòng', lines: ['Đồ dùng', 'văn phòng'], match: ['văn phòng', 'van phong', 'đồ dùng văn phòng', 'office', 'van-phong'] },
-  { name: 'Tiêu dùng khác', lines: ['Tiêu dùng', 'khác'], match: ['khác', 'khac', 'tiêu dùng khác', 'chưa phân loại', 'misc', 'tieu-dung'] },
+  { name: 'Thực phẩm', nameEn: 'Food', lines: ['Thực phẩm'], linesEn: ['Food'], match: ['thực phẩm', 'thuc pham', 'tpcn', 'thuc-pham', 'do-an'] },
+  { name: 'Đồ uống', nameEn: 'Beverages', lines: ['Đồ uống'], linesEn: ['Beverages'], match: ['đồ uống', 'do uong', 'drink', 'do-uong'] },
+  { name: 'Gia vị & Đồ khô', nameEn: 'Spices & Dry', lines: ['Gia vị &', 'Đồ khô'], linesEn: ['Spices &', 'Dry Food'], match: ['gia vị', 'gia vi', 'đồ khô', 'do kho', 'spice', 'gia-vi'] },
+  { name: 'Đồ dùng gia đình', nameEn: 'Household', lines: ['Đồ dùng', 'gia đình'], linesEn: ['Household', 'Goods'], match: ['gia đình', 'gia dinh', 'đồ dùng gia đình', 'house', 'gia-dinh', 'gia-dung'] },
+  { name: 'Chăm sóc cá nhân', nameEn: 'Personal Care', lines: ['Chăm sóc', 'cá nhân'], linesEn: ['Personal', 'Care'], match: ['cá nhân', 'ca nhan', 'chăm sóc cá nhân', 'care', 'ca-nhan'] },
+  { name: 'Đồ dùng văn phòng', nameEn: 'Office Supplies', lines: ['Đồ dùng', 'văn phòng'], linesEn: ['Office', 'Supplies'], match: ['văn phòng', 'van phong', 'đồ dùng văn phòng', 'office', 'van-phong'] },
+  { name: 'Tiêu dùng khác', nameEn: 'Other Goods', lines: ['Tiêu dùng', 'khác'], linesEn: ['Other', 'Goods'], match: ['khác', 'khac', 'tiêu dùng khác', 'chưa phân loại', 'misc', 'tieu-dung'] },
 ];
 
 export function ProductionDashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { language } = useTranslation();
+  const isEn = language === 'en';
 
   // API data state
   const [metrics, setMetrics] = useState(null);
@@ -218,14 +221,16 @@ export function ProductionDashboard() {
     });
     const revRaw = found ? (found.revenue ?? 0) : 0;
     const margin = found ? (found.margin ?? 0) : 0;
-    const rev = revRaw >= 1_000_000
-      ? `${(revRaw / 1_000_000).toFixed(1)}tr`
-      : revRaw > 0
-        ? `${(revRaw / 1000).toFixed(0)}k`
-        : '0₫';
+    const rev = revRaw >= 1_000_000_000
+      ? `${(revRaw / 1_000_000_000).toFixed(3)}${isEn ? 'B' : 'tỷ'}`
+      : revRaw >= 1_000_000
+        ? `${(revRaw / 1_000_000).toFixed(3)}${isEn ? 'M' : 'tr'}`
+        : revRaw > 0
+          ? `${(revRaw / 1000).toFixed(0)}k`
+          : '0₫';
     return {
-      name: std.name,
-      lines: std.lines,
+      name: isEn ? (std.nameEn || std.name) : std.name,
+      lines: isEn ? (std.linesEn || std.lines) : std.lines,
       revRaw,
       rev,
       pct: margin > 0 ? `+${margin}%` : `${margin}%`,
@@ -259,8 +264,8 @@ export function ProductionDashboard() {
 
   const formatTickLabel = (val) => {
     if (val === 0) return '0';
-    if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(val % 1_000_000_000 === 0 ? 0 : 1)}tỷ`;
-    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(val % 1_000_000 === 0 ? 0 : 1)}tr`;
+    if (val >= 1_000_000_000) return `${(val / 1_000_000_000).toFixed(val % 1_000_000_000 === 0 ? 0 : 1)}${isEn ? 'B' : 'tỷ'}`;
+    if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(val % 1_000_000 === 0 ? 0 : 1)}${isEn ? 'M' : 'tr'}`;
     if (val >= 1_000) return `${(val / 1_000).toFixed(0)}k`;
     return `${val}`;
   };
@@ -327,9 +332,9 @@ export function ProductionDashboard() {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       buckets.push({
-        month: `T${d.getMonth() + 1}`,
+        month: isEn ? `M${d.getMonth() + 1}` : `T${d.getMonth() + 1}`,
         ym,
-        label: `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`,
+        label: isEn ? `Month ${d.getMonth() + 1}/${d.getFullYear()}` : `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`,
       });
     }
     return buckets;
@@ -486,7 +491,7 @@ export function ProductionDashboard() {
         </div>
         <div className="flex-1 text-center md:text-left space-y-1 w-full">
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900" style={{ color: '#0f172a' }}>
-            Hệ thống Quản lý & Tồn kho
+            {isEn ? 'Warehouse & Inventory Management' : 'Hệ thống Quản lý & Tồn kho'}
           </h1>
           <p className="text-xs sm:text-sm font-medium" style={{ color: '#0f172a' }}>
             <strong style={{ color: '#0f172a', fontWeight: 800 }}>StockPilot</strong>
@@ -503,10 +508,10 @@ export function ProductionDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-blue-100/70 shadow-[0_4px_20px_-4px_rgba(37,99,235,0.05)]">
         <div className="flex items-center gap-1.5">
           {[
-            { id: 'today', label: 'Hôm nay' },
-            { id: '7days', label: '7 ngày' },
-            { id: '30days', label: '30 ngày' },
-            { id: 'custom', label: 'Tùy chọn' },
+            { id: 'today', label: isEn ? 'Today' : 'Hôm nay' },
+            { id: '7days', label: isEn ? '7 days' : '7 ngày' },
+            { id: '30days', label: isEn ? '30 days' : '30 ngày' },
+            { id: 'custom', label: isEn ? 'Custom' : 'Tùy chọn' },
           ].map((t) => (
             <button
               key={t.id}
@@ -524,14 +529,14 @@ export function ProductionDashboard() {
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold">
             <Clock className="w-3.5 h-3.5" />
-            <span>Cập nhật lúc {lastUpdated}</span>
+            <span>{isEn ? `Updated at ${lastUpdated}` : `Cập nhật lúc ${lastUpdated}`}</span>
           </div>
           <button
             onClick={handleRefresh}
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-all cursor-pointer border border-blue-200"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>Làm mới</span>
+            <span>{isEn ? 'Refresh' : 'Làm mới'}</span>
           </button>
         </div>
       </div>
@@ -542,7 +547,7 @@ export function ProductionDashboard() {
           <div className="flex items-center gap-2.5 flex-wrap">
             <div className="flex items-center gap-1.5 font-bold text-slate-700">
               <Calendar className="w-4 h-4 text-blue-600" />
-              <span>Chế độ xem:</span>
+              <span>{isEn ? 'View mode:' : 'Chế độ xem:'}</span>
             </div>
 
             {/* Sub-mode switcher */}
@@ -556,7 +561,7 @@ export function ProductionDashboard() {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Theo ngày
+                {isEn ? 'By day' : 'Theo ngày'}
               </button>
               <button
                 type="button"
@@ -567,7 +572,7 @@ export function ProductionDashboard() {
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Theo tháng
+                {isEn ? 'By month' : 'Theo tháng'}
               </button>
             </div>
 
@@ -586,7 +591,7 @@ export function ProductionDashboard() {
                   className="flex items-center gap-2 bg-white hover:bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-200/90 shadow-xs font-bold text-slate-800 text-xs transition-all cursor-pointer group"
                 >
                   <Calendar className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform" />
-                  <span>Ngày {selectedCustomDate.split('-').reverse().join('/')}</span>
+                  <span>{isEn ? `Date ${selectedCustomDate.split('-').reverse().join('/')}` : `Ngày ${selectedCustomDate.split('-').reverse().join('/')}`}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
                 </button>
 
@@ -613,7 +618,7 @@ export function ProductionDashboard() {
                         </button>
 
                         <span className="font-extrabold text-xs sm:text-sm text-slate-900">
-                          Tháng {pickerMonthIndex + 1}, Năm {pickerYear}
+                          {isEn ? `Month ${pickerMonthIndex + 1}, Year ${pickerYear}` : `Tháng ${pickerMonthIndex + 1}, Năm ${pickerYear}`}
                         </span>
 
                         <button
@@ -633,15 +638,15 @@ export function ProductionDashboard() {
                         </button>
                       </div>
 
-                      {/* Weekday labels in Vietnamese */}
+                      {/* Weekday labels */}
                       <div className="grid grid-cols-7 gap-1 pt-3 pb-2 text-center text-[10px] font-extrabold text-slate-400">
-                        <span>T2</span>
-                        <span>T3</span>
-                        <span>T4</span>
-                        <span>T5</span>
-                        <span>T6</span>
-                        <span className="text-blue-500">T7</span>
-                        <span className="text-rose-500">CN</span>
+                        <span>{isEn ? 'Mon' : 'T2'}</span>
+                        <span>{isEn ? 'Tue' : 'T3'}</span>
+                        <span>{isEn ? 'Wed' : 'T4'}</span>
+                        <span>{isEn ? 'Thu' : 'T5'}</span>
+                        <span>{isEn ? 'Fri' : 'T6'}</span>
+                        <span className="text-blue-500">{isEn ? 'Sat' : 'T7'}</span>
+                        <span className="text-rose-500">{isEn ? 'Sun' : 'CN'}</span>
                       </div>
 
                       {/* Days grid */}
@@ -687,7 +692,7 @@ export function ProductionDashboard() {
                             }}
                             className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
                           >
-                            Hôm nay (18/10)
+                            {isEn ? 'Today (18/10)' : 'Hôm nay (18/10)'}
                           </button>
                           <button
                             type="button"
@@ -699,7 +704,7 @@ export function ProductionDashboard() {
                             }}
                             className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
                           >
-                            Hôm qua (17/10)
+                            {isEn ? 'Yesterday (17/10)' : 'Hôm qua (17/10)'}
                           </button>
                         </div>
                         <button
@@ -707,7 +712,7 @@ export function ProductionDashboard() {
                           onClick={() => setIsDayPickerOpen(false)}
                           className="text-slate-400 hover:text-slate-600 font-semibold px-1.5 py-1 cursor-pointer"
                         >
-                          Đóng
+                          {isEn ? 'Close' : 'Đóng'}
                         </button>
                       </div>
                     </div>
@@ -728,7 +733,7 @@ export function ProductionDashboard() {
                   className="flex items-center gap-2 bg-white hover:bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-200/90 shadow-xs font-bold text-slate-800 text-xs transition-all cursor-pointer group"
                 >
                   <Calendar className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform" />
-                  <span>Tháng {selectedCustomMonth.split('-')[1]} / {selectedCustomMonth.split('-')[0]}</span>
+                  <span>{isEn ? `Month ${selectedCustomMonth.split('-')[1]} / ${selectedCustomMonth.split('-')[0]}` : `Tháng ${selectedCustomMonth.split('-')[1]} / ${selectedCustomMonth.split('-')[0]}`}</span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
                 </button>
 
@@ -748,7 +753,7 @@ export function ProductionDashboard() {
                         </button>
 
                         <span className="font-extrabold text-xs sm:text-sm text-slate-900">
-                          Năm {pickerYear}
+                          {isEn ? `Year ${pickerYear}` : `Năm ${pickerYear}`}
                         </span>
 
                         <button
@@ -761,7 +766,7 @@ export function ProductionDashboard() {
                         </button>
                       </div>
 
-                      {/* 12 Months Grid in Vietnamese */}
+                      {/* 12 Months Grid */}
                       <div className="grid grid-cols-3 gap-2 pt-3 pb-1">
                         {Array.from({ length: 12 }).map((_, i) => {
                           const m = i + 1;
@@ -781,7 +786,7 @@ export function ProductionDashboard() {
                                   : 'bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-600'
                               }`}
                             >
-                              Tháng {m}
+                              {isEn ? `Month ${m}` : `Tháng ${m}`}
                             </button>
                           );
                         })}
@@ -798,14 +803,14 @@ export function ProductionDashboard() {
                           }}
                           className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold cursor-pointer"
                         >
-                          Tháng 10/2026 (Hiện tại)
+                          {isEn ? 'Oct 2026 (Current)' : 'Tháng 10/2026 (Hiện tại)'}
                         </button>
                         <button
                           type="button"
                           onClick={() => setIsMonthPickerOpen(false)}
                           className="text-slate-400 hover:text-slate-600 font-semibold px-2 py-1 cursor-pointer"
                         >
-                          Đóng
+                          {isEn ? 'Close' : 'Đóng'}
                         </button>
                       </div>
                     </div>
@@ -817,8 +822,8 @@ export function ProductionDashboard() {
 
           <div className="text-[11px] font-semibold text-blue-700 bg-blue-100/70 border border-blue-200/60 px-3 py-1.5 rounded-xl">
             {customFilterMode === 'day'
-              ? `Đang lọc: Ngày ${selectedCustomDate.split('-').reverse().join('/')}`
-              : `Đang lọc: Tháng ${selectedCustomMonth.split('-')[1]}/${selectedCustomMonth.split('-')[0]}`}
+              ? (isEn ? `Filtered: Date ${selectedCustomDate.split('-').reverse().join('/')}` : `Đang lọc: Ngày ${selectedCustomDate.split('-').reverse().join('/')}`)
+              : (isEn ? `Filtered: Month ${selectedCustomMonth.split('-')[1]}/${selectedCustomMonth.split('-')[0]}` : `Đang lọc: Tháng ${selectedCustomMonth.split('-')[1]}/${selectedCustomMonth.split('-')[0]}`)}
           </div>
         </div>
       )}
@@ -827,7 +832,7 @@ export function ProductionDashboard() {
       {/* 3. 5 STAT CARDS                                                */}
       {/* ============================================================== */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4">
-        {/* Card 1: Doanh thu — Xanh Dương Pastel (nhận từ Số đơn hàng) */}
+        {/* Card 1: Doanh thu — Xanh Dương Pastel */}
         <div
           style={{
             backgroundColor: '#ffffff',
@@ -840,13 +845,13 @@ export function ProductionDashboard() {
           <div className="px-3 py-2 rounded-lg bg-[#eff6ff] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-[#2563eb] shrink-0" />
-              <span className="text-[11.5px] font-bold text-slate-800 uppercase tracking-wider">1. DOANH THU</span>
+              <span className="text-[11.5px] font-bold text-slate-800 uppercase tracking-wider">{isEn ? '1. TOTAL REVENUE' : '1. DOANH THU'}</span>
             </div>
           </div>
           <div className="px-3 pt-3 pb-2 flex-1 flex flex-col justify-between">
             <div className="my-2">
               {(() => {
-                const kpi = formatKPIValue(metrics?.netRevenue ?? 0);
+                const kpi = formatKPIValue(metrics?.netRevenue ?? 0, isEn);
                 return (
                   <div className="stat-number text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight font-sans">
                     {kpi.val} <span className="stat-unit text-sm font-semibold text-slate-400">{kpi.unit}</span>
@@ -856,14 +861,14 @@ export function ProductionDashboard() {
             </div>
             <div className="flex items-center justify-between text-xs pt-2.5 border-t border-slate-100">
               <span className="text-[#2563eb] font-bold flex items-center gap-0.5">
-                <ArrowUpRight className="w-3.5 h-3.5" /> Doanh thu thuần
+                <ArrowUpRight className="w-3.5 h-3.5" /> {isEn ? 'Net Revenue' : 'Doanh thu thuần'}
               </span>
-              <span className="text-slate-500 text-[11px]">Lợi nhuận {metrics?.marginPct ?? 0}%</span>
+              <span className="text-slate-500 text-[11px]">{isEn ? 'Profit' : 'Lợi nhuận'} {metrics?.marginPct ?? 0}%</span>
             </div>
           </div>
         </div>
 
-        {/* Card 2: Số đơn hàng — Tím / Chàm Pastel (nhận từ Giá trị tồn kho) */}
+        {/* Card 2: Số đơn hàng — Tím / Chàm Pastel */}
         <div
           style={{
             backgroundColor: '#ffffff',
@@ -876,25 +881,25 @@ export function ProductionDashboard() {
           <div className="px-3 py-2 rounded-lg bg-[#f5f3ff] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4 text-[#6366f1] shrink-0" />
-              <span className="text-[11.5px] font-bold text-slate-800 uppercase tracking-wider">2. SỐ ĐƠN HÀNG</span>
+              <span className="text-[11.5px] font-bold text-slate-800 uppercase tracking-wider">{isEn ? '2. TOTAL ORDERS' : '2. SỐ ĐƠN HÀNG'}</span>
             </div>
           </div>
           <div className="px-3 pt-3 pb-2 flex-1 flex flex-col justify-between">
             <div className="my-2">
               <div className="stat-number text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight font-sans">
-                {(metrics?.completedOrdersCount ?? metrics?.orderCount ?? 0).toLocaleString('vi-VN')} <span className="stat-unit text-sm font-semibold text-slate-400">đơn</span>
+                {(metrics?.completedOrdersCount ?? metrics?.orderCount ?? 0).toLocaleString('vi-VN')} <span className="stat-unit text-sm font-semibold text-slate-400">{isEn ? 'orders' : 'đơn'}</span>
               </div>
             </div>
             <div className="flex items-center justify-between text-xs pt-2.5 border-t border-slate-100">
               <span className="text-[#6366f1] font-bold flex items-center gap-0.5">
-                <ArrowUpRight className="w-3.5 h-3.5" /> Đã hoàn thành
+                <ArrowUpRight className="w-3.5 h-3.5" /> {isEn ? 'Completed' : 'Đã hoàn thành'}
               </span>
-              <span className="text-slate-500 text-[11px]">{formatCompactVND(metrics?.avgOrderValue ?? 0)}/đơn</span>
+              <span className="text-slate-500 text-[11px]">{formatCompactVND(metrics?.avgOrderValue ?? 0)}{isEn ? '/order' : '/đơn'}</span>
             </div>
           </div>
         </div>
 
-        {/* Card 3: Giá trị tồn kho — Đỏ San Hô Pastel (nhận từ Cảnh báo tồn) */}
+        {/* Card 3: Giá trị tồn kho — Đỏ San Hô Pastel */}
         <div
           style={{
             backgroundColor: '#ffffff',
@@ -907,13 +912,13 @@ export function ProductionDashboard() {
           <div className="px-3 py-2 rounded-lg bg-[#fff1f2] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Boxes className="w-4 h-4 text-[#fb7185] shrink-0" />
-              <span className="text-[11.5px] font-bold text-slate-800 uppercase tracking-wider">3. GIÁ TRỊ TỒN KHO</span>
+              <span className="text-[11.5px] font-bold text-slate-800 uppercase tracking-wider">{isEn ? '3. INVENTORY VALUE' : '3. GIÁ TRỊ TỒN KHO'}</span>
             </div>
           </div>
           <div className="px-3 pt-3 pb-2 flex-1 flex flex-col justify-between">
             <div className="my-2">
               {(() => {
-                const kpi = formatKPIValue(metrics?.inventoryValuation ?? metrics?.inventoryCostValuation ?? 0);
+                const kpi = formatKPIValue(metrics?.inventoryValuation ?? metrics?.inventoryCostValuation ?? 0, isEn);
                 return (
                   <div className="stat-number text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight font-sans">
                     {kpi.val} <span className="stat-unit text-sm font-semibold text-slate-400">{kpi.unit}</span>
@@ -922,13 +927,13 @@ export function ProductionDashboard() {
               })()}
             </div>
             <div className="flex items-center justify-between text-xs pt-2.5 border-t border-slate-100">
-              <span className="text-[#fb7185] font-bold">{(metrics?.totalStockQuantity ?? 0).toLocaleString('vi-VN')} sp</span>
-              <span className="text-slate-500 text-[11px]">Giá nhập kho</span>
+              <span className="text-[#fb7185] font-bold">{(metrics?.totalStockQuantity ?? 0).toLocaleString('vi-VN')} SP</span>
+              <span className="text-slate-500 text-[11px]">{isEn ? 'Cost Value' : 'Giá nhập kho'}</span>
             </div>
           </div>
         </div>
 
-        {/* Card 4: Cảnh báo hàng tồn — Hồng Pastel (nhận từ Doanh thu) */}
+        {/* Card 4: Cảnh báo hàng tồn — Hồng Pastel */}
         <div
           style={{
             backgroundColor: '#ffffff',
@@ -941,18 +946,18 @@ export function ProductionDashboard() {
           <div className="px-3 py-2 rounded-lg bg-[#fdf2f8] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-[#db2777] shrink-0" />
-              <span className="text-[11.5px] font-bold text-slate-800 uppercase tracking-wider">4. CẢNH BÁO TỒN</span>
+              <span className="text-[11.5px] font-bold text-slate-800 uppercase tracking-wider">{isEn ? '4. STOCK ALERTS' : '4. CẢNH BÁO TỒN'}</span>
             </div>
           </div>
           <div className="px-3 pt-3 pb-2 flex-1 flex flex-col justify-between">
             <div className="my-2">
               <div className="stat-number text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight font-sans">
-                {interventionProducts.length} <span className="stat-unit text-sm font-semibold text-slate-400">bán chậm</span>
+                {interventionProducts.length} <span className="stat-unit text-sm font-semibold text-slate-400">{isEn ? 'slow-moving' : 'bán chậm'}</span>
               </div>
             </div>
             <div className="flex items-center justify-between text-xs pt-2.5 border-t border-slate-100">
-              <span className="text-[#db2777] font-semibold text-[11px]">Cần xử lý ngay</span>
-              <span onClick={() => navigate('/alerts')} className="text-[#db2777] font-bold hover:underline cursor-pointer">Xem →</span>
+              <span className="text-[#db2777] font-semibold text-[11px]">{isEn ? 'Action needed' : 'Cần xử lý ngay'}</span>
+              <span onClick={() => navigate('/alerts')} className="text-[#db2777] font-bold hover:underline cursor-pointer">{isEn ? 'View →' : 'Xem →'}</span>
             </div>
           </div>
         </div>
@@ -970,13 +975,13 @@ export function ProductionDashboard() {
           <div className="px-3 py-2 rounded-lg bg-[#f0fdf4] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-[#16a34a] shrink-0" />
-              <span className="text-[11.5px] font-bold text-slate-800 uppercase tracking-wider">5. LỢI NHUẬN GỘP</span>
+              <span className="text-[11.5px] font-bold text-slate-800 uppercase tracking-wider">{isEn ? '5. GROSS PROFIT' : '5. LỢI NHUẬN GỘP'}</span>
             </div>
           </div>
           <div className="px-3 pt-3 pb-2 flex-1 flex flex-col justify-between">
             <div className="my-2">
               {(() => {
-                const kpi = formatKPIValue(metrics?.grossProfit ?? 0);
+                const kpi = formatKPIValue(metrics?.grossProfit ?? 0, isEn);
                 return (
                   <div className="stat-number text-2xl sm:text-[26px] font-black text-slate-900 tracking-tight font-sans">
                     {kpi.val} <span className="stat-unit text-sm font-semibold text-slate-400">{kpi.unit}</span>
@@ -985,7 +990,7 @@ export function ProductionDashboard() {
               })()}
             </div>
             <div className="flex items-center justify-between text-xs pt-2.5 border-t border-slate-100">
-              <span className="text-slate-500 text-[11px]">Biên LN</span>
+              <span className="text-slate-500 text-[11px]">{isEn ? 'Margin' : 'Biên LN'}</span>
               <span className="text-[#16a34a] font-bold bg-[#f0fdf4] border border-[#bbf7d0] px-2 py-0.5 rounded-full">{metrics?.marginPct ?? metrics?.profitMargin ?? 0}%</span>
             </div>
           </div>
@@ -1002,7 +1007,7 @@ export function ProductionDashboard() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-blue-600" />
-                <h3 className="text-base font-bold text-slate-900">C1. Doanh thu theo danh mục</h3>
+                <h3 className="text-base font-bold text-slate-900">{isEn ? 'C1. Revenue by Category' : 'C1. Doanh thu theo danh mục'}</h3>
               </div>
             </div>
 
@@ -1195,7 +1200,7 @@ export function ProductionDashboard() {
                 >
                   <p className="font-bold text-sky-300">{hoveredCatBar.name}</p>
                   <p className="font-extrabold text-sm text-white mt-0.5">{formatVND(hoveredCatBar.revRaw)}</p>
-                  <p className="text-[11px] text-emerald-400 mt-0.5">Biên lợi nhuận: {hoveredCatBar.pct}</p>
+                  <p className="text-[11px] text-emerald-400 mt-0.5">{isEn ? 'Profit margin:' : 'Biên lợi nhuận:'} {hoveredCatBar.pct}</p>
                 </div>
               )}
 
@@ -1203,19 +1208,19 @@ export function ProductionDashboard() {
           </div>
         </div>
 
-        {/* CHART C2: Xu hướng doanh thu 6 tháng — BÊN PHẢI (MỐC 20 40 60 80 100 TRIỆU, CÁCH TRÁI XA) */}
+        {/* CHART C2: Xu hướng doanh thu 6 tháng — BÊN PHẢI */}
         <div className="bg-white rounded-2xl px-3.5 py-4 sm:py-5 shadow-[0_4px_20px_-4px_rgba(37,99,235,0.06)] border border-blue-100/70 flex flex-col justify-between relative">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-blue-600" />
                 <h3 className="text-base font-bold text-slate-900">
-                  C2. Xu hướng doanh thu 6 tháng
+                  {isEn ? 'C2. 6-Month Revenue Trend' : 'C2. Xu hướng doanh thu 6 tháng'}
                 </h3>
               </div>
             </div>
 
-            {/* SVG Line Chart — Dài và Rộng */}
+            {/* SVG Line Chart */}
             <div className="relative pt-2">
               <svg
                 viewBox={`0 0 ${SVG_W} ${SVG_H}`}
@@ -1297,13 +1302,15 @@ export function ProductionDashboard() {
                 {/* Month labels & Data point dots & values */}
                 {monthlyPoints.map((p) => {
                   const isHovered = hoveredPoint?.ym === p.ym;
-                  const valLabel = p.revenue >= 1_000_000
-                    ? `${(p.revenue / 1_000_000).toFixed(1)}tr`
-                    : p.revenue >= 1_000
-                      ? `${(p.revenue / 1_000).toFixed(0)}k`
-                      : p.revenue > 0
-                        ? `${p.revenue}₫`
-                        : '';
+                  const valLabel = p.revenue >= 1_000_000_000
+                    ? `${(p.revenue / 1_000_000_000).toFixed(3)}${isEn ? 'B' : 'tỷ'}`
+                    : p.revenue >= 1_000_000
+                      ? `${(p.revenue / 1_000_000).toFixed(3)}${isEn ? 'M' : 'tr'}`
+                      : p.revenue >= 1_000
+                        ? `${(p.revenue / 1_000).toFixed(0)}k`
+                        : p.revenue > 0
+                          ? `${p.revenue}₫`
+                          : '';
                   return (
                     <g
                       key={p.ym}
@@ -1361,7 +1368,7 @@ export function ProductionDashboard() {
                         />
                       )}
 
-                      {/* Value label above point: tự nhiên không bo viền */}
+                      {/* Value label above point */}
                       {valLabel && (
                         <text
                           x={p.x}
@@ -1407,7 +1414,7 @@ export function ProductionDashboard() {
                 >
                   <p className="font-bold text-sky-300">{hoveredPoint.label}</p>
                   <p className="font-extrabold text-sm text-white mt-0.5">{formatVND(hoveredPoint.revenue)}</p>
-                  <p className="text-[11px] text-slate-300 mt-0.5">{hoveredPoint.orderCount} đơn đã hoàn thành</p>
+                  <p className="text-[11px] text-slate-300 mt-0.5">{hoveredPoint.orderCount} {isEn ? 'orders completed' : 'đơn đã hoàn thành'}</p>
                 </div>
               )}
 
@@ -1422,25 +1429,31 @@ export function ProductionDashboard() {
               <div className="flex items-center gap-2">
                 <Tag className="w-5 h-5 text-blue-600" />
                 <h3 className="text-base font-bold text-slate-900">
-                  {c3Tab === 'best' ? 'C3. Top 5 sản phẩm bán chạy' : 'C3. Top 5 sản phẩm bán chậm'}
+                  {c3Tab === 'best'
+                    ? (isEn ? 'C3. Top 5 Best Sellers' : 'C3. Top 5 sản phẩm bán chạy')
+                    : (isEn ? 'C3. Top 5 Slow Movers' : 'C3. Top 5 sản phẩm bán chậm')}
                 </h3>
               </div>
               <div className="flex items-center gap-1 text-[11px] bg-slate-100 p-1 rounded-lg">
-                <button onClick={() => setC3Tab('best')} className={`px-2.5 py-1.5 rounded-md font-bold transition-all cursor-pointer ${ c3Tab === 'best' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-blue-600' }`}>Bán chạy</button>
-                <button onClick={() => setC3Tab('slow')} className={`px-2.5 py-1.5 rounded-md font-bold transition-all cursor-pointer ${ c3Tab === 'slow' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-blue-600' }`}>Bán chậm</button>
+                <button onClick={() => setC3Tab('best')} className={`px-2.5 py-1.5 rounded-md font-bold transition-all cursor-pointer ${ c3Tab === 'best' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-blue-600' }`}>
+                  {isEn ? 'Best Sellers' : 'Bán chạy'}
+                </button>
+                <button onClick={() => setC3Tab('slow')} className={`px-2.5 py-1.5 rounded-md font-bold transition-all cursor-pointer ${ c3Tab === 'slow' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:text-blue-600' }`}>
+                  {isEn ? 'Slow Movers' : 'Bán chậm'}
+                </button>
               </div>
             </div>
 
             <div className="space-y-3.5 pt-1">
               {(c3Tab === 'best' ? topSellers : slowMovers).length === 0 ? (
-                <div className="text-slate-400 text-sm text-center py-8">Chưa có dữ liệu</div>
+                <div className="text-slate-400 text-sm text-center py-8">{isEn ? 'No data available' : 'Chưa có dữ liệu'}</div>
               ) : (
                 (c3Tab === 'best' ? topSellers : slowMovers).map((item) => (
                   <div key={item.name} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700 truncate max-w-[240px]">{item.name}</span>
                       <span className="font-bold text-blue-600">
-                        {c3Tab === 'best' ? `${item.qty} sp` : `${item.days} ngày`}
+                        {c3Tab === 'best' ? `${item.qty} SP` : `${item.days} ${isEn ? 'days' : 'ngày'}`}
                       </span>
                     </div>
                     <div className="h-2 rounded-full bg-blue-50 overflow-hidden">
@@ -1459,18 +1472,18 @@ export function ProductionDashboard() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Boxes className="w-5 h-5 text-blue-600" />
-                <h3 className="text-base font-bold text-slate-900">C4. Tình trạng tồn kho</h3>
+                <h3 className="text-base font-bold text-slate-900">{isEn ? 'C4. Inventory Health' : 'C4. Tình trạng tồn kho'}</h3>
               </div>
-              <span className="text-xs text-slate-400 font-medium">{(metrics?.totalStockQuantity ?? 0).toLocaleString('vi-VN')} sản phẩm</span>
+              <span className="text-xs text-slate-400 font-medium">{(metrics?.totalStockQuantity ?? 0).toLocaleString('vi-VN')} {isEn ? 'products' : 'sản phẩm'}</span>
             </div>
 
             {/* Summary cards: 2x2 grid */}
             <div className="grid grid-cols-2 gap-3 mt-2">
               {[
-                { label: 'Doanh thu gộp', value: formatCompactVND(metrics?.grossRevenue ?? 0), color: 'bg-blue-50 text-blue-700', border: 'border-blue-200' },
-                { label: 'Đã hoàn tiền', value: formatCompactVND(metrics?.refundedAmount ?? 0), color: 'bg-rose-50 text-rose-700', border: 'border-rose-200' },
-                { label: 'Giá trị nhập', value: formatCompactVND(metrics?.inventoryValuation ?? 0), color: 'bg-indigo-50 text-indigo-700', border: 'border-indigo-200' },
-                { label: 'Giá bán lẻ', value: formatCompactVND(metrics?.inventoryRetailValuation ?? 0), color: 'bg-emerald-50 text-emerald-700', border: 'border-emerald-200' },
+                { label: isEn ? 'Gross Revenue' : 'Doanh thu gộp', value: formatCompactVND(metrics?.grossRevenue ?? 0), color: 'bg-blue-50 text-blue-700', border: 'border-blue-200' },
+                { label: isEn ? 'Refunded' : 'Đã hoàn tiền', value: formatCompactVND(metrics?.refundedAmount ?? 0), color: 'bg-rose-50 text-rose-700', border: 'border-rose-200' },
+                { label: isEn ? 'Cost Value' : 'Giá trị nhập', value: formatCompactVND(metrics?.inventoryValuation ?? 0), color: 'bg-indigo-50 text-indigo-700', border: 'border-indigo-200' },
+                { label: isEn ? 'Retail Value' : 'Giá bán lẻ', value: formatCompactVND(metrics?.inventoryRetailValuation ?? 0), color: 'bg-emerald-50 text-emerald-700', border: 'border-emerald-200' },
               ].map(({ label, value, color, border }) => (
                 <div key={label} className={`rounded-xl border ${border} p-3 ${color}`}>
                   <p className="text-[11px] font-semibold opacity-70 mb-0.5">{label}</p>
@@ -1486,12 +1499,12 @@ export function ProductionDashboard() {
       {/* 5. THAO TÁC NHANH (⚡) & TỔNG KẾT NHANH (📊) (Hub Layout)      */}
       {/* ============================================================== */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* LEFT: Quick Actions ("Thao tác nhanh" - Image 1) - cols 6 */}
+        {/* LEFT: Quick Actions */}
         <div className="lg:col-span-6 bg-white rounded-2xl p-5 sm:p-6 shadow-[0_4px_20px_-4px_rgba(37,99,235,0.06)] border border-blue-100/70">
           <div className="flex items-center gap-2 mb-5">
             <Zap className="w-5 h-5 text-blue-600 fill-blue-600" />
             <h3 className="text-base font-bold text-slate-800">
-              Thao tác nhanh
+              {isEn ? 'Quick Actions' : 'Thao tác nhanh'}
             </h3>
           </div>
 
@@ -1505,7 +1518,7 @@ export function ProductionDashboard() {
                 <PackagePlus className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600">
-                Thêm sản phẩm
+                {isEn ? 'Add Product' : 'Thêm sản phẩm'}
               </span>
             </button>
 
@@ -1517,7 +1530,7 @@ export function ProductionDashboard() {
                 <ArrowDownUp className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600">
-                Nhập / Xuất kho
+                {isEn ? 'Stock In / Out' : 'Nhập / Xuất kho'}
               </span>
             </button>
 
@@ -1529,7 +1542,7 @@ export function ProductionDashboard() {
                 <FileText className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600">
-                Tạo báo cáo tồn
+                {isEn ? 'Inventory Report' : 'Tạo báo cáo tồn'}
               </span>
             </button>
 
@@ -1541,13 +1554,13 @@ export function ProductionDashboard() {
                 <Printer className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600">
-                In tem mã vạch
+                {isEn ? 'Print Barcode' : 'In tem mã vạch'}
               </span>
             </button>
           </div>
         </div>
 
-        {/* RIGHT: Mặt hàng cần can thiệp (4 sản phẩm bán chậm nhất) - cols 6 */}
+        {/* RIGHT: Mặt hàng cần can thiệp */}
         <div className="lg:col-span-6 bg-white rounded-2xl p-5 sm:p-6 shadow-[0_4px_20px_-4px_rgba(37,99,235,0.06)] border border-blue-100/70 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -1557,19 +1570,21 @@ export function ProductionDashboard() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    Mặt hàng cần can thiệp
+                    {isEn ? 'Items Requiring Action' : 'Mặt hàng cần can thiệp'}
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                      4 Bán chậm nhất
+                      {isEn ? '4 Slowest Movers' : '4 Bán chậm nhất'}
                     </span>
                   </h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Ưu tiên xử lý xả kho & giải phóng vốn lưu động</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {isEn ? 'Prioritize clearance & release tied working capital' : 'Ưu tiên xử lý xả kho & giải phóng vốn lưu động'}
+                  </p>
                 </div>
               </div>
               <button
                 onClick={() => navigate('/alerts')}
                 className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1 cursor-pointer shrink-0"
               >
-                <span>Chi tiết</span>
+                <span>{isEn ? 'Details' : 'Chi tiết'}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -1577,7 +1592,7 @@ export function ProductionDashboard() {
             {/* List of slow-selling products from DB */}
             <div className="space-y-2.5">
               {interventionProducts.length === 0 ? (
-                <div className="text-center text-slate-400 text-sm py-8">Không có sản phẩm cần can thiệp</div>
+                <div className="text-center text-slate-400 text-sm py-8">{isEn ? 'No products require action' : 'Không có sản phẩm cần can thiệp'}</div>
               ) : (
                 interventionProducts.map((p) => (
                   <div
@@ -1595,16 +1610,16 @@ export function ProductionDashboard() {
                         <p className="text-xs font-bold text-slate-800 truncate group-hover:text-blue-600 transition-colors">{p.name}</p>
                         <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
                           <span className="inline-flex items-center gap-1 text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded text-[10px]">
-                            <Clock className="w-3 h-3" /> {p.daysNoSale} ngày không bán
+                            <Clock className="w-3 h-3" /> {p.daysNoSale} {isEn ? 'days no sale' : 'ngày không bán'}
                           </span>
                           <span>•</span>
-                          <span>Tồn: <strong className="text-slate-700">{p.stock}</strong></span>
+                          <span>{isEn ? 'Stock:' : 'Tồn:'} <strong className="text-slate-700">{p.stock}</strong></span>
                         </div>
                       </div>
                     </div>
                     <div className="text-right shrink-0">
                       <span className="text-xs font-bold text-blue-700 block">{p.tiedCapital}</span>
-                      <span className="text-[10px] text-slate-400 font-medium block">vốn ứ đọng</span>
+                      <span className="text-[10px] text-slate-400 font-medium block">{isEn ? 'tied capital' : 'vốn ứ đọng'}</span>
                     </div>
                   </div>
                 ))
@@ -1614,13 +1629,13 @@ export function ProductionDashboard() {
 
           <div className="pt-3.5 mt-3 border-t border-slate-100 flex items-center justify-between text-xs">
             <span className="text-[11px] text-slate-400">
-              Tổng vốn đọng: <strong className="text-blue-700 font-bold">{formatVND(totalTiedCapital)}</strong> ({interventionProducts.length} SP)
+              {isEn ? 'Total tied capital:' : 'Tổng vốn đọng:'} <strong className="text-blue-700 font-bold">{formatVND(totalTiedCapital)}</strong> ({interventionProducts.length} SP)
             </span>
             <button
-              onClick={() => toast({ type: 'info', title: 'Đề xuất xả kho', message: 'Xem xét giảm giá hoặc combo cho các sản phẩm bán chậm.' })}
+              onClick={() => toast({ type: 'info', title: isEn ? 'Clearance Suggestion' : 'Đề xuất xả kho', message: isEn ? 'Consider discounts or combos for slow-moving products.' : 'Xem xét giảm giá hoặc combo cho các sản phẩm bán chậm.' })}
               className="text-[11px] font-bold text-blue-600 hover:text-blue-700 cursor-pointer flex items-center gap-1"
             >
-              <span>Xử lý xả kho</span>
+              <span>{isEn ? 'Clearance Action' : 'Xử lý xả kho'}</span>
               <ChevronRight className="w-3 h-3" />
             </button>
           </div>
@@ -1628,9 +1643,8 @@ export function ProductionDashboard() {
       </div>
 
       {/* ============================================================== */}
-      {/* 6. MODALS: QUICK ACTIONS            */}
+      {/* 6. MODALS: QUICK ACTIONS                                       */}
       {/* ============================================================== */}
-      {/* Quick Action Modal */}
       {activeQuickAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 animate-in zoom-in-95">
@@ -1641,10 +1655,10 @@ export function ProductionDashboard() {
                 {activeQuickAction === 'report' && <FileText className="w-5 h-5 text-amber-600" />}
                 {activeQuickAction === 'print_barcode' && <Printer className="w-5 h-5 text-indigo-600" />}
 
-                {activeQuickAction === 'add_product' && 'Thêm sản phẩm mới vào kho'}
-                {activeQuickAction === 'stock_trans' && 'Tạo phiếu Nhập / Xuất kho'}
-                {activeQuickAction === 'report' && 'Xuất báo cáo tồn kho & doanh số'}
-                {activeQuickAction === 'print_barcode' && 'In tem mã vạch & bảng giá'}
+                {activeQuickAction === 'add_product' && (isEn ? 'Add new product to warehouse' : 'Thêm sản phẩm mới vào kho')}
+                {activeQuickAction === 'stock_trans' && (isEn ? 'Create Stock In / Out receipt' : 'Tạo phiếu Nhập / Xuất kho')}
+                {activeQuickAction === 'report' && (isEn ? 'Export inventory & sales report' : 'Xuất báo cáo tồn kho & doanh số')}
+                {activeQuickAction === 'print_barcode' && (isEn ? 'Print barcode & price tag' : 'In tem mã vạch & bảng giá')}
               </h3>
               <button
                 onClick={() => setActiveQuickAction(null)}
@@ -1659,18 +1673,18 @@ export function ProductionDashboard() {
                 <>
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Tên sản phẩm
+                      {isEn ? 'Product Name' : 'Tên sản phẩm'}
                     </label>
                     <input
                       required
-                      placeholder="Ví dụ: Cà phê Robusta Đắk Lắk 500g"
+                      placeholder={isEn ? 'Example: Robusta Coffee Dak Lak 500g' : 'Ví dụ: Cà phê Robusta Đắk Lắk 500g'}
                       className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:border-blue-500"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Danh mục
+                        {isEn ? 'Category' : 'Danh mục'}
                       </label>
                       <select className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:outline-none">
                         {revenueByCat.map((c, i) => (
@@ -1680,7 +1694,7 @@ export function ProductionDashboard() {
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Số lượng ban đầu
+                        {isEn ? 'Initial Stock' : 'Số lượng ban đầu'}
                       </label>
                       <input
                         type="number"
@@ -1695,16 +1709,16 @@ export function ProductionDashboard() {
               {activeQuickAction === 'stock_trans' && (
                 <div className="space-y-3">
                   <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1">
-                    <p className="font-semibold">Hệ thống hỗ trợ cân bằng tồn kho tự động:</p>
-                    <p>• Phiếu sẽ cập nhật số lượng tồn khả dụng ngay lập tức.</p>
-                    <p>• Tự động kiểm tra cảnh báo thiếu hàng hoặc đọng vốn.</p>
+                    <p className="font-semibold">{isEn ? 'Automated inventory balance tracking:' : 'Hệ thống hỗ trợ cân bằng tồn kho tự động:'}</p>
+                    <p>{isEn ? '• Real-time stock level updates upon submission.' : '• Phiếu sẽ cập nhật số lượng tồn khả dụng ngay lập tức.'}</p>
+                    <p>{isEn ? '• Automated low stock & tied-capital alerts.' : '• Tự động kiểm tra cảnh báo thiếu hàng hoặc đọng vốn.'}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <button type="button" className="p-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold">
-                      Nhập kho hàng
+                      {isEn ? 'Stock In' : 'Nhập kho hàng'}
                     </button>
                     <button type="button" className="p-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold">
-                      Xuất bán / Điều chuyển
+                      {isEn ? 'Stock Out' : 'Xuất bán / Điều chuyển'}
                     </button>
                   </div>
                 </div>
@@ -1713,14 +1727,14 @@ export function ProductionDashboard() {
               {activeQuickAction === 'report' && (
                 <div className="space-y-3">
                   <label className="block text-xs font-semibold text-slate-700">
-                    Chọn loại báo cáo cần kết xuất
+                    {isEn ? 'Select report type to export' : 'Chọn loại báo cáo cần kết xuất'}
                   </label>
                   <div className="grid grid-cols-2 gap-3">
                     <button type="button" className="p-3 rounded-xl border-2 border-blue-500 bg-blue-50/50 text-blue-700 text-xs font-bold flex items-center justify-center gap-2">
-                      <Download className="w-4 h-4" /> Báo cáo Doanh số (.xlsx)
+                      <Download className="w-4 h-4" /> {isEn ? 'Sales Report (.xlsx)' : 'Báo cáo Doanh số (.xlsx)'}
                     </button>
                     <button type="button" className="p-3 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center gap-2">
-                      <Download className="w-4 h-4" /> Báo cáo Tồn kho (.pdf)
+                      <Download className="w-4 h-4" /> {isEn ? 'Inventory Report (.pdf)' : 'Báo cáo Tồn kho (.pdf)'}
                     </button>
                   </div>
                 </div>
@@ -1728,9 +1742,9 @@ export function ProductionDashboard() {
 
               {activeQuickAction === 'print_barcode' && (
                 <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-800 space-y-1">
-                  <p className="font-semibold">Định dạng tem in chuẩn:</p>
-                  <p>• Khổ tem: 3 tem / hàng (chuẩn Decal nhiệt 35x22mm)</p>
-                  <p>• Tự động sinh mã Code128 cùng tên sản phẩm và giá niêm yết.</p>
+                  <p className="font-semibold">{isEn ? 'Standard Label Format:' : 'Định dạng tem in chuẩn:'}</p>
+                  <p>{isEn ? '• 3 labels per row (Thermal decal 35x22mm)' : '• Khổ tem: 3 tem / hàng (chuẩn Decal nhiệt 35x22mm)'}</p>
+                  <p>{isEn ? '• Auto-generate Code128 with item name and retail price.' : '• Tự động sinh mã Code128 cùng tên sản phẩm và giá niêm yết.'}</p>
                 </div>
               )}
 
@@ -1740,7 +1754,7 @@ export function ProductionDashboard() {
                   onClick={() => setActiveQuickAction(null)}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100 cursor-pointer"
                 >
-                  Hủy
+                  {isEn ? 'Cancel' : 'Hủy'}
                 </button>
                 <button
                   type="submit"
@@ -1750,7 +1764,7 @@ export function ProductionDashboard() {
                   {isProcessing ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
                   ) : (
-                    <span>Xác nhận thực hiện</span>
+                    <span>{isEn ? 'Confirm Action' : 'Xác nhận thực hiện'}</span>
                   )}
                 </button>
               </div>
