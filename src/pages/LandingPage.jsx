@@ -646,19 +646,19 @@ export function LandingPage() {
               tabIndex={0}
             >
               <div
-                className={`absolute top-0.5 bottom-0.5 w-[34px] rounded-full bg-white shadow-xs border border-slate-200/80 transition-transform duration-300 ease-out ${
-                  language === 'en' ? 'translate-x-[34px]' : 'translate-x-0'
+                className={`absolute top-0.5 bottom-0.5 w-8.5 rounded-full bg-white shadow-xs border border-slate-200/80 transition-transform duration-300 ease-out ${
+                  language === 'en' ? 'translate-x-8.5' : 'translate-x-0'
                 }`}
               />
               <span
-                className={`relative z-10 w-[34px] py-1 text-center text-xs font-bold transition-colors duration-200 ${
+                className={`relative z-10 w-8.5 py-1 text-center text-xs font-bold transition-colors duration-200 ${
                   language === 'vi' ? 'text-[#006FFF]' : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
                 VI
               </span>
               <span
-                className={`relative z-10 w-[34px] py-1 text-center text-xs font-bold transition-colors duration-200 ${
+                className={`relative z-10 w-8.5 py-1 text-center text-xs font-bold transition-colors duration-200 ${
                   language === 'en' ? 'text-[#006FFF]' : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
@@ -885,16 +885,16 @@ export function LandingPage() {
               {/* Social Proof Row */}
               <div className="pt-2 flex items-center justify-center lg:justify-start gap-3 border-t border-slate-200/70">
                 <div className="flex -space-x-2">
-                  <span className="inline-block w-8 h-8 rounded-full ring-2 ring-white bg-blue-500 text-white text-[11px] font-bold flex items-center justify-center">
+                  <span className="inline-flex w-8 h-8 rounded-full ring-2 ring-white bg-blue-500 text-white text-[11px] font-bold items-center justify-center">
                     H
                   </span>
-                  <span className="inline-block w-8 h-8 rounded-full ring-2 ring-white bg-indigo-500 text-white text-[11px] font-bold flex items-center justify-center">
+                  <span className="inline-flex w-8 h-8 rounded-full ring-2 ring-white bg-indigo-500 text-white text-[11px] font-bold items-center justify-center">
                     Q
                   </span>
-                  <span className="inline-block w-8 h-8 rounded-full ring-2 ring-white bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center">
+                  <span className="inline-flex w-8 h-8 rounded-full ring-2 ring-white bg-emerald-500 text-white text-[11px] font-bold items-center justify-center">
                     N
                   </span>
-                  <span className="inline-block w-8 h-8 rounded-full ring-2 ring-white bg-amber-500 text-white text-[11px] font-bold flex items-center justify-center">
+                  <span className="inline-flex w-8 h-8 rounded-full ring-2 ring-white bg-amber-500 text-white text-[11px] font-bold items-center justify-center">
                     +
                   </span>
                 </div>
@@ -945,7 +945,7 @@ export function LandingPage() {
                 ? 'INTEGRATED WITH POPULAR PAYMENTS & HARDWARE IN VIETNAM'
                 : 'TÍCH HỢP THANH TOÁN & THIẾT BỊ PHỔ BIẾN TẠI VIỆT NAM'}
             </p>
-            <div className="relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_12%,black_88%,transparent)]">
+            <div className="relative overflow-hidden mask-[linear-gradient(90deg,transparent,black_12%,black_88%,transparent)]">
               <div className="sp-marquee flex w-max gap-4">
                 {[...INTEGRATIONS, ...INTEGRATIONS].map((partner, idx) => (
                   <span
@@ -1612,7 +1612,7 @@ export function LandingPage() {
             
             <div className="lg:col-span-7 order-2 lg:order-1">
               <div className="relative">
-                <div className="rounded-3xl overflow-hidden aspect-[4/3] sm:aspect-[16/10] shadow-xl shadow-slate-900/10">
+                <div className="rounded-3xl overflow-hidden aspect-4/3 sm:aspect-16/10 shadow-xl shadow-slate-900/10">
                   <img
                     src="/posCashier.svg"
                     alt="Thu ngân thanh toán cho khách tại quầy"
@@ -1622,7 +1622,7 @@ export function LandingPage() {
                 </div>
 
                 {/* Floating Retail Receipt Card */}
-                <div className="relative -mt-24 sm:-mt-0 sm:absolute sm:-bottom-8 sm:-left-6 mx-3 sm:mx-0 sm:w-[340px] bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xl shadow-slate-900/15">
+                <div className="relative -mt-24 sm:mt-0 sm:absolute sm:-bottom-8 sm:-left-6 mx-3 sm:mx-0 sm:w-85 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xl shadow-slate-900/15">
                   <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between text-xs">
                     <span className="font-bold text-slate-900">
                       {language === 'en' ? 'Retail Receipt' : 'Hóa đơn bán lẻ'}
@@ -1853,7 +1853,7 @@ export function LandingPage() {
                 <Link
                   key={idx}
                   to="/register"
-                  className="group relative h-[380px] rounded-3xl overflow-hidden shadow-xs hover:shadow-2xl hover:shadow-slate-900/15 transition-all duration-300"
+                  className="group relative h-95 rounded-3xl overflow-hidden shadow-xs hover:shadow-2xl hover:shadow-slate-900/15 transition-all duration-300"
                 >
                   <img
                     src={ind.image}
