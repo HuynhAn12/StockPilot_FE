@@ -15,6 +15,8 @@ import { useAuthStore } from '../../store/authStore';
 import { canCancelOrder, canViewOrderFinancialSummary, isStaff } from '../../config/permissions.config';
 import { docSoThanhChu } from '../../utils/numberToWordsVN';
 import { useTranslation } from '../../i18n/useTranslation';
+import { ReceiptPrintContent, ReceiptPrintPortal } from '../../components/pos/ReceiptPrintView';
+
 
 function safeNum(val) {
   if (val === null || val === undefined) return 0;
@@ -1922,102 +1924,39 @@ export function OrdersPage() {
         </div>
       )}
 
+      {/* ─── HIDDEN RECEIPT PORTAL FOR ACTUAL 1-PAGE PRINTING ─── */}
+      {printReceiptData && (
+        <ReceiptPrintPortal data={printReceiptData} />
+      )}
+
       {/* ─── PRINT RECEIPT PREVIEW MODAL ─── */}
       {printReceiptData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in-0">
-          <div className="bg-white text-black w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
-            <div className="p-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center print:hidden">
-              <span className="text-xs font-bold text-gray-700">Xem trước hóa đơn in</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in-0 print:hidden">
+          <div className="bg-white text-black w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="p-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-bold text-gray-800">Xem trước hóa đơn in</span>
+              </div>
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-all cursor-pointer shadow-sm active:scale-95"
                 >
                   <Printer className="w-3.5 h-3.5" /> In ngay
                 </button>
                 <button
+                  type="button"
                   onClick={() => setPrintReceiptData(null)}
-                  className="p-1 rounded-lg hover:bg-gray-200 text-gray-500"
+                  className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* Printable Receipt Layout */}
-            <div id="receipt-print-area" className="p-8 overflow-y-auto space-y-4 text-xs font-sans text-gray-800 bg-white">
-              <div className="text-center space-y-1">
-                <h2 className="text-xl font-extrabold tracking-wide uppercase text-blue-700">
-                  {printReceiptData.storeName}
-                </h2>
-                <p className="text-[11px] text-gray-500">{printReceiptData.storeAddress}</p>
-                <p className="text-[11px] text-gray-500">Điện thoại: {printReceiptData.storePhone}</p>
-                <h3 className="text-base font-bold uppercase mt-3 text-black">HÓA ĐƠN BÁN HÀNG</h3>
-                <p className="text-[11px] text-gray-600 font-mono">Số HĐ: {printReceiptData.orderNumber}</p>
-                <p className="text-[11px] text-gray-500">Ngày: {printReceiptData.createdAt}</p>
-              </div>
-
-              <div className="border-t border-b border-dashed border-gray-300 py-2 space-y-1 text-[11px]">
-                <div className="flex justify-between">
-                  <span>Khách hàng: <strong>{printReceiptData.customerName}</strong></span>
-                  {printReceiptData.customerPhone && <span>SĐT: {printReceiptData.customerPhone}</span>}
-                </div>
-                <div className="flex justify-between">
-                  <span>Thu ngân: {printReceiptData.cashier}</span>
-                  <span>Phương thức: {printReceiptData.paymentMethod}</span>
-                </div>
-              </div>
-
-              <table className="w-full text-left border-collapse text-[11px]">
-                <thead>
-                  <tr className="border-b border-gray-400">
-                    <th className="py-1.5 font-bold">Tên hàng hóa</th>
-                    <th className="py-1.5 text-center font-bold">SL</th>
-                    <th className="py-1.5 text-right font-bold">Đơn giá</th>
-                    <th className="py-1.5 text-right font-bold">Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {printReceiptData.items.map((it, idx) => (
-                    <tr key={idx}>
-                      <td className="py-1.5 pr-2">
-                        <span className="font-semibold block">{it.name}</span>
-                        {it.sku && <span className="text-[10px] text-gray-400 font-mono">{it.sku}</span>}
-                      </td>
-                      <td className="py-1.5 text-center">{it.quantity}</td>
-                      <td className="py-1.5 text-right">{it.price.toLocaleString('vi-VN')}</td>
-                      <td className="py-1.5 text-right font-bold">{it.subtotal.toLocaleString('vi-VN')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="border-t border-dashed border-gray-300 pt-2 space-y-1 text-right text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tổng tiền hàng:</span>
-                  <span className="font-semibold">{formatVND(printReceiptData.subtotal)}</span>
-                </div>
-                {printReceiptData.discount > 0 && (
-                  <div className="flex justify-between text-gray-600">
-                    <span>Chiết khấu:</span>
-                    <span className="font-semibold">-{formatVND(printReceiptData.discount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm font-bold pt-1 border-t border-gray-300 text-black">
-                  <span>Tổng thanh toán:</span>
-                  <span>{formatVND(printReceiptData.total)}</span>
-                </div>
-              </div>
-
-              <div className="pt-1 italic text-[11px] text-gray-600">
-                ({printReceiptData.totalInWords})
-              </div>
-
-              <div className="text-center pt-4 border-t border-dashed border-gray-300 space-y-1">
-                <p className="font-bold text-gray-800">Cảm ơn và hẹn gặp lại Quý khách!</p>
-                <p className="text-[10px] text-gray-400">Hệ thống StockPilot POS Retail</p>
-              </div>
-            </div>
+            <ReceiptPrintContent data={printReceiptData} isPreview={true} />
           </div>
         </div>
       )}

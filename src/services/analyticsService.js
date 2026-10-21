@@ -84,6 +84,12 @@ export async function apiUpdatePaymentConfig(payload) {
   return data.data;
 }
 
+// POST /store-payment-config/payos/test
+export async function apiTestPaymentConfig(payload = {}) {
+  const { data } = await apiClient.post('/store-payment-config/payos/test', payload);
+  return data;
+}
+
 // GET /audit-logs (bảng audit_logs)
 export async function apiGetAuditLogs({ page = 1, limit = 50, entityType = 'ALL', search = '' } = {}) {
   const params = { page, limit };
