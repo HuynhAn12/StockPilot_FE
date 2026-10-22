@@ -492,12 +492,12 @@ export function AdminSystemPage() {
                           </td>
 
                           {/* Lượt hỏi kèm thanh ngang xám tỉ lệ */}
-                          <td className="px-4 py-3 whitespace-nowrap min-w-[180px]">
+                          <td className="px-4 py-3 whitespace-nowrap min-w-45">
                             <div className="flex items-center gap-3">
                               <span className="text-[#334155] font-medium tabular-nums min-w-8">
                                 {count.toLocaleString('vi-VN')}
                               </span>
-                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden max-w-[100px]">
+                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden max-w-25">
                                 <div
                                   className="h-full bg-slate-400 rounded-full"
                                   style={{ width: `${percent}%` }}
