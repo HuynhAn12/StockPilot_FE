@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { readSheet } from 'read-excel-file/browser';
+import readXlsxFile from 'read-excel-file/browser';
 import {
   Upload, FileSpreadsheet, CheckCircle2, AlertTriangle, Loader2, Package, Receipt, LifeBuoy, ArrowLeft, Download, ShieldCheck,
 } from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
 import {
-  IMPORT_KINDS, FIELD_LABELS, detectSheet, toProductItems, toSalesRows, parseCsv, buildTemplateCsv,
+  IMPORT_KINDS, FIELD_LABELS, detectSheet, pickSheet, toProductItems, toSalesRows, parseCsv, buildTemplateCsv,
 } from '../../lib/spreadsheetImport';
 import { apiPreviewProductImport, apiCommitProductImport, apiPreviewSalesImport, apiCommitSalesImport } from '../../services/importService';
 import { adminStyles as ui } from '../admin/adminStyles';
@@ -28,6 +28,7 @@ const SOURCES = [
     name: 'KiotViet',
     PRODUCTS: ['Mở Hàng hóa → Danh sách hàng hóa.', 'Bấm Xuất file để tải toàn bộ hàng hóa.'],
     SALES: ['Mở Giao dịch → Hóa đơn, lọc khoảng thời gian cần chuyển.', 'Bấm Xuất file, chọn File chi tiết (mỗi dòng một mặt hàng).'],
+    note: 'Đang dùng file Excel mẫu miễn phí của KiotViet (chưa dùng phần mềm)? Tải nguyên file lên: hệ thống tự lấy trang Danh mục cho sản phẩm và trang Xuất hàng cho lịch sử bán, bỏ qua trang Nhập hàng.',
   },
   {
     id: 'sapo',
@@ -82,9 +83,16 @@ function downloadTemplate(kind) {
   URL.revokeObjectURL(url);
 }
 
-async function readRows(file) {
-  if (/\.csv$/i.test(file.name)) return parseCsv(await file.text());
-  return readSheet(file);
+/** Every sheet of the workbook as [{ sheet, data }]; a CSV is a single sheet. */
+async function readSheets(file) {
+  if (/\.csv$/i.test(file.name)) return [{ sheet: 'CSV', data: parseCsv(await file.text()) }];
+  return readXlsxFile(file);
+}
+
+function convertSheet(sheet, kind, detection = detectSheet(sheet.data, kind)) {
+  if (!detection.kind) return { detection, payload: [], skipped: [] };
+  const converted = kind === IMPORT_KINDS.PRODUCTS ? toProductItems(sheet.data, detection) : toSalesRows(sheet.data, detection);
+  return { detection, payload: converted.items || converted.rows, skipped: converted.skipped };
 }
 
 export function ImportDataPage() {
@@ -96,6 +104,8 @@ export function ImportDataPage() {
   const [sourceId, setSourceId] = useState('kiotviet');
   const [fileName, setFileName] = useState('');
   const [parsed, setParsed] = useState(null);
+  const [sheets, setSheets] = useState([]);
+  const [sheetIndex, setSheetIndex] = useState(0);
   const [productMode, setProductMode] = useState('CREATE_ONLY');
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
@@ -104,6 +114,7 @@ export function ImportDataPage() {
   const reset = () => {
     setFileName('');
     setParsed(null);
+    setSheets([]);
     setPreview(null);
     setResult(null);
   };
@@ -126,15 +137,14 @@ export function ImportDataPage() {
     }
     setBusy('read');
     try {
-      const rows = await readRows(file);
-      const detection = detectSheet(rows, kind);
+      const workbook = await readSheets(file);
+      // Workbooks such as the free KiotViet Excel template hold several sheets (catalogue, purchases, sales...).
+      const picked = pickSheet(workbook, kind);
+      const index = picked.index >= 0 ? picked.index : 0;
       setFileName(file.name);
-      if (!detection.kind) {
-        setParsed({ detection, payload: [], skipped: [] });
-        return;
-      }
-      const converted = kind === IMPORT_KINDS.PRODUCTS ? toProductItems(rows, detection) : toSalesRows(rows, detection);
-      setParsed({ detection, payload: converted.items || converted.rows, skipped: converted.skipped });
+      setSheets(workbook);
+      setSheetIndex(index);
+      setParsed(convertSheet(workbook[index], kind, picked.detection || undefined));
     } catch {
       toast({ type: 'error', title: 'Không đọc được file', description: 'File có thể bị hỏng hoặc đang đặt mật khẩu. Hãy xuất lại file.' });
     } finally {
@@ -271,6 +281,29 @@ export function ImportDataPage() {
               <span className="text-[12px] text-[#94A3B8]">Excel (.xlsx) hoặc CSV · tối đa {MAX_FILE_MB} MB</span>
               <input type="file" accept=".xlsx,.csv" className="sr-only" onChange={(e) => handleFile(e.target.files?.[0])} onClick={(e) => (e.target.value = '')} />
             </label>
+
+            {sheets.length > 1 && (
+              <label className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-[#475569]">
+                Trang tính:
+                <select
+                  value={sheetIndex}
+                  onChange={(e) => {
+                    const index = Number(e.target.value);
+                    setSheetIndex(index);
+                    setPreview(null);
+                    setParsed(convertSheet(sheets[index], kind));
+                  }}
+                  className={`${ui.select} w-auto`}
+                >
+                  {sheets.map((sh, i) => (
+                    <option key={sh.sheet} value={i}>
+                      {sh.sheet}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[12px] text-[#94A3B8]">File có {sheets.length} trang, hệ thống đã tự chọn trang phù hợp nhất.</span>
+              </label>
+            )}
 
             {parsed && !detection.kind && (
               <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-[13px] text-red-800">
@@ -442,6 +475,7 @@ export function ImportDataPage() {
               ))}
               <li>Tải file vừa xuất lên ở bước 2.</li>
             </ol>
+            {source.note && <p className="mt-3 text-[12px] text-[#475569] bg-slate-50 border border-[#E5E7EB] rounded-lg p-2.5">{source.note}</p>}
             <p className="mt-3 text-[12px] text-[#94A3B8]">
               Tên menu có thể khác tùy phiên bản. Hệ thống tự nhận diện cột theo tên nên không cần sửa file.
             </p>

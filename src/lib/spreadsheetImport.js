@@ -11,12 +11,16 @@ export const IMPORT_KINDS = {
 const PRODUCT_COLUMNS = {
   sku: ['mahang', 'mahanghoa', 'masku', 'masp', 'masanpham', 'sku', 'mavattu'],
   productName: ['tenhang', 'tenhanghoa', 'tensanpham', 'tenvattu', 'productname', 'ten'],
-  categoryName: ['nhomhang3cap', 'nhomhang', 'danhmuc', 'nhomsanpham', 'loaisanpham', 'nhomvattu', 'category', 'categoryname'],
+  // "Loại hàng hóa" trong mẫu Excel miễn phí của KiotViet là nhóm hàng; khác "Loại hàng" (hàng hóa/dịch vụ) của file xuất.
+  categoryName: ['nhomhang3cap', 'nhomhang', 'danhmuc', 'nhomsanpham', 'loaisanpham', 'loaihanghoa', 'nhomvattu', 'category', 'categoryname'],
   barcode: ['mavach', 'barcode', 'mabarcode'],
   // Sapo: "LC_CN1_Giá vốn khởi tạo" (giá vốn theo chi nhánh) được ưu tiên hơn "PL_Giá nhập".
   costPrice: ['giavon', 'giavonkhoitao', 'gianhap', 'costprice'],
   sellingPrice: ['giaban', 'giabanle', 'dongiaban', 'sellingprice', 'gia'],
-  initialQuantity: ['tonkho', 'tonkhohientai', 'tonkhobandau', 'soluongton', 'soluongtonkho', 'ton', 'initialquantity', 'soluong'],
+  initialQuantity: [
+    'tonkho', 'tonkhohientai', 'tonkhobandau', 'soluongton', 'soluongtonkho', 'soluonghangcotrongkho', 'soluongtrongkho',
+    'ton', 'initialquantity', 'soluong',
+  ],
   minStockLevel: ['tonnhonhat', 'tontoithieu', 'minstocklevel'],
   maxStockLevel: ['tonlonnhat', 'tontoida', 'maxstocklevel'],
   productType: ['loaihang'],
@@ -24,8 +28,11 @@ const PRODUCT_COLUMNS = {
 };
 
 const SALES_COLUMNS = {
-  externalOrderId: ['mahoadon', 'mahd', 'madonhang', 'sochungtu', 'externalorderid', 'orderid'],
-  soldAt: ['thoigian', 'thoigiantao', 'ngayban', 'ngaytaodon', 'ngaydathang', 'ngaychungtu', 'ngaytao', 'ngay', 'soldat'],
+  externalOrderId: ['mahoadon', 'mahd', 'madonhang', 'sochungtu', 'chungtu', 'externalorderid', 'orderid'],
+  soldAt: [
+    'thoigian', 'thoigiantao', 'ngayban', 'ngaytaodon', 'ngaydathang', 'ngaychungtu', 'ngaythang', 'ngaythangphatsinh',
+    'ngaytao', 'ngay', 'soldat',
+  ],
   sku: ['mahang', 'mahanghoa', 'masku', 'masp', 'masanpham', 'sku'],
   quantity: ['soluong', 'soluongsanpham', 'sl', 'quantity'],
   // "Giá bán" trong chi tiết hóa đơn KiotViet là giá sau giảm; "Đơn giá" là giá niêm yết.
@@ -353,4 +360,31 @@ const TEMPLATES = {
 export function buildTemplateCsv(kind) {
   const quote = (v) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
   return '\uFEFF' + TEMPLATES[kind].map((r) => r.map(quote).join(',')).join('\r\n') + '\r\n';
+}
+
+// Tên trang tính gợi ý nội dung: trang "Nhập hàng" có cùng cột với trang "Xuất hàng" nhưng là hàng mua vào,
+// nên không bao giờ được chọn làm lịch sử bán hàng.
+const SALES_SHEET_HINTS = ['xuat', 'ban', 'hoadon', 'donhang', 'sales', 'order', 'invoice'];
+const PURCHASE_SHEET_HINTS = ['nhap', 'muahang', 'purchase'];
+const PRODUCT_SHEET_HINTS = ['danhmuc', 'hanghoa', 'sanpham', 'product', 'tonkho'];
+
+/**
+ * Chọn trang tính phù hợp nhất với loại dữ liệu trong file nhiều trang (vd. mẫu Excel có các trang
+ * Danh mục / Nhập hàng / Xuất hàng / Báo cáo). Trả về { index, detection } hoặc index = -1 nếu không trang nào khớp.
+ */
+export function pickSheet(sheets, kind) {
+  let best = { index: -1, detection: null, score: -Infinity };
+  sheets.forEach((sheet, index) => {
+    const name = normalizeHeader(sheet.sheet);
+    if (kind === IMPORT_KINDS.SALES && PURCHASE_SHEET_HINTS.some((h) => name.includes(h))) return;
+    const detection = detectSheet(sheet.data, kind);
+    if (!detection.kind) return;
+    const hints = kind === IMPORT_KINDS.SALES ? SALES_SHEET_HINTS : PRODUCT_SHEET_HINTS;
+    const score =
+      (detection.missing.length === 0 ? 100 : 0) +
+      Object.keys(detection.mapping).length +
+      (hints.some((h) => name.includes(h)) ? 10 : 0);
+    if (score > best.score) best = { index, detection, score };
+  });
+  return { index: best.index, detection: best.detection };
 }

@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useCallback } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, FolderTree, ShoppingCart, ShoppingBag, Boxes, TrendingUp,
@@ -6,7 +6,9 @@ import {
   ChevronRight, LogOut, Sparkles, ShieldCheck, Store, Warehouse, X,
   UserCheck, Server, LifeBuoy, FileUp,
 } from 'lucide-react';
-import { apiAdminListTickets } from '../../services/supportService';
+import { apiAdminListTickets, apiGetMyUnreadCount } from '../../services/supportService';
+import { apiListAdminLeads } from '../../services/adminService';
+import { usePolling } from '../support/SupportChat';
 import { cn } from '../lib/utils';
 import { useAuthStore } from '../store/authStore';
 import { useUIStore } from '../store/uiStore';
@@ -31,13 +33,13 @@ const NAV_ITEM_CONFIG = [
   // Cấu hình (Chủ shop)
   { key: 'navSettings', sectionKey: 'configSection', defaultName: 'Cài đặt hệ thống', defaultSection: 'Cấu hình', href: '/settings', icon: Settings, roles: ['store_owner'] },
   { key: 'navImport', defaultName: 'Nhập dữ liệu', href: '/import', icon: FileUp, roles: ['store_owner'] },
-  { key: 'navSupport', defaultName: 'Hỗ trợ', href: '/support', icon: LifeBuoy, roles: ['store_owner','warehouse_staff'] },
+  { key: 'navSupport', defaultName: 'Hỗ trợ', href: '/support', icon: LifeBuoy, badgeKey: 'storeSupport', badgeVariant: 'error', roles: ['store_owner','warehouse_staff'] },
   // Quản trị hệ thống (Chỉ dành cho Admin)
   { key: 'navUsers', sectionKey: 'adminSection', defaultName: 'Người dùng & Quyền', defaultSection: 'Quản trị hệ thống', href: '/admin/users', icon: Users, roles: ['admin'] },
   { key: 'navStores', defaultName: 'Cửa hàng', href: '/admin/stores', icon: Store, roles: ['admin'] },
   { key: 'navAuditLog', defaultName: 'Nhật ký kiểm toán', href: '/admin/audit-log', icon: FileText, roles: ['admin'] },
   { key: 'navAdminSupport', defaultName: 'Hỗ trợ khách hàng', href: '/admin/support', icon: LifeBuoy, badgeKey: 'support', badgeVariant: 'error', roles: ['admin'] },
-  { key: 'navLeads', defaultName: 'Khách hàng tiềm năng', href: '/admin/leads', icon: UserCheck, roles: ['admin'] },
+  { key: 'navLeads', defaultName: 'Khách hàng tiềm năng', href: '/admin/leads', icon: UserCheck, badgeKey: 'leads', roles: ['admin'] },
   { key: 'navSystem', defaultName: 'Hệ thống & AI', href: '/admin/system', icon: Server, roles: ['admin'] },
 ];
 
@@ -70,14 +72,24 @@ export function Sidebar() {
     }
   }, [fetchAlerts, fetchRecommendations, currentRole]);
 
-  // Admin: số yêu cầu hỗ trợ chưa ai trả lời, làm mới khi đổi trang.
-  const [unansweredTickets, setUnansweredTickets] = useState(0);
+  // Số đếm cần chú ý: admin = phiếu có tin mới từ cửa hàng + khách tiềm năng mới;
+  // cửa hàng = phiếu có phản hồi mới từ đội hỗ trợ. Làm mới khi đổi trang và mỗi 30 giây.
+  const [attention, setAttention] = useState({ support: 0, leads: 0, storeSupport: 0 });
+  const loadAttention = useCallback(() => {
+    if (currentRole === 'admin') {
+      Promise.all([apiAdminListTickets({ limit: 1 }), apiListAdminLeads({ limit: 1 })])
+        .then(([tickets, leads]) => setAttention({ support: tickets.summary?.unread ?? 0, leads: leads.summary?.NEW ?? 0, storeSupport: 0 }))
+        .catch(() => {});
+    } else if (currentRole === 'store_owner' || currentRole === 'warehouse_staff') {
+      apiGetMyUnreadCount()
+        .then((unread) => setAttention({ support: 0, leads: 0, storeSupport: unread }))
+        .catch(() => {});
+    }
+  }, [currentRole]);
   useEffect(() => {
-    if (currentRole !== 'admin') return;
-    apiAdminListTickets({ status: 'OPEN', limit: 1 })
-      .then((res) => setUnansweredTickets(res.summary?.unanswered ?? 0))
-      .catch(() => {});
-  }, [currentRole, location.pathname]);
+    loadAttention();
+  }, [loadAttention, location.pathname]);
+  usePolling(loadAttention, 30000, Boolean(currentRole));
 
   const openAlertsCount = getOpenCount();
   const pendingPricingCount = getPendingCount();
@@ -88,7 +100,9 @@ export function Sidebar() {
         let badge = undefined;
         if (item.badgeKey === 'alerts') badge = openAlertsCount;
         if (item.badgeKey === 'pricing') badge = pendingPricingCount;
-        if (item.badgeKey === 'support') badge = unansweredTickets || undefined;
+        if (item.badgeKey === 'support') badge = attention.support || undefined;
+        if (item.badgeKey === 'leads') badge = attention.leads || undefined;
+        if (item.badgeKey === 'storeSupport') badge = attention.storeSupport || undefined;
 
         return {
           ...item,
@@ -97,7 +111,7 @@ export function Sidebar() {
           badge,
         };
       }),
-    [currentRole, openAlertsCount, pendingPricingCount, unansweredTickets, t]
+    [currentRole, openAlertsCount, pendingPricingCount, attention, t]
   );
 
   const getRoleBadgeLabel = (role) => {

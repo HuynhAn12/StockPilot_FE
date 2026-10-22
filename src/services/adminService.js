@@ -170,7 +170,26 @@ export async function apiListAdminLeads(params = {}) {
   return {
     data: data.data || [],
     pagination: data.pagination || { page: 1, limit: 20, total: 0, totalPages: 1 },
+    summary: data.summary || null,
   };
+}
+
+// GET /admin/leads/:id: thông tin đầy đủ + lịch sử chăm sóc
+export async function apiGetAdminLead(id) {
+  const { data } = await apiClient.get(`/admin/leads/${id}`);
+  return data.data;
+}
+
+// PATCH /admin/leads/:id ({ status?, assigneeId? })
+export async function apiUpdateAdminLead(id, patch) {
+  const { data } = await apiClient.patch(`/admin/leads/${id}`, patch);
+  return data.data;
+}
+
+// POST /admin/leads/:id/notes ({ type: NOTE|CALL|EMAIL|MEETING, body })
+export async function apiAddAdminLeadNote(id, payload) {
+  const { data } = await apiClient.post(`/admin/leads/${id}/notes`, payload);
+  return data.data;
 }
 
 // PATCH /admin/leads/:id/status ({ status: 'NEW' | 'CONTACTED' | 'CONVERTED' | 'REJECTED' })
@@ -201,5 +220,17 @@ export async function apiUpdateAdminSetting(key, value) {
 // GET /public/platform-status: thông báo toàn hệ thống + trạng thái mở đăng ký (không cần đăng nhập)
 export async function apiGetPlatformStatus() {
   const { data } = await apiClient.get('/public/platform-status');
+  return data.data;
+}
+
+// PATCH /admin/users/:id ({ fullName }): admin chỉ sửa được tên hiển thị
+export async function apiUpdateAdminUser(id, payload) {
+  const { data } = await apiClient.patch(`/admin/users/${id}`, payload);
+  return data.data;
+}
+
+// PATCH /admin/stores/:id ({ name?, phone?, address? }): mã cửa hàng (subdomain) không đổi được
+export async function apiUpdateAdminStore(id, payload) {
+  const { data } = await apiClient.patch(`/admin/stores/${id}`, payload);
   return data.data;
 }

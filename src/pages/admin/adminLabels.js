@@ -10,7 +10,7 @@ export function roleLabel(role) {
   return ROLE_LABELS[String(role || '').toUpperCase()] || 'Hệ thống';
 }
 
-const ACTION_LABELS = {
+export const ACTION_LABELS = {
   USER_LOGIN: 'Đăng nhập',
   LOGIN: 'Đăng nhập',
   LOGOUT: 'Đăng xuất',
@@ -27,6 +27,7 @@ const ACTION_LABELS = {
   STORE_REGISTERED: 'Đăng ký cửa hàng',
   STORE_LOCKED: 'Tạm khóa cửa hàng',
   STORE_UNLOCKED: 'Mở lại cửa hàng',
+  STORE_UPDATED: 'Sửa thông tin cửa hàng',
   ORDER_CREATED: 'Tạo đơn hàng',
   ORDER_CONFIRMED: 'Xác nhận đơn hàng',
   ORDER_FULFILLED: 'Hoàn tất đơn hàng',
@@ -59,6 +60,9 @@ const ACTION_LABELS = {
   ALERT_ACKNOWLEDGED: 'Ghi nhận cảnh báo',
   ALERT_RESOLVED: 'Xử lý cảnh báo',
   LEAD_STATUS_UPDATED: 'Cập nhật khách tiềm năng',
+  LEAD_ASSIGNED: 'Giao khách tiềm năng',
+  SUPPORT_TICKET_CREATED: 'Gửi yêu cầu hỗ trợ',
+  SUPPORT_TICKET_UPDATED: 'Cập nhật yêu cầu hỗ trợ',
   AUDIT_LOG_EXPORTED: 'Xuất nhật ký kiểm toán',
 };
 
@@ -94,6 +98,7 @@ export const ENTITY_LABELS = {
   AUDIT_LOG: 'Nhật ký',
   SYSTEM: 'Hệ thống',
   SYSTEM_SETTING: 'Cài đặt hệ thống',
+  SUPPORT_TICKET: 'Hỗ trợ',
 };
 
 export function entityLabel(entityType) {
