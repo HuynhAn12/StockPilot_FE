@@ -5,7 +5,7 @@ import {
   RotateCcw, Sparkles, Tag, ChevronRight, ChevronLeft, Check, AlertCircle,
   FileText, Percent, Minus, SlidersHorizontal, Package, RefreshCw,
   Receipt, Zap, Scan, Wifi, WifiOff, Link2, Loader2, Copy, ExternalLink,
-  Smartphone, Settings
+  Smartphone, Settings, ShieldCheck, CheckCircle2
 } from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
 import { useAuthStore } from '../../components/store/authStore';
@@ -24,6 +24,8 @@ import {
 } from '../../services/posService';
 import { apiClient } from '../../lib/apiClient';
 import { docSoThanhChu } from '../../utils/numberToWordsVN';
+import { ReceiptPrintContent, ReceiptPrintPortal } from '../../components/pos/ReceiptPrintView';
+
 
 function safeNum(val) {
   if (val === null || val === undefined) return 0;
@@ -121,6 +123,8 @@ function applyPosOverrides(products) {
   return products;
 }
 
+
+
 export function PosPage() {
   const { toast } = useToast();
   const { user } = useAuthStore();
@@ -155,6 +159,15 @@ export function PosPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [printReceiptData, setPrintReceiptData] = useState(null);
+  const [completedReceipt, setCompletedReceipt] = useState(null);
+  const [autoPrintCountdown, setAutoPrintCountdown] = useState(null);
+  const autoPrintTimerRef = useRef(null);
+  const isPrintingRef = useRef(false);
+
+
+  // ── Cash Payment Success State ─────────────────────────────────
+  const [cashSuccessModalOpen, setCashSuccessModalOpen] = useState(false);
+  const [cashSuccessData, setCashSuccessData] = useState(null);
 
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [custNameInput, setCustNameInput] = useState('');
@@ -696,6 +709,10 @@ export function PosPage() {
     return () => {
       stopPayosPolling();
       stopMomoPolling();
+      if (autoPrintTimerRef.current) {
+        clearInterval(autoPrintTimerRef.current);
+        autoPrintTimerRef.current = null;
+      }
     };
   }, [stopPayosPolling, stopMomoPolling]);
 
@@ -707,6 +724,49 @@ export function PosPage() {
       bc.postMessage({ type: 'ORDERS_UPDATED' });
       bc.close();
     } catch (_) {}
+  };
+
+
+
+  const handlePrintReceipt = (receipt = completedReceipt) => {
+    const dataToPrint = receipt || completedReceipt;
+    if (!dataToPrint) return;
+
+    // Khóa debounce ngăn chặn việc bấm đúp hoặc gọi lệnh in 2 lần liên tục
+    if (isPrintingRef.current) return;
+    isPrintingRef.current = true;
+    setTimeout(() => {
+      isPrintingRef.current = false;
+    }, 2000);
+
+    // Hủy bỏ đồng hồ đếm ngược tự in nếu người dùng đã bấm in thủ công
+    if (autoPrintTimerRef.current) {
+      clearInterval(autoPrintTimerRef.current);
+      autoPrintTimerRef.current = null;
+    }
+    setAutoPrintCountdown(null);
+
+    setCompletedReceipt(dataToPrint);
+    setTimeout(() => {
+      window.print();
+    }, 120);
+  };
+
+  const startAutoPrintCountdown = (receipt) => {
+    if (autoPrintTimerRef.current) clearInterval(autoPrintTimerRef.current);
+    setAutoPrintCountdown(3);
+    let left = 3;
+    autoPrintTimerRef.current = setInterval(() => {
+      left -= 1;
+      if (left <= 0) {
+        clearInterval(autoPrintTimerRef.current);
+        autoPrintTimerRef.current = null;
+        setAutoPrintCountdown(null);
+        handlePrintReceipt(receipt);
+      } else {
+        setAutoPrintCountdown(left);
+      }
+    }, 1000);
   };
 
   const handleCopyText = (field, text) => {
@@ -739,7 +799,7 @@ export function PosPage() {
           storeName: user?.store?.name || 'StockPilot Store',
           storeAddress: user?.store?.address || 'Chi nhánh trung tâm',
           storePhone: user?.store?.phone || '0978.387.857',
-          items: activeTab.items,
+          items: [...activeTab.items],
           subtotal: subtotalAmount,
           discount: discountAmount,
           total: totalPayable,
@@ -749,15 +809,15 @@ export function PosPage() {
           paymentMethod: 'Ví điện tử MoMo',
         };
 
-        setTimeout(() => {
-          setMomoModalOpen(false);
-          updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
-          toast({
-            title: 'Thanh toán MoMo thành công!',
-            description: `Đơn hàng #${momoData?.orderNumber} đã ghi nhận và hoàn tất.`,
-            type: 'success',
-          });
-        }, 2000);
+        setCompletedReceipt(receipt);
+        updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
+        toast({
+          title: 'Thanh toán MoMo thành công!',
+          description: `Đơn hàng #${receipt.orderNumber} đã ghi nhận và hoàn tất.`,
+          type: 'success',
+        });
+
+
       }
     } catch (err) {
       toast({
@@ -834,7 +894,7 @@ export function PosPage() {
                 storeName: user?.store?.name || 'StockPilot Store',
                 storeAddress: user?.store?.address || 'Chi nhánh trung tâm',
                 storePhone: user?.store?.phone || '0978.387.857',
-                items: activeTab.items,
+                items: [...activeTab.items],
                 subtotal: subtotalAmount,
                 discount: discountAmount,
                 total: totalPayable,
@@ -844,20 +904,19 @@ export function PosPage() {
                 paymentMethod: 'Ví điện tử MoMo',
               };
 
-              if (shouldPrint) {
-                setPrintReceiptData(receipt);
-                setTimeout(() => window.print(), 500);
-              }
+              setCompletedReceipt(receipt);
+              updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
+              toast({
+                title: 'Thanh toán MoMo thành công!',
+                description: `Đơn hàng #${receipt.orderNumber} đã ghi nhận và hoàn tất.`,
+                type: 'success',
+              });
 
-              setTimeout(() => {
-                setMomoModalOpen(false);
-                updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
-                toast({
-                  title: 'Thanh toán MoMo thành công!',
-                  description: `Đơn hàng #${res?.orderNumber} đã ghi nhận và hoàn tất.`,
-                  type: 'success',
-                });
-              }, 2200);
+
+
+              if (shouldPrint) {
+                startAutoPrintCountdown(receipt);
+              }
             }
           } catch (pollErr) {
             console.warn('Lỗi kiểm tra MoMo:', pollErr);
@@ -933,7 +992,7 @@ export function PosPage() {
                 storeName: user?.store?.name || 'StockPilot Store',
                 storeAddress: user?.store?.address || 'Chi nhánh trung tâm',
                 storePhone: user?.store?.phone || '0978.387.857',
-                items: activeTab.items,
+                items: [...activeTab.items],
                 subtotal: subtotalAmount,
                 discount: discountAmount,
                 total: totalPayable,
@@ -943,20 +1002,19 @@ export function PosPage() {
                 paymentMethod: 'VietQR PayOS',
               };
 
-              if (shouldPrint) {
-                setPrintReceiptData(receipt);
-                setTimeout(() => window.print(), 500);
-              }
+              setCompletedReceipt(receipt);
+              updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
+              toast({
+                title: 'Thanh toán PayOS thành công!',
+                description: `Đơn hàng #${receipt.orderNumber} đã ghi nhận và hoàn tất.`,
+                type: 'success',
+              });
 
-              setTimeout(() => {
-                setPayosModalOpen(false);
-                updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
-                toast({
-                  title: 'Thanh toán PayOS thành công!',
-                  description: `Đơn hàng #${res?.orderNumber} đã ghi nhận và hoàn tất.`,
-                  type: 'success',
-                });
-              }, 2200);
+
+
+              if (shouldPrint) {
+                startAutoPrintCountdown(receipt);
+              }
             }
           } catch (pollErr) {
             console.warn('Lỗi kiểm tra PayOS:', pollErr);
@@ -1008,7 +1066,7 @@ export function PosPage() {
         storeName: user?.store?.name || 'StockPilot Store',
         storeAddress: user?.store?.address || 'Chi nhánh trung tâm',
         storePhone: user?.store?.phone || '0978.387.857',
-        items: activeTab.items,
+        items: [...activeTab.items],
         subtotal: subtotalAmount,
         discount: discountAmount,
         total: totalPayable,
@@ -1018,12 +1076,22 @@ export function PosPage() {
         paymentMethod: 'Tiền mặt',
       };
 
+      setCompletedReceipt(receipt);
       updateActiveTab({ items: [], note: '', discount: 0, customer: { name: 'Khách lẻ', phone: '' } });
       setIsCheckoutOpen(false);
 
+      setCashSuccessData({
+        orderNumber: receipt.orderNumber,
+        total: totalPayable,
+        amountGiven: customerPayNum,
+        changeDue: Math.max(0, changeDue),
+        customerName: receipt.customerName,
+      });
+      setCashSuccessModalOpen(true);
+
+
       if (shouldPrint) {
-        setPrintReceiptData(receipt);
-        setTimeout(() => window.print(), 400);
+        startAutoPrintCountdown(receipt);
       }
     } catch (err) {
       console.error('[POS Checkout Error]', err);
@@ -1098,6 +1166,8 @@ export function PosPage() {
             <span className="text-[11px] text-slate-400 hidden sm:inline font-medium">
               {t('hotkeyHint', 'F3 Tìm hàng · F9 Thanh toán')}
             </span>
+
+
             {/* Scanner connect button */}
             <button
               onClick={() => setScannerOpen(true)}
@@ -1780,108 +1850,42 @@ export function PosPage() {
         </div>
       )}
 
-      {/* ─── PRINT RECEIPT PREVIEW ─── */}
+      {/* ─── HIDDEN PORTAL FOR ACTUAL PRINTING (ATTACHED TO BODY TO PREVENT MULTI-PAGE BLEED) ─── */}
+      {(completedReceipt || printReceiptData) && (
+        <ReceiptPrintPortal data={printReceiptData || completedReceipt} />
+      )}
+
+      {/* ─── PRINT RECEIPT PREVIEW (MODAL ON SCREEN ONLY) ─── */}
       {printReceiptData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(4px)' }}>
-          <div className="bg-white text-black w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
-            <div className="p-3 border-b border-slate-200 flex justify-between items-center print:hidden"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:hidden" style={{ background: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(4px)' }}>
+          <div className="bg-white text-black w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="p-3 border-b border-slate-200 flex justify-between items-center"
               style={{ background: 'linear-gradient(180deg, #f8fafd 0%, #f1f5fb 100%)' }}
             >
-              <span className="text-xs font-bold text-slate-700">Xem trước hóa đơn in</span>
+              <div className="flex items-center gap-2">
+                <Printer className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-bold text-slate-800">Xem trước hóa đơn in</span>
+              </div>
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg text-white transition-all"
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl text-white transition-all cursor-pointer shadow-sm hover:brightness-105 active:scale-95"
                   style={{ background: 'linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%)' }}
                 >
                   <Printer className="w-3.5 h-3.5" /> In ngay
                 </button>
                 <button
+                  type="button"
                   onClick={() => setPrintReceiptData(null)}
-                  className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 transition-all"
+                  className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 transition-all cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            <div id="receipt-print-area" className="p-8 overflow-y-auto space-y-4 text-xs font-sans text-gray-800 bg-white">
-              <div className="text-center space-y-1">
-                <h2 className="text-xl font-extrabold tracking-wide uppercase text-blue-700">{printReceiptData.storeName}</h2>
-                <p className="text-[11px] text-gray-500">{printReceiptData.storeAddress}</p>
-                <p className="text-[11px] text-gray-500">ĐT: {printReceiptData.storePhone}</p>
-                <h3 className="text-base font-bold uppercase mt-3 text-black">HÓA ĐƠN BÁN HÀNG</h3>
-                <p className="text-[11px] text-gray-500 font-mono">Số HĐ: {printReceiptData.orderNumber}</p>
-                <p className="text-[11px] text-gray-500">Ngày: {printReceiptData.createdAt}</p>
-              </div>
-
-              <div className="border-t border-b border-dashed border-gray-300 py-2 space-y-1 text-[11px]">
-                <div className="flex justify-between">
-                  <span>Khách hàng: <strong>{printReceiptData.customerName}</strong></span>
-                  {printReceiptData.customerPhone && <span>SĐT: {printReceiptData.customerPhone}</span>}
-                </div>
-                <div className="flex justify-between">
-                  <span>Thu ngân: {printReceiptData.cashier}</span>
-                  <span>PT: {printReceiptData.paymentMethod}</span>
-                </div>
-              </div>
-
-              <table className="w-full text-left border-collapse text-[11px]">
-                <thead>
-                  <tr className="border-b border-gray-400">
-                    <th className="py-1.5 font-bold">Tên hàng hóa</th>
-                    <th className="py-1.5 text-center font-bold">SL</th>
-                    <th className="py-1.5 text-right font-bold">Đơn giá</th>
-                    <th className="py-1.5 text-right font-bold">Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {printReceiptData.items.map((it, idx) => (
-                    <tr key={idx}>
-                      <td className="py-1.5 pr-2">
-                        <span className="font-semibold block">{it.name}</span>
-                        <span className="text-[10px] text-gray-400 font-mono">{it.sku}</span>
-                      </td>
-                      <td className="py-1.5 text-center">{it.quantity}</td>
-                      <td className="py-1.5 text-right">{it.price.toLocaleString('vi-VN')}</td>
-                      <td className="py-1.5 text-right font-bold">{it.subtotal.toLocaleString('vi-VN')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <div className="border-t border-dashed border-gray-300 pt-2 space-y-1 text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tổng tiền hàng:</span>
-                  <span className="font-semibold">{formatVND(printReceiptData.subtotal)}</span>
-                </div>
-                {printReceiptData.discount > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Chiết khấu:</span>
-                    <span className="font-semibold">-{formatVND(printReceiptData.discount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between text-sm font-bold pt-1 border-t border-gray-300 text-black">
-                  <span>Tổng thanh toán:</span>
-                  <span>{formatVND(printReceiptData.total)}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Tiền khách đưa:</span>
-                  <span>{formatVND(printReceiptData.amountGiven)}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Tiền trả lại:</span>
-                  <span className="font-bold text-gray-800">{formatVND(printReceiptData.changeDue)}</span>
-                </div>
-              </div>
-
-              <div className="pt-1 italic text-[11px] text-gray-500">({printReceiptData.totalInWords})</div>
-
-              <div className="text-center pt-4 border-t border-dashed border-gray-300 space-y-1">
-                <p className="font-bold text-gray-800">Cảm ơn và hẹn gặp lại Quý khách!</p>
-                <p className="text-[10px] text-gray-400">Hệ thống StockPilot POS Retail</p>
-              </div>
-            </div>
+            <ReceiptPrintContent data={printReceiptData} isPreview={true} />
           </div>
         </div>
       )}
@@ -1983,25 +1987,35 @@ export function PosPage() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-linear-to-r from-blue-50/70 via-indigo-50/40 to-white">
+            <div className={`px-6 py-4 border-b flex items-center justify-between transition-colors ${
+              payosStatus === 'SUCCESS'
+                ? 'border-emerald-100 bg-linear-to-r from-emerald-50 via-teal-50/50 to-white'
+                : 'border-slate-100 bg-linear-to-r from-blue-50/70 via-indigo-50/40 to-white'
+            }`}>
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs font-black text-sm">
-                  P
+                <div className={`w-9 h-9 rounded-xl text-white flex items-center justify-center shadow-xs font-black text-sm ${
+                  payosStatus === 'SUCCESS' ? 'bg-emerald-600' : 'bg-blue-600'
+                }`}>
+                  {payosStatus === 'SUCCESS' ? <Check className="w-5 h-5 stroke-3" /> : 'P'}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-sm text-slate-900">Thanh toán VietQR PayOS</h3>
+                    <h3 className="font-bold text-sm text-slate-900">
+                      {payosStatus === 'SUCCESS' ? 'Giao dịch thành công' : 'Thanh toán VietQR PayOS'}
+                    </h3>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
-                      Tự động nhận diện
+                      {payosStatus === 'SUCCESS' ? 'Đã nhận tiền' : 'Tự động nhận diện'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400">Mã đơn: #{payosData.orderNumber || payosData.orderCode}</p>
+                  <p className="text-[11px] text-slate-400">Mã đơn: #{completedReceipt?.orderNumber || payosData.orderNumber || payosData.orderCode}</p>
                 </div>
               </div>
 
               <button
                 type="button"
                 onClick={() => {
+                  if (autoPrintTimerRef.current) clearInterval(autoPrintTimerRef.current);
+                  setAutoPrintCountdown(null);
                   stopPayosPolling();
                   setPayosModalOpen(false);
                 }}
@@ -2025,11 +2039,28 @@ export function PosPage() {
                   </div>
 
                   {/* QR Code Container */}
-                  <div className="relative p-3 bg-white rounded-2xl border-2 border-dashed border-blue-200 shadow-md mb-4 flex items-center justify-center">
+                  <div className="relative p-3 bg-white rounded-2xl border-2 border-dashed border-blue-200 shadow-md mb-4 flex items-center justify-center min-h-60 min-w-60">
                     <img
-                      src={payosData.qrImageUrl || `https://api.vietqr.io/image/${payosData.bin}-${payosData.accountNumber}-compact2.png?amount=${payosData.amount}&addInfo=${encodeURIComponent(payosData.description)}&accountName=${encodeURIComponent(payosData.accountName)}`}
+                      src={
+                        payosData.qrImageUrl ||
+                        (payosData.qrCode
+                          ? `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(payosData.qrCode)}`
+                          : (payosData.bin && payosData.accountNumber
+                              ? `https://img.vietqr.io/image/${payosData.bin}-${payosData.accountNumber}-compact2.png?amount=${payosData.amount}&addInfo=${encodeURIComponent(payosData.description)}&accountName=${encodeURIComponent(payosData.accountName)}`
+                              : ''))
+                      }
                       alt="Mã QR PayOS"
                       className="w-56 h-56 object-contain rounded-xl"
+                      onError={(e) => {
+                        const target = e.target;
+                        if (payosData.qrCode && !target.dataset.triedQuickchart) {
+                          target.dataset.triedQuickchart = 'true';
+                          target.src = `https://quickchart.io/qr?text=${encodeURIComponent(payosData.qrCode)}&size=300`;
+                        } else if (payosData.bin && payosData.accountNumber && !target.dataset.triedVietqrSvg) {
+                          target.dataset.triedVietqrSvg = 'true';
+                          target.src = `https://img.vietqr.io/image/${payosData.bin}-${payosData.accountNumber}-compact2.svg?amount=${payosData.amount}&addInfo=${encodeURIComponent(payosData.description)}&accountName=${encodeURIComponent(payosData.accountName)}`;
+                        }
+                      }}
                     />
 
                     {/* Scanning radar indicator line */}
@@ -2094,17 +2125,105 @@ export function PosPage() {
               )}
 
               {payosStatus === 'SUCCESS' && (
-                <div className="py-8 flex flex-col items-center animate-in zoom-in-90 duration-300">
-                  <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20">
-                    <CheckCircle className="w-12 h-12 stroke-[2.5]" />
+                <div className="py-2 flex flex-col items-center animate-in zoom-in-95 duration-300 w-full">
+                  {/* Glowing Success Badge */}
+                  <div className="relative mb-3 flex items-center justify-center">
+                    <div className="absolute w-24 h-24 rounded-full bg-emerald-400/20 animate-ping" />
+                    <div className="w-20 h-20 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                      <CheckCircle className="w-11 h-11 stroke-[2.5]" />
+                    </div>
                   </div>
-                  <h4 className="text-xl font-black text-slate-900 mb-1">ĐÃ NHẬN TIỀN THÀNH CÔNG!</h4>
-                  <p className="text-xs text-slate-500 mb-3">
-                    PayOS đã xác nhận giao dịch <strong>{formatVND(payosData.amount)}</strong>
+
+                  <h4 className="text-xl font-black text-slate-900 tracking-tight mb-1">
+                    ĐÃ NHẬN TIỀN THÀNH CÔNG!
+                  </h4>
+                  <p className="text-xs text-slate-500 font-medium mb-3 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>PayOS đã xác nhận tiền vào tài khoản MBBank</span>
                   </p>
-                  <div className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 flex items-center gap-2">
-                    <Printer className="w-4 h-4" />
-                    <span>Đang cập nhật tồn kho & in hóa đơn...</span>
+
+                  {/* Giant Received Amount Card */}
+                  <div className="w-full p-4 rounded-2xl bg-linear-to-br from-emerald-50 via-teal-50/60 to-blue-50 border border-emerald-200/80 flex flex-col items-center shadow-xs mb-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                      Số tiền đã nhận
+                    </span>
+                    <span className="text-3xl sm:text-4xl font-black text-emerald-600 tracking-tight mt-0.5">
+                      +{formatVND(payosData.amount || completedReceipt?.total)}
+                    </span>
+                    <span className="text-[11px] text-emerald-800/80 font-medium mt-1">
+                      ({completedReceipt?.totalInWords || docSoThanhChu(payosData.amount)})
+                    </span>
+                  </div>
+
+
+                  {/* Order Details Breakdown */}
+                  <div className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-left space-y-1.5 text-xs mb-3">
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>Mã đơn hàng:</span>
+                      <strong className="text-slate-900 font-mono">
+                        {completedReceipt?.orderNumber || payosData.description}
+                      </strong>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>Khách hàng:</span>
+                      <strong className="text-slate-900">
+                        {completedReceipt?.customerName || 'Khách lẻ'}
+                      </strong>
+                    </div>
+                    <div className="flex justify-between items-center text-slate-600">
+                      <span>Kênh thanh toán:</span>
+                      <span className="font-semibold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded text-[11px]">
+                        VietQR PayOS (Tự động nhận diện)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Auto-print Countdown Banner */}
+                  {autoPrintCountdown !== null && (
+                    <div className="w-full px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium flex items-center justify-between mb-3 animate-pulse">
+                      <div className="flex items-center gap-2">
+                        <Printer className="w-4 h-4" />
+                        <span>Tự động in hóa đơn sau <strong>{autoPrintCountdown} giây</strong>...</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (autoPrintTimerRef.current) clearInterval(autoPrintTimerRef.current);
+                          setAutoPrintCountdown(null);
+                        }}
+                        className="text-[11px] font-bold text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                      >
+                        Hủy tự in
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="w-full flex items-center gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handlePrintReceipt(completedReceipt)}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-xs text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                      style={{
+                        background: 'linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%)',
+                        boxShadow: '0 4px 14px rgb(59 130 246 / 0.35)',
+                      }}
+                    >
+                      <Printer className="w-4 h-4" />
+                      <span>IN HÓA ĐƠN NGAY</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (autoPrintTimerRef.current) clearInterval(autoPrintTimerRef.current);
+                        setAutoPrintCountdown(null);
+                        setPayosModalOpen(false);
+                      }}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>TẠO ĐƠN TIẾP THEO</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -2299,17 +2418,83 @@ export function PosPage() {
               )}
 
               {momoStatus === 'SUCCESS' && (
-                <div className="py-8 flex flex-col items-center animate-in zoom-in-90 duration-300">
-                  <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/20">
-                    <CheckCircle className="w-12 h-12 stroke-[2.5]" />
+                <div className="py-2 flex flex-col items-center animate-in zoom-in-95 duration-300 w-full">
+                  {/* Glowing Success Badge */}
+                  <div className="relative mb-3 flex items-center justify-center">
+                    <div className="absolute w-24 h-24 rounded-full bg-pink-400/20 animate-ping" />
+                    <div className="w-20 h-20 rounded-full bg-linear-to-tr from-pink-600 to-rose-500 text-white flex items-center justify-center shadow-lg shadow-pink-500/30">
+                      <CheckCircle className="w-11 h-11 stroke-[2.5]" />
+                    </div>
                   </div>
-                  <h4 className="text-xl font-black text-slate-900 mb-1">ĐÃ NHẬN TIỀN VÍ MOMO THÀNH CÔNG!</h4>
-                  <p className="text-xs text-slate-500 mb-3">
-                    Ví MoMo đã xác nhận giao dịch <strong>{formatVND(momoData.amount)}</strong>
+
+                  <h4 className="text-xl font-black text-slate-900 tracking-tight mb-1">
+                    ĐÃ NHẬN TIỀN VÍ MOMO!
+                  </h4>
+                  <p className="text-xs text-slate-500 font-medium mb-3 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-pink-600" />
+                    <span>Ví MoMo đã xác nhận giao dịch thành công</span>
                   </p>
-                  <div className="px-4 py-2 rounded-xl bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200 flex items-center gap-2">
-                    <Printer className="w-4 h-4" />
-                    <span>Đang cập nhật tồn kho & hoàn tất đơn hàng...</span>
+
+                  {/* Giant Received Amount Card */}
+                  <div className="w-full p-4 rounded-2xl bg-linear-to-br from-pink-50 via-rose-50/60 to-purple-50 border border-pink-200/80 flex flex-col items-center shadow-xs mb-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-pink-700">
+                      Số tiền đã nhận
+                    </span>
+                    <span className="text-3xl sm:text-4xl font-black text-pink-600 tracking-tight mt-0.5">
+                      +{formatVND(momoData.amount || completedReceipt?.total)}
+                    </span>
+                    <span className="text-[11px] text-pink-800/80 font-medium mt-1">
+                      ({completedReceipt?.totalInWords || docSoThanhChu(momoData.amount)})
+                    </span>
+                  </div>
+
+
+                  {/* Auto-print Countdown Banner */}
+                  {autoPrintCountdown !== null && (
+                    <div className="w-full px-3 py-2 rounded-xl bg-pink-50 border border-pink-200 text-pink-700 text-xs font-medium flex items-center justify-between mb-3 animate-pulse">
+                      <div className="flex items-center gap-2">
+                        <Printer className="w-4 h-4" />
+                        <span>Tự động in hóa đơn sau <strong>{autoPrintCountdown} giây</strong>...</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (autoPrintTimerRef.current) clearInterval(autoPrintTimerRef.current);
+                          setAutoPrintCountdown(null);
+                        }}
+                        className="text-[11px] font-bold text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                      >
+                        Hủy tự in
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="w-full flex items-center gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handlePrintReceipt(completedReceipt)}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-xs text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                      style={{
+                        background: 'linear-gradient(135deg, #a50064 0%, #d82d8b 100%)',
+                        boxShadow: '0 4px 14px rgba(165, 0, 100, 0.35)',
+                      }}
+                    >
+                      <Printer className="w-4 h-4" />
+                      <span>IN HÓA ĐƠN NGAY</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (autoPrintTimerRef.current) clearInterval(autoPrintTimerRef.current);
+                        setAutoPrintCountdown(null);
+                        setMomoModalOpen(false);
+                      }}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>TẠO ĐƠN TIẾP THEO</span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -2335,6 +2520,126 @@ export function PosPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cash Payment Success Modal ──────────────────────── */}
+      {cashSuccessModalOpen && cashSuccessData && (
+        <div className="fixed inset-0 z-90 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-110 bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200 flex flex-col"
+            style={{ boxShadow: '0 25px 60px -15px rgba(16, 185, 129, 0.25)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="px-6 py-4 flex items-center justify-between border-b border-emerald-100 bg-emerald-50/80">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-sm shadow-xs">
+                  <Banknote className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-sm leading-tight">
+                    Thanh toán Tiền mặt
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-mono">Đơn #{cashSuccessData.orderNumber}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (autoPrintTimerRef.current) clearInterval(autoPrintTimerRef.current);
+                  setAutoPrintCountdown(null);
+                  setCashSuccessModalOpen(false);
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 flex flex-col items-center text-center">
+              <div className="relative mb-3 flex items-center justify-center">
+                <div className="absolute w-24 h-24 rounded-full bg-emerald-400/20 animate-ping" />
+                <div className="w-20 h-20 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                  <CheckCircle className="w-11 h-11 stroke-[2.5]" />
+                </div>
+              </div>
+
+              <h4 className="text-xl font-black text-slate-900 tracking-tight mb-1">
+                THANH TOÁN THÀNH CÔNG!
+              </h4>
+              <p className="text-xs text-slate-500 font-medium mb-3 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Đã ghi nhận doanh thu & cập nhật tồn kho</span>
+              </p>
+
+              {/* Amount and Change Due Card */}
+              <div className="w-full p-4 rounded-2xl bg-linear-to-br from-emerald-50 via-teal-50/60 to-amber-50/40 border border-emerald-200/80 text-left space-y-2 mb-3 shadow-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-600">Tổng tiền hàng:</span>
+                  <span className="text-sm font-bold text-slate-900">{formatVND(cashSuccessData.total)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-600">Tiền khách đưa:</span>
+                  <span className="text-sm font-semibold text-slate-700">{formatVND(cashSuccessData.amountGiven)}</span>
+                </div>
+                <div className="pt-2 border-t border-emerald-200 flex justify-between items-center">
+                  <span className="text-xs font-bold text-amber-900">TIỀN THỐI LẠI KHÁCH:</span>
+                  <span className="text-xl font-black text-amber-700">{formatVND(cashSuccessData.changeDue)}</span>
+                </div>
+              </div>
+
+
+              {/* Auto-print Countdown */}
+              {autoPrintCountdown !== null && (
+                <div className="w-full px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium flex items-center justify-between mb-3 animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <Printer className="w-4 h-4" />
+                    <span>Tự động in hóa đơn sau <strong>{autoPrintCountdown} giây</strong>...</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (autoPrintTimerRef.current) clearInterval(autoPrintTimerRef.current);
+                      setAutoPrintCountdown(null);
+                    }}
+                    className="text-[11px] font-bold text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                  >
+                    Hủy tự in
+                  </button>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="w-full flex items-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handlePrintReceipt(completedReceipt)}
+                  className="flex-1 py-3 px-4 rounded-xl font-bold text-xs text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                  style={{
+                    background: 'linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%)',
+                    boxShadow: '0 4px 14px rgb(59 130 246 / 0.35)',
+                  }}
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>IN HÓA ĐƠN NGAY</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (autoPrintTimerRef.current) clearInterval(autoPrintTimerRef.current);
+                    setAutoPrintCountdown(null);
+                    setCashSuccessModalOpen(false);
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl font-bold text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>TẠO ĐƠN TIẾP THEO</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

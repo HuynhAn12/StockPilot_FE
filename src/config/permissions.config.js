@@ -29,16 +29,16 @@ export const canViewProfit = (role) => !isStaff(role);
 export const canViewTotalInventoryValue = (role) => !isStaff(role);
 export const canViewFinancialCharts = (role) => !isStaff(role);
 
-export const canDeleteProduct = (role) => isOwner(role) || isAdmin(role);
-export const canEditCostPrice = (role) => isOwner(role) || isAdmin(role);
-export const canEditSellingPrice = (role) => isOwner(role) || isAdmin(role);
-export const canApprovePricing = (role) => isOwner(role) || isAdmin(role);
-export const canCancelOrder = (role) => isOwner(role) || isAdmin(role);
-export const canAccessOrders = (role) => isOwner(role) || isAdmin(role);
-export const canViewOrderFinancialSummary = (role) => isOwner(role) || isAdmin(role);
-export const canAccessPricing = (role) => isOwner(role) || isAdmin(role);
-export const canAccessAnalytics = (role) => isOwner(role) || isAdmin(role);
-export const canAccessSettings = (role) => isOwner(role) || isAdmin(role);
+export const canDeleteProduct = (role) => isOwner(role);
+export const canEditCostPrice = (role) => isOwner(role);
+export const canEditSellingPrice = (role) => isOwner(role);
+export const canApprovePricing = (role) => isOwner(role);
+export const canCancelOrder = (role) => isOwner(role);
+export const canAccessOrders = (role) => isOwner(role);
+export const canViewOrderFinancialSummary = (role) => isOwner(role);
+export const canAccessPricing = (role) => isOwner(role);
+export const canAccessAnalytics = (role) => isOwner(role);
+export const canAccessSettings = (role) => isOwner(role);
 export const canManageUsers = (role) => isAdmin(role);
 export const canViewAuditLog = (role) => isAdmin(role);
 
@@ -63,21 +63,27 @@ export const permissions = {
   canViewAuditLog,
 };
 
-// ─── Route Access Matrix (Đã tối ưu chuẩn hoá 12 phân hệ) ───
+// ─── Route Access Matrix (Tách biệt quyền Admin và Nghiệp vụ Shop) ───
 export const ROUTE_PERMISSIONS = {
   '/dashboard': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF, ROLES.ADMIN],
-  '/products': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF, ROLES.ADMIN],
-  '/pos': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF, ROLES.ADMIN],
-  '/orders': [ROLES.SHOP_OWNER, ROLES.ADMIN],
-  '/inventory': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF, ROLES.ADMIN],
-  '/alerts': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF, ROLES.ADMIN],
-  '/ai-assistant': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF, ROLES.ADMIN],
-  '/pricing': [ROLES.SHOP_OWNER, ROLES.ADMIN],
-  '/analytics': [ROLES.SHOP_OWNER, ROLES.ADMIN],
-  '/settings': [ROLES.SHOP_OWNER, ROLES.ADMIN],
-  '/staff': [ROLES.SHOP_OWNER, ROLES.ADMIN],
+  '/products': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
+  '/pos': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
+  '/orders': [ROLES.SHOP_OWNER],
+  '/inventory': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
+  '/alerts': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
+  '/ai-assistant': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
+  '/pricing': [ROLES.SHOP_OWNER],
+  '/analytics': [ROLES.SHOP_OWNER],
+  '/settings': [ROLES.SHOP_OWNER],
+  '/staff': [ROLES.SHOP_OWNER],
   '/admin/users': [ROLES.ADMIN],
+  '/admin/stores': [ROLES.ADMIN],
   '/admin/audit-log': [ROLES.ADMIN],
+  '/admin/leads': [ROLES.ADMIN],
+  '/admin/system': [ROLES.ADMIN],
+  '/admin/support': [ROLES.ADMIN],
+  '/support': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
+  '/import': [ROLES.SHOP_OWNER],
 };
 
 export function canAccessRoute(role, path) {

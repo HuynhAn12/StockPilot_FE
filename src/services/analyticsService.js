@@ -84,12 +84,18 @@ export async function apiUpdatePaymentConfig(payload) {
   return data.data;
 }
 
-// GET /audit-logs (bảng audit_logs)
+// POST /store-payment-config/payos/test
+export async function apiTestPaymentConfig(payload = {}) {
+  const { data } = await apiClient.post('/store-payment-config/payos/test', payload);
+  return data;
+}
+
+// GET /admin/audit-logs (bảng audit_logs)
 export async function apiGetAuditLogs({ page = 1, limit = 50, entityType = 'ALL', search = '' } = {}) {
   const params = { page, limit };
   if (entityType && entityType !== 'ALL') params.entityType = entityType;
   if (search) params.search = search;
-  const { data } = await apiClient.get('/audit-logs', { params });
+  const { data } = await apiClient.get('/admin/audit-logs', { params });
   return data;
 }
 

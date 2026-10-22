@@ -390,7 +390,7 @@ const CONTENT = {
       copyright: '© 2026 StockPilot Decision Engine. Nền tảng quản lý bán lẻ & ra quyết định định lượng.',
       terms: 'Điều khoản dịch vụ',
       privacy: 'Chính sách bảo mật dữ liệu',
-      operation: 'Quy chế hoạt động'
+      operation: 'Giải quyết khiếu nại'
     }
   },
   en: {
@@ -484,7 +484,7 @@ const CONTENT = {
       copyright: '© 2026 StockPilot Decision Engine. Quantitative Decision & Retail SaaS Platform.',
       terms: 'Terms of Service',
       privacy: 'Privacy Policy',
-      operation: 'Operating Regulations'
+      operation: 'Complaints & Support'
     }
   }
 };
@@ -2412,9 +2412,9 @@ export function LandingPage() {
           <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 gap-3">
             <p>{t.footer.copyright}</p>
             <div className="flex items-center gap-5">
-              <span className="hover:text-slate-400 cursor-pointer">{t.footer.terms}</span>
-              <span className="hover:text-slate-400 cursor-pointer">{t.footer.privacy}</span>
-              <span className="hover:text-slate-400 cursor-pointer">{t.footer.operation}</span>
+              <a href="/dieu-khoan/dieu-khoan-su-dung" className="hover:text-slate-300">{t.footer.terms}</a>
+              <a href="/dieu-khoan/chinh-sach-bao-mat" className="hover:text-slate-300">{t.footer.privacy}</a>
+              <a href="/dieu-khoan/giai-quyet-khieu-nai" className="hover:text-slate-300">{t.footer.operation}</a>
             </div>
           </div>
         </div>
