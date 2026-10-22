@@ -328,6 +328,7 @@ export function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showChecksumKey, setShowChecksumKey] = useState(false);
   const [payosClientIdMasked, setPayosClientIdMasked] = useState('');
+  const [payosNeedsReentry, setPayosNeedsReentry] = useState(false);
   const [savingPayos, setSavingPayos] = useState(false);
   const [togglingPayos, setTogglingPayos] = useState(false);
   const [showPayosGuide, setShowPayosGuide] = useState(false);
@@ -390,6 +391,7 @@ export function SettingsPage() {
       setPayosConfigured(Boolean(cfg.configured));
       setPayosActive(Boolean(cfg.active));
       setPayosClientIdMasked(cfg.clientIdMasked || '');
+      setPayosNeedsReentry(Boolean(cfg.needsReentry));
       setPayosConfiguredAt(cfg.configuredAt || null);
       setPayosUpdatedAt(cfg.updatedAt || null);
       if (cfg.webhookUrl) {
@@ -667,6 +669,7 @@ export function SettingsPage() {
       if (res?.clientIdMasked) {
         setPayosClientIdMasked(res.clientIdMasked);
       }
+      setPayosNeedsReentry(Boolean(res?.needsReentry));
       setPayosConfiguredAt(res?.configuredAt || new Date().toISOString());
       setPayosUpdatedAt(res?.updatedAt || new Date().toISOString());
       if (res?.webhookUrl) {
@@ -1496,6 +1499,21 @@ export function SettingsPage() {
                       : 'StockPilot mã hóa toàn bộ thông tin kết nối bằng thuật toán AES-256 trước khi lưu vào cơ sở dữ liệu. Khóa bảo mật sẽ không bao giờ hiển thị ở dạng văn bản thuần.'}
                   </span>
                 </div>
+
+                {payosNeedsReentry && (
+                  <div
+                    className="st-info-box"
+                    role="alert"
+                    style={{ marginBottom: 20, background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}
+                  >
+                    <AlertTriangle size={16} color="#dc2626" style={{ flexShrink: 0, marginTop: 1 }} />
+                    <span>
+                      {isEn
+                        ? 'The saved PayOS credentials can no longer be read because the server encryption key changed. QR payments are paused until you enter Client ID, API Key and Checksum Key again.'
+                        : 'Không đọc được cấu hình PayOS đã lưu vì khóa mã hóa trên máy chủ đã thay đổi. Thanh toán QR tạm ngưng cho tới khi bạn nhập lại đầy đủ Client ID, API Key và Checksum Key bên dưới.'}
+                    </span>
+                  </div>
+                )}
 
                 <form onSubmit={handleSavePayos} autoComplete="off">
                   {/* Decoy inputs to prevent browser autofill */}

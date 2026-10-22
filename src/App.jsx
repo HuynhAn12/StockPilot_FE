@@ -30,7 +30,14 @@ import { InventoryPage } from './pages/staff/InventoryPage';
 
 // Admin Pages (Quản trị hệ thống)
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { AdminStoresPage } from './pages/admin/AdminStoresPage';
 import { AdminAuditPage } from './pages/admin/AdminAuditPage';
+import { AdminLeadsPage } from './pages/admin/AdminLeadsPage';
+import { AdminSystemPage } from './pages/admin/AdminSystemPage';
+import { AdminSupportPage } from './pages/admin/AdminSupportPage';
+import { SupportPage } from './pages/shared/SupportPage';
+import { ImportDataPage } from './pages/owner/ImportDataPage';
+import { LegalPage } from './pages/LegalPage';
 import { ToastContainer } from './components/common/Toast';
 
 // ─── Error Boundary: bắt lỗi render, hiển thị thông báo thay vì màn trắng ───
@@ -158,23 +165,51 @@ export default function App() {
             }
           >
             <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-            <Route path="/products" element={<ErrorBoundary><ProductsPage /></ErrorBoundary>} />
-            <Route path="/pos" element={<ErrorBoundary><PosPage /></ErrorBoundary>} />
+            <Route
+              path="/products"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><ProductsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/pos"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><PosPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
             <Route path="/categories" element={<Navigate to="/pos" replace />} />
             <Route
               path="/orders"
               element={
-                <RequireRole roles={['store_owner', 'admin']}>
+                <RequireRole roles={['store_owner']}>
                   <ErrorBoundary><OrdersPage /></ErrorBoundary>
                 </RequireRole>
               }
             />
-            <Route path="/inventory" element={<ErrorBoundary><InventoryPage /></ErrorBoundary>} />
-            <Route path="/alerts" element={<ErrorBoundary><AlertsPage /></ErrorBoundary>} />
+            <Route
+              path="/inventory"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><InventoryPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/alerts"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><AlertsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
             <Route
               path="/pricing"
               element={
-                <RequireRole roles={['store_owner', 'admin']}>
+                <RequireRole roles={['store_owner']}>
                   <ErrorBoundary><PricingPage /></ErrorBoundary>
                 </RequireRole>
               }
@@ -182,16 +217,23 @@ export default function App() {
             <Route
               path="/analytics"
               element={
-                <RequireRole roles={['store_owner', 'admin']}>
+                <RequireRole roles={['store_owner']}>
                   <ErrorBoundary><AnalyticsPage /></ErrorBoundary>
                 </RequireRole>
               }
             />
-            <Route path="/ai-assistant" element={<ErrorBoundary><AIAssistantPage /></ErrorBoundary>} />
+            <Route
+              path="/ai-assistant"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><AIAssistantPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
             <Route
               path="/settings"
               element={
-                <RequireRole roles={['store_owner', 'admin']}>
+                <RequireRole roles={['store_owner']}>
                   <ErrorBoundary><SettingsPage /></ErrorBoundary>
                 </RequireRole>
               }
@@ -199,7 +241,7 @@ export default function App() {
             <Route
               path="/staff"
               element={
-                <RequireRole roles={['store_owner', 'admin']}>
+                <RequireRole roles={['store_owner']}>
                   <ErrorBoundary><StaffPage /></ErrorBoundary>
                 </RequireRole>
               }
@@ -215,6 +257,14 @@ export default function App() {
               }
             />
             <Route
+              path="/admin/stores"
+              element={
+                <RequireRole roles={['admin']}>
+                  <ErrorBoundary><AdminStoresPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
               path="/admin/audit-log"
               element={
                 <RequireRole roles={['admin']}>
@@ -222,10 +272,51 @@ export default function App() {
                 </RequireRole>
               }
             />
+            <Route
+              path="/admin/leads"
+              element={
+                <RequireRole roles={['admin']}>
+                  <ErrorBoundary><AdminLeadsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/support"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><SupportPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/import"
+              element={
+                <RequireRole roles={['store_owner']}>
+                  <ErrorBoundary><ImportDataPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/support"
+              element={
+                <RequireRole roles={['admin']}>
+                  <ErrorBoundary><AdminSupportPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/system"
+              element={
+                <RequireRole roles={['admin']}>
+                  <ErrorBoundary><AdminSystemPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
           </Route>
 
           {/* Landing page for root path */}
           <Route path="/" element={<ErrorBoundary><LandingPage /></ErrorBoundary>} />
+          <Route path="/dieu-khoan/:slug" element={<ErrorBoundary><LegalPage /></ErrorBoundary>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 

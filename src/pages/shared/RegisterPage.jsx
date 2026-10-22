@@ -409,11 +409,11 @@ function StepStore({ form, errors, onChange, isEn }) {
         />
         <span className="text-xs leading-relaxed text-slate-600">
           {isEn ? 'I have read and agree to the ' : 'Tôi đã đọc và đồng ý với '}
-          <a href="#" className="text-blue-600 font-semibold hover:underline" onClick={(e) => e.preventDefault()}>
+          <a href="/dieu-khoan/dieu-khoan-su-dung" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold hover:underline">
             {isEn ? 'Terms of Service' : 'Điều khoản Dịch vụ'}
           </a>{' '}
           {isEn ? 'and ' : 'và '}
-          <a href="#" className="text-blue-600 font-semibold hover:underline" onClick={(e) => e.preventDefault()}>
+          <a href="/dieu-khoan/chinh-sach-bao-mat" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-semibold hover:underline">
             {isEn ? 'Privacy Policy' : 'Chính sách Bảo mật Dữ liệu'}
           </a>{' '}
           {isEn

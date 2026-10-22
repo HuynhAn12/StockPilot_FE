@@ -90,12 +90,12 @@ export async function apiTestPaymentConfig(payload = {}) {
   return data;
 }
 
-// GET /audit-logs (bảng audit_logs)
+// GET /admin/audit-logs (bảng audit_logs)
 export async function apiGetAuditLogs({ page = 1, limit = 50, entityType = 'ALL', search = '' } = {}) {
   const params = { page, limit };
   if (entityType && entityType !== 'ALL') params.entityType = entityType;
   if (search) params.search = search;
-  const { data } = await apiClient.get('/audit-logs', { params });
+  const { data } = await apiClient.get('/admin/audit-logs', { params });
   return data;
 }
 
