@@ -314,18 +314,77 @@
   }
 }
 
+/* ─── Receipt Print Engine ─── */
+#receipt-print-portal {
+  display: none;
+}
+
 @media print {
-  body * { visibility: hidden; }
-  #receipt-print-area, #receipt-print-area * { visibility: visible; }
+  @page {
+    size: auto;
+    margin: 0mm !important;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Ẩn triệt để toàn bộ ứng dụng React khỏi luồng in để KHÔNG phát sinh thêm trang thứ 2 */
+  #root {
+    display: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Chỉ hiển thị duy nhất container in hóa đơn gắn trực tiếp vào body qua Portal */
+  #receipt-print-portal {
+    display: block !important;
+    position: static !important;
+    width: 80mm !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 3mm 4mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    break-before: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #receipt-print-portal * {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Tương thích ngược nếu còn dùng receipt-print-area */
   #receipt-print-area {
-    position: absolute;
-    left: 0; top: 0;
-    width: 100%; max-width: 100%;
-    margin: 0; padding: 12px;
-    background: white !important;
-    color: black !important;
+    display: block !important;
+    width: 80mm !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 3mm 4mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
+
 
 /* Hide number input spin arrows in POS quantity field */
 .pos-qty-input::-webkit-outer-spin-button,

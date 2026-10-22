@@ -64,7 +64,7 @@ export function LoginPage() {
     <div className="w-full bg-white rounded-[28px] shadow-[0_25px_70px_-12px_rgba(30,58,138,0.18),0_10px_25px_-5px_rgba(15,23,42,0.08)] border border-white/80 ring-1 ring-blue-900/5 overflow-hidden flex flex-col md:flex-row">
 
       {/* LEFT: Blue gradient panel with dark high-contrast typography */}
-      <div className="md:w-[45%] bg-gradient-to-br from-sky-400 via-blue-400 to-indigo-400 p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
+      <div className="md:w-[45%] bg-linear-to-br from-sky-400 via-blue-400 to-indigo-400 p-8 sm:p-10 flex flex-col justify-between relative overflow-hidden">
         {/* Soft glowing ambient circles */}
         <div className="absolute top-0 right-0 w-72 h-72 bg-white/20 rounded-full blur-3xl pointer-events-none -translate-y-1/3 translate-x-1/3" />
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-sky-200/30 rounded-full blur-3xl pointer-events-none translate-y-1/3 -translate-x-1/3" />
@@ -84,7 +84,7 @@ export function LoginPage() {
             </span>
           </div>
           <h1 className="text-3xl font-black tracking-tight text-slate-950 mb-2">StockPilot</h1>
-          <p className="text-xs font-bold text-slate-900 max-w-[260px] leading-relaxed">
+          <p className="text-xs font-bold text-slate-900 max-w-65 leading-relaxed">
             {isEn
               ? 'Intelligent Decision Support for Inventory, Pricing & Revenue'
               : 'Hệ thống hỗ trợ quyết định Tồn kho, Giá bán & Doanh thu thông minh'}
@@ -142,10 +142,10 @@ export function LoginPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
             {/* Email */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <label htmlFor="email" className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {isEn ? 'Email / Username' : 'Email / Tên đăng nhập'}
               </label>
               <div className="relative">
@@ -153,11 +153,13 @@ export function LoginPage() {
                   <User className="w-4 h-4" />
                 </div>
                 <input
+                  id="email"
+                  name="username"
                   type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={isEn ? 'owner@store.com' : 'email@cuahang.com'}
-                  autoComplete="off"
+                  autoComplete="username"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 text-slate-900 text-sm rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-400 font-medium"
                 />
               </div>
@@ -165,7 +167,7 @@ export function LoginPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              <label htmlFor="password" className="block text-xs font-semibold text-slate-700 mb-1.5">
                 {isEn ? 'Password' : 'Mật khẩu'}
               </label>
               <div className="relative">
@@ -173,11 +175,13 @@ export function LoginPage() {
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
+                  id="password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={isEn ? '••••••••' : '••••••••'}
-                  autoComplete="new-password"
+                  autoComplete="current-password"
                   className="w-full pl-10 pr-10 py-2.5 bg-slate-50 text-slate-900 text-sm rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-400 font-medium tracking-wide"
                 />
                 <button
@@ -252,36 +256,49 @@ export function LoginPage() {
                 sub: isEn ? 'Full Store Control' : 'Quản lý toàn bộ',
                 icon: Store,
                 color: 'text-blue-500',
-                bg: 'bg-blue-50',
-                border: 'border-blue-100',
+                bg: 'bg-blue-50 hover:bg-blue-100/70',
+                border: 'border-blue-100 hover:border-blue-300',
+                demoEmail: 'owner@stockpilot.vn',
+                demoPass: 'Password123!',
               },
               {
                 label: isEn ? 'Warehouse Staff' : 'Nhân viên kho',
                 sub: isEn ? 'Stock & Inbound' : 'Nhập / xuất kho',
                 icon: Warehouse,
                 color: 'text-emerald-500',
-                bg: 'bg-emerald-50',
-                border: 'border-emerald-100',
+                bg: 'bg-emerald-50 hover:bg-emerald-100/70',
+                border: 'border-emerald-100 hover:border-emerald-300',
+                demoEmail: 'staff@stockpilot.vn',
+                demoPass: 'Password123!',
               },
               {
                 label: isEn ? 'Administrator' : 'Quản trị viên',
                 sub: isEn ? 'System & Audit' : 'Hệ thống & audit',
                 icon: ShieldCheck,
                 color: 'text-violet-500',
-                bg: 'bg-violet-50',
-                border: 'border-violet-100',
+                bg: 'bg-violet-50 hover:bg-violet-100/70',
+                border: 'border-violet-100 hover:border-violet-300',
+                demoEmail: 'admin@stockpilot.vn',
+                demoPass: 'Password123!',
               },
-            ].map(({ label, sub, icon: Icon, color, bg, border }) => (
-              <div
+            ].map(({ label, sub, icon: Icon, color, bg, border, demoEmail, demoPass }) => (
+              <button
                 key={label}
-                className={`p-2.5 rounded-xl border ${border} ${bg} text-left select-none`}
+                type="button"
+                onClick={() => {
+                  setEmail(demoEmail);
+                  setPassword(demoPass);
+                  setLoginError('');
+                }}
+                title={isEn ? `Click to auto-fill ${label}` : `Bấm để điền nhanh tài khoản ${label}`}
+                className={`p-2.5 rounded-xl border ${border} ${bg} text-left select-none cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] group`}
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
-                  <Icon className={`w-3 h-3 ${color} shrink-0`} />
+                  <Icon className={`w-3 h-3 ${color} shrink-0 group-hover:scale-110 transition-transform`} />
                   <div className="text-[11px] font-bold text-slate-700 truncate">{label}</div>
                 </div>
                 <div className="text-[10px] text-slate-400 truncate">{sub}</div>
-              </div>
+              </button>
             ))}
           </div>
 

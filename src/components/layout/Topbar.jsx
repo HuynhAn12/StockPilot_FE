@@ -95,9 +95,9 @@ export function Topbar() {
 
   const currentRole = normalizeRole(user?.role);
 
-  // Fetch notifications từ API thật (bảng notifications trong MySQL)
+  // Fetch notifications từ API thật (bảng notifications trong MySQL) - Chỉ áp dụng cho người dùng thuộc Store
   const fetchRealNotifications = async () => {
-    if (!user) return;
+    if (!user || currentRole === 'admin') return;
     try {
       const data = await apiGetNotifications({ page: 1, limit: 30 });
       const items = Array.isArray(data) ? data : (data.items || data.data || []);
@@ -118,11 +118,12 @@ export function Topbar() {
   };
 
   useEffect(() => {
+    if (currentRole === 'admin') return;
     fetchRealNotifications();
     // Live polling mỗi 12 giây để bắt đơn hàng mới hoặc cảnh báo kho thời gian thực
     const interval = setInterval(fetchRealNotifications, 12000);
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, currentRole]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -166,18 +167,32 @@ export function Topbar() {
       navigate('/pricing');
     } else if (n.type === 'order' || n.entityType === 'ORDER') {
       navigate('/orders');
+    } else if (n.entityType === 'SUPPORT_TICKET') {
+      navigate(`/support?ticket=${n.entityId}`);
     } else {
       navigate('/settings');
     }
   };
 
+  const isAdmin = currentRole === 'admin';
+
   return (
-    <header className="h-16 bg-white/95 backdrop-blur-md border-b border-blue-100/70 sticky top-0 z-40 flex items-center justify-between px-4 lg:px-6">
+    <header
+      className={cn(
+        'h-16 sticky top-0 z-40 flex items-center justify-between px-4 lg:px-6 transition-colors',
+        isAdmin
+          ? 'bg-white border-b border-[#E5E7EB] text-[#475569]'
+          : 'bg-white/95 backdrop-blur-md border-b border-blue-100/70 text-slate-900'
+      )}
+    >
       {/* Left: Mobile toggle & Breadcrumbs */}
       <div className="flex items-center gap-3">
         <button
           onClick={() => setSidebarMobileOpen(true)}
-          className="p-2 -ml-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted lg:hidden"
+          className={cn(
+            'p-2 -ml-2 rounded-lg lg:hidden transition-colors',
+            'text-muted-foreground hover:text-foreground hover:bg-muted'
+          )}
           aria-label="Mở thanh điều hướng"
         >
           <Menu className="w-5 h-5" />
@@ -187,50 +202,57 @@ export function Topbar() {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2 sm:gap-3">
-
-
         {/* Role Badge (Phân định màu sắc chuẩn yêu cầu RBAC) */}
-        <div className={cn(
-          'hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border select-none transition-all',
-          currentRole === 'store_owner' && 'bg-blue-600 text-white border-blue-700 shadow-xs',
-          currentRole === 'warehouse_staff' && 'bg-emerald-50 text-emerald-800 border-emerald-300',
-          currentRole === 'admin' && 'bg-purple-600 text-white border-purple-700 shadow-xs'
-        )}>
+        <div
+          className={cn(
+            'hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border select-none transition-colors',
+            currentRole === 'store_owner' && 'bg-blue-600 text-white border-blue-700 shadow-xs font-bold',
+            currentRole === 'warehouse_staff' && 'bg-emerald-50 text-emerald-800 border-emerald-300 font-bold',
+            currentRole === 'admin' && 'bg-slate-700 text-white border-slate-700 font-medium'
+          )}
+        >
           {currentRole === 'store_owner' && <Store className="w-3.5 h-3.5" />}
           {currentRole === 'warehouse_staff' && <Warehouse className="w-3.5 h-3.5 text-emerald-600" />}
           {currentRole === 'admin' && <ShieldCheck className="w-3.5 h-3.5" />}
           <span>
             {currentRole === 'store_owner'
-              ? (isEn ? 'Store Owner' : 'Chủ shop')
+              ? isEn
+                ? 'Store Owner'
+                : 'Chủ shop'
               : currentRole === 'warehouse_staff'
-              ? (isEn ? 'Staff' : 'Nhân viên')
-              : (isEn ? 'Admin' : 'Quản trị viên / Admin')}
+              ? isEn
+                ? 'Staff'
+                : 'Nhân viên'
+              : isEn
+              ? 'Admin'
+              : 'Quản trị viên'}
           </span>
         </div>
 
-        {/* Store Switcher for Admin */}
-        {currentRole === 'admin' && (
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-50 border border-purple-200 text-purple-800 text-xs font-bold">
-            <Building2 className="w-3.5 h-3.5 text-purple-600" />
-            <span>{isEn ? 'Flagship Store (#4)' : 'Kho Flagship (#4)'}</span>
-          </div>
-        )}
-
-        {/* Language Toggle with Active Style matching user screenshot */}
+        {/* Language Toggle */}
         <button
           onClick={toggleLanguage}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
+          className={cn(
+            'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer',
             language === 'en'
               ? 'border-blue-500 bg-blue-50/70 text-blue-700 shadow-xs ring-1 ring-blue-400/30'
               : 'border-slate-200 hover:border-slate-300 text-slate-700 hover:bg-slate-50'
-          }`}
+          )}
           title={language === 'vi' ? 'Switch to English (EN)' : 'Chuyển sang Tiếng Việt (VI)'}
         >
-          <Globe className={`w-3.5 h-3.5 ${language === 'en' ? 'text-blue-600' : 'text-slate-600'}`} />
+          <Globe
+            className={cn(
+              'w-3.5 h-3.5',
+              language === 'en'
+                ? 'text-blue-600'
+                : 'text-slate-600'
+            )}
+          />
           <span className="uppercase font-extrabold">{language}</span>
         </button>
 
-        {/* Notification Bell */}
+        {/* Notification Bell (store users only) */}
+        {!isAdmin && (
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setNotificationsOpen(!notificationsOpen)}
@@ -329,44 +351,94 @@ export function Topbar() {
             </div>
           )}
         </div>
+        )}
 
         {/* User Menu */}
         <div className="relative" ref={userRef}>
-          <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 p-1 rounded-lg hover:bg-muted transition-colors cursor-pointer">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
-              {user?.name ? user.name.charAt(0) : 'U'}
+          <button
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            className={cn(
+              'flex items-center gap-2 p-1 rounded-lg transition-colors cursor-pointer',
+              'hover:bg-muted'
+            )}
+          >
+            <div
+              className={cn(
+                'w-8 h-8 rounded-full text-white font-bold text-xs flex items-center justify-center shadow-xs',
+                'bg-blue-600'
+              )}
+            >
+              {user?.fullName ? user.fullName.charAt(0).toUpperCase() : user?.name ? user.name.charAt(0) : 'A'}
             </div>
             <div className="hidden xl:flex flex-col text-left">
-              <span className="text-xs font-semibold text-foreground truncate max-w-28">{user?.name || (isEn ? 'User' : 'Người dùng')}</span>
+              <span className="text-xs font-semibold truncate max-w-28 text-foreground">
+                {user?.fullName || user?.name || (isEn ? 'User' : 'Người dùng')}
+              </span>
               <span className="text-[10px] text-muted-foreground">
                 {currentRole === 'store_owner'
-                  ? (isEn ? 'Store Owner' : 'Chủ cửa hàng')
+                  ? isEn
+                    ? 'Store Owner'
+                    : 'Chủ cửa hàng'
                   : currentRole === 'warehouse_staff'
-                  ? (isEn ? 'Warehouse Staff' : 'Nhân viên kho')
-                  : 'Admin'}
+                  ? isEn
+                    ? 'Warehouse Staff'
+                    : 'Nhân viên kho'
+                  : isEn
+                  ? 'Admin'
+                  : 'Quản trị viên'}
               </span>
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-muted-foreground hidden sm:block" />
           </button>
 
           {userMenuOpen && (
-            <div className="absolute right-0 mt-2 w-72 bg-white border border-slate-200 rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)] p-2.5 z-50 animate-in fade-in zoom-in-95 duration-150">
+            <div
+              className={cn(
+                'absolute right-0 mt-2 w-72 rounded-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-150 border shadow-2xl',
+                'bg-white border-slate-200 text-slate-800 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.25)]'
+              )}
+            >
               {/* User Profile Header */}
-              <div className="p-3 bg-gradient-to-r from-blue-50 to-indigo-50/60 rounded-xl border border-blue-100 mb-2">
+              <div
+                className={cn(
+                  'p-3 rounded-xl border mb-2',
+                  'bg-linear-to-r from-blue-50 to-indigo-50/60 border-blue-100'
+                )}
+              >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-extrabold text-sm flex items-center justify-center shadow-md shrink-0">
-                    {user?.name ? user.name.charAt(0) : 'U'}
+                  <div
+                    className={cn(
+                      'w-10 h-10 rounded-full text-white font-extrabold text-sm flex items-center justify-center shadow-md shrink-0',
+                      'bg-blue-600'
+                    )}
+                  >
+                    {user?.fullName ? user.fullName.charAt(0).toUpperCase() : user?.name ? user.name.charAt(0) : 'A'}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-bold text-slate-900 truncate">{user?.name || 'Nguyễn Thị Lan'}</p>
-                    <p className="text-xs text-slate-500 truncate">{user?.email || 'owner@demo.vn'}</p>
+                    <p className="text-sm font-bold truncate text-slate-900">
+                      {user?.fullName || user?.name || 'Administrator'}
+                    </p>
+                    <p className="text-xs truncate text-slate-500">
+                      {user?.email || 'admin@stockpilot.vn'}
+                    </p>
                     <div className="mt-1 flex items-center gap-1.5">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-600 text-white shadow-xs">
+                      <span
+                        className={cn(
+                          'text-[10px] font-bold px-2 py-0.5 rounded-full shadow-xs',
+                          'bg-blue-600 text-white'
+                        )}
+                      >
                         {currentRole === 'store_owner'
-                          ? (isEn ? 'Store Owner (Full Access)' : 'Chủ shop (Toàn quyền)')
+                          ? isEn
+                            ? 'Store Owner (Full Access)'
+                            : 'Chủ shop (Toàn quyền)'
                           : currentRole === 'warehouse_staff'
-                          ? (isEn ? 'Warehouse Staff' : 'NV Kho (Nhập/xuất)')
-                          : (isEn ? 'System Admin' : 'Admin hệ thống')}
+                          ? isEn
+                            ? 'Warehouse Staff'
+                            : 'NV Kho (Nhập/xuất)'
+                          : isEn
+                          ? 'Platform admin'
+                          : 'Quản trị viên nền tảng'}
                       </span>
                     </div>
                   </div>
@@ -377,43 +449,79 @@ export function Topbar() {
               <div className="space-y-1 py-1">
                 {/* THÔNG TIN TÀI KHOẢN */}
                 <button
-                  onClick={() => { setAccountModalOpen(true); setUserMenuOpen(false); }}
-                  className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:text-blue-700 hover:bg-blue-50/80 rounded-xl transition-colors flex items-center gap-2.5 font-medium cursor-pointer"
+                  onClick={() => {
+                    setAccountModalOpen(true);
+                    setUserMenuOpen(false);
+                  }}
+                  className={cn(
+                    'w-full text-left px-3 py-2 text-xs rounded-xl transition-colors flex items-center gap-2.5 font-medium cursor-pointer',
+                    'text-slate-700 hover:text-blue-700 hover:bg-blue-50/80'
+                  )}
                 >
-                  <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                  <div
+                    className={cn(
+                      'w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
+                      'bg-blue-100 text-blue-600'
+                    )}
+                  >
                     <User className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="block font-bold text-slate-800">{isEn ? 'Account Information' : 'Thông tin tài khoản'}</span>
-                    <span className="block text-[10px] text-slate-400 truncate">{isEn ? 'Personal profile, email & security' : 'Hồ sơ cá nhân, email & đổi mật khẩu'}</span>
+                    <span className="block font-bold text-slate-800">
+                      {isEn ? 'Account Information' : 'Thông tin tài khoản'}
+                    </span>
+                    <span className="block text-[10px] text-slate-400 truncate">
+                      {isEn ? 'Personal profile, email & security' : 'Hồ sơ cá nhân, email & bảo mật'}
+                    </span>
                   </div>
                 </button>
 
-                {/* NHÂN VIÊN */}
-                <button
-                  onClick={() => { navigate('/staff'); setUserMenuOpen(false); }}
-                  className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/80 rounded-xl transition-colors flex items-center gap-2.5 font-medium cursor-pointer"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                    <Users className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="block font-bold text-slate-800">{isEn ? 'Staff' : 'Nhân viên'}</span>
-                    <span className="block text-[10px] text-slate-400 truncate">{isEn ? 'Staff list, add, edit & permissions' : 'Danh sách, thêm mới, sửa đổi & phân quyền'}</span>
-                  </div>
-                </button>
+                {!isAdmin && (
+                  <button
+                    onClick={() => {
+                      navigate('/staff');
+                      setUserMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:text-emerald-700 hover:bg-emerald-50/80 rounded-xl transition-colors flex items-center gap-2.5 font-medium cursor-pointer"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="block font-bold text-slate-800">{isEn ? 'Staff' : 'Nhân viên'}</span>
+                      <span className="block text-[10px] text-slate-400 truncate">
+                        {isEn ? 'Staff list, add, edit & permissions' : 'Danh sách, thêm mới, sửa đổi & phân quyền'}
+                      </span>
+                    </div>
+                  </button>
+                )}
 
                 {/* TRỢ GIÚP & HƯỚNG DẪN */}
                 <button
-                  onClick={() => { setHelpModalOpen(true); setUserMenuOpen(false); }}
-                  className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:text-blue-700 hover:bg-blue-50/80 rounded-xl transition-colors flex items-center gap-2.5 font-medium cursor-pointer"
+                  onClick={() => {
+                    setHelpModalOpen(true);
+                    setUserMenuOpen(false);
+                  }}
+                  className={cn(
+                    'w-full text-left px-3 py-2 text-xs rounded-xl transition-colors flex items-center gap-2.5 font-medium cursor-pointer',
+                    'text-slate-700 hover:text-blue-700 hover:bg-blue-50/80'
+                  )}
                 >
-                  <div className="w-7 h-7 rounded-lg bg-cyan-100 text-cyan-600 flex items-center justify-center shrink-0">
+                  <div
+                    className={cn(
+                      'w-7 h-7 rounded-lg flex items-center justify-center shrink-0',
+                      'bg-cyan-100 text-cyan-600'
+                    )}
+                  >
                     <HelpCircle className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="block font-bold text-slate-800">{isEn ? 'Help & Documentation' : 'Trợ giúp & Hướng dẫn'}</span>
-                    <span className="block text-[10px] text-slate-400 truncate">{isEn ? 'User guides & StockPilot AI assistant' : 'Tài liệu HDSD & trợ lý AI StockPilot'}</span>
+                    <span className="block font-bold text-slate-800">
+                      {isEn ? 'Help & Documentation' : 'Trợ giúp & Hướng dẫn'}
+                    </span>
+                    <span className="block text-[10px] text-slate-400 truncate">
+                      {isEn ? 'User guides & StockPilot AI assistant' : 'Tài liệu HDSD & trợ lý AI StockPilot'}
+                    </span>
                   </div>
                 </button>
               </div>
@@ -421,8 +529,11 @@ export function Topbar() {
               {/* ĐĂNG XUẤT KHỎI HỆ THỐNG */}
               <div className="pt-1 mt-1 border-t border-slate-100">
                 <button
-                  onClick={() => { setUserMenuOpen(false); handleLogout(); }}
-                  className="w-full text-left px-3 py-2 text-xs text-rose-600 hover:bg-rose-50/80 rounded-xl transition-colors font-bold flex items-center gap-2.5 cursor-pointer"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 rounded-xl transition-colors font-bold flex items-center gap-2.5 cursor-pointer"
                 >
                   <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
                     <LogOut className="w-4 h-4" />

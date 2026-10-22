@@ -4,10 +4,12 @@ import React, { useState, useEffect } from 'react';
 import {
   Settings, Store, Bell, Shield, Save, RefreshCw,
   CheckCircle2, Sparkles, CreditCard, Eye, EyeOff,
-  Lock, Mail, Globe, Zap, X, Check,
+  Lock, Mail, X,
   Building2, Package, TrendingUp, Percent,
   AlertTriangle, Info, Loader2, User,
-  Users, UserPlus, UserCheck, UserX, Plus
+  Users, UserPlus, Plus,
+  ExternalLink, ChevronDown, ChevronUp, QrCode,
+  HelpCircle, Clock, KeyRound, Copy, Check, ArrowRight
 } from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
 import { useAuthStore } from '../../components/store/authStore';
@@ -17,6 +19,7 @@ import {
   apiUpdateDecisionConfig,
   apiGetPaymentConfig,
   apiUpdatePaymentConfig,
+  apiTestPaymentConfig,
   apiTogglePaymentConfig,
   apiGetNotificationSettings,
   apiUpdateNotificationSettings,
@@ -325,6 +328,18 @@ export function SettingsPage() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showChecksumKey, setShowChecksumKey] = useState(false);
   const [payosClientIdMasked, setPayosClientIdMasked] = useState('');
+  const [payosNeedsReentry, setPayosNeedsReentry] = useState(false);
+  const [savingPayos, setSavingPayos] = useState(false);
+  const [togglingPayos, setTogglingPayos] = useState(false);
+  const [showPayosGuide, setShowPayosGuide] = useState(false);
+  const [payosConfiguredAt, setPayosConfiguredAt] = useState(null);
+  const [payosUpdatedAt, setPayosUpdatedAt] = useState(null);
+  const [payosWebhookUrl, setPayosWebhookUrl] = useState('');
+  const [payosIsPublicDomain, setPayosIsPublicDomain] = useState(true);
+  const [testingPayos, setTestingPayos] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+  const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
   const [notif, setNotif] = useState({
     criticalStockout: true, aiPriceSuggestion: true,
@@ -373,9 +388,18 @@ export function SettingsPage() {
   useEffect(() => {
     apiGetPaymentConfig().then(cfg => {
       if (!cfg) return;
-      setPayosConfigured(cfg.configured);
-      setPayosActive(cfg.active);
+      setPayosConfigured(Boolean(cfg.configured));
+      setPayosActive(Boolean(cfg.active));
       setPayosClientIdMasked(cfg.clientIdMasked || '');
+      setPayosNeedsReentry(Boolean(cfg.needsReentry));
+      setPayosConfiguredAt(cfg.configuredAt || null);
+      setPayosUpdatedAt(cfg.updatedAt || null);
+      if (cfg.webhookUrl) {
+        setPayosWebhookUrl(cfg.webhookUrl);
+      }
+      if (typeof cfg.isPublicDomain === 'boolean') {
+        setPayosIsPublicDomain(cfg.isPublicDomain);
+      }
     }).catch(() => {});
   }, []);
 
@@ -541,44 +565,172 @@ export function SettingsPage() {
     setEngineDirty(true);
   };
 
+  const handleCopyWebhookUrl = () => {
+    const fallbackOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000';
+    const urlToCopy = payosWebhookUrl || `${fallbackOrigin}/api/v1/pos/payos/webhook`;
+
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(urlToCopy);
+    } else {
+      const el = document.createElement('textarea');
+      el.value = urlToCopy;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+    }
+
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2500);
+
+    toast({
+      title: isEn ? 'Callback URL Copied' : 'Đã sao chép Callback URL',
+      description: isEn
+        ? 'Paste this URL into the Webhook URL field in PayOS Dashboard.'
+        : 'Đã sao chép Callback URL. Hãy dán URL này vào cấu hình Webhook trên PayOS.',
+      type: 'success',
+    });
+  };
+
+  const handleTestPayosConnection = async () => {
+    setTestingPayos(true);
+    setTestResult(null);
+    try {
+      const payload = {};
+      if (payosClientId.trim()) payload.clientId = payosClientId.trim();
+      if (payosApiKey.trim()) payload.apiKey = payosApiKey.trim();
+      if (payosChecksumKey.trim()) payload.checksumKey = payosChecksumKey.trim();
+
+      const res = await apiTestPaymentConfig(payload);
+      const isSuccess = Boolean(res?.success);
+      const msg = res?.message || (isSuccess
+        ? (isEn ? 'PayOS credentials verified successfully!' : 'Xác thực cổng thanh toán PayOS thành công! Cổng thanh toán kết nối bình thường.')
+        : (isEn ? 'Could not verify PayOS connection.' : 'Chưa thể xác minh kết nối PayOS. Vui lòng kiểm tra lại thông tin cấu hình.'));
+
+      setTestResult({
+        tested: true,
+        success: isSuccess,
+        message: msg,
+      });
+
+      toast({
+        title: isSuccess
+          ? (isEn ? 'Connection Test Passed' : 'Kiểm tra kết nối thành công')
+          : (isEn ? 'Connection Test Failed' : 'Kiểm tra kết nối thất bại'),
+        description: msg,
+        type: isSuccess ? 'success' : 'error',
+      });
+    } catch (err) {
+      const errMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error?.message ||
+        err?.message ||
+        (isEn ? 'Connection test failed. Please try again.' : 'Chưa thể xác minh kết nối PayOS. Vui lòng kiểm tra thông tin kết nối và thử lại.');
+
+      setTestResult({
+        tested: true,
+        success: false,
+        message: errMsg,
+      });
+
+      toast({
+        title: isEn ? 'Connection Test Failed' : 'Kiểm tra kết nối thất bại',
+        description: errMsg,
+        type: 'error',
+      });
+    } finally {
+      setTestingPayos(false);
+    }
+  };
+
   const handleSavePayos = async (e) => {
     e.preventDefault();
-    if (!payosClientId || !payosApiKey || !payosChecksumKey) {
-      toast({ title: isEn ? 'Missing Information' : 'Thiếu thông tin', description: isEn ? 'Please enter Client ID, API Key, and Checksum Key.' : 'Vui lòng nhập đầy đủ Client ID, API Key và Checksum Key.', type: 'error' });
+    if (!payosConfigured && (!payosClientId.trim() || !payosApiKey.trim() || !payosChecksumKey.trim())) {
+      toast({
+        title: isEn ? 'Missing Information' : 'Thông tin kết nối chưa đầy đủ',
+        description: isEn
+          ? 'Please enter Client ID, API Key, and Checksum Key.'
+          : 'Thông tin kết nối chưa đầy đủ. Vui lòng kiểm tra lại Client ID và các khóa bảo mật.',
+        type: 'error',
+      });
       return;
     }
-    setSaving(true);
+
+    setSavingPayos(true);
     try {
-      const res = await apiUpdatePaymentConfig({
-        clientId: payosClientId.trim(),
-        apiKey: payosApiKey.trim(),
-        checksumKey: payosChecksumKey.trim(),
-      });
+      const payload = {};
+      if (payosClientId.trim()) payload.clientId = payosClientId.trim();
+      if (payosApiKey.trim()) payload.apiKey = payosApiKey.trim();
+      if (payosChecksumKey.trim()) payload.checksumKey = payosChecksumKey.trim();
+
+      const res = await apiUpdatePaymentConfig(payload);
       setPayosConfigured(true);
-      setPayosActive(true);
-      setPayosClientIdMasked(res.clientIdMasked || payosClientId.slice(0, 8) + '...');
+      setPayosActive(res?.active ?? payosActive);
+      if (res?.clientIdMasked) {
+        setPayosClientIdMasked(res.clientIdMasked);
+      }
+      setPayosNeedsReentry(Boolean(res?.needsReentry));
+      setPayosConfiguredAt(res?.configuredAt || new Date().toISOString());
+      setPayosUpdatedAt(res?.updatedAt || new Date().toISOString());
+      if (res?.webhookUrl) {
+        setPayosWebhookUrl(res.webhookUrl);
+      }
+      if (typeof res?.isPublicDomain === 'boolean') {
+        setPayosIsPublicDomain(res.isPublicDomain);
+      }
+
       setPayosClientId('');
       setPayosApiKey('');
       setPayosChecksumKey('');
-      toast({ title: isEn ? 'Connected' : 'Đã kết nối', description: isEn ? 'PayOS connected successfully. VietQR is now available.' : 'Cổng PayOS đã được kết nối thành công. Quét mã VietQR đã sẵn sàng.', type: 'success' });
+      setShowApiKey(false);
+      setShowChecksumKey(false);
+      setTestResult(null);
+
+      toast({
+        title: isEn ? 'Configuration Saved' : 'Đã lưu thông tin PayOS',
+        description: isEn
+          ? 'PayOS credentials saved. You can now test the connection.'
+          : 'Thông tin PayOS đã được lưu. Bạn có thể tiếp tục kiểm tra kết nối.',
+        type: 'success',
+      });
     } catch (err) {
-      toast({ title: isEn ? 'Connection Failed' : 'Lỗi kết nối', description: err?.response?.data?.error?.message || (isEn ? 'Invalid credentials or connection error.' : 'Không thể lưu cấu hình PayOS. Kiểm tra lại thông tin.'), type: 'error' });
+      toast({
+        title: isEn ? 'Connection Failed' : 'Lỗi kết nối PayOS',
+        description:
+          err?.response?.data?.error?.message ||
+          err?.message ||
+          (isEn ? 'Invalid credentials or connection error.' : 'Không thể lưu cấu hình PayOS. Vui lòng kiểm tra lại thông tin.'),
+        type: 'error',
+      });
     } finally {
-      setSaving(false);
+      setSavingPayos(false);
     }
   };
 
   const handleTogglePayos = async () => {
+    if (togglingPayos || !payosConfigured) return;
+    const targetState = !payosActive;
+    setTogglingPayos(true);
     try {
-      const res = await apiTogglePaymentConfig();
+      const res = await apiTogglePaymentConfig(targetState);
       setPayosActive(res.active);
       toast({
-        title: res.active ? (isEn ? 'PayOS Activated' : 'Đã kích hoạt PayOS') : (isEn ? 'PayOS Deactivated' : 'Đã tắt PayOS'),
-        description: res.active ? (isEn ? 'VietQR active on POS.' : 'Phương thức VietQR tự động đã được bật tại màn hình POS.') : (isEn ? 'VietQR disabled on POS.' : 'Phương thức VietQR tạm thời tắt, hệ thống sẽ ẩn mã QR tự động.'),
+        title: res.active
+          ? (isEn ? 'PayOS VietQR Activated' : 'Đã kích hoạt VietQR')
+          : (isEn ? 'PayOS VietQR Paused' : 'Đã tạm dừng VietQR'),
+        description: res.active
+          ? (isEn ? 'VietQR payment method is now active on POS checkout.' : 'Phương thức VietQR tự động đã được bật tại màn hình POS.')
+          : (isEn ? 'VietQR payment method is now paused on POS checkout.' : 'Phương thức VietQR tạm thời tắt, hệ thống sẽ ẩn mã QR tự động trên POS.'),
         type: res.active ? 'success' : 'info',
       });
     } catch (err) {
-      toast({ title: isEn ? 'Error' : 'Lỗi', description: isEn ? 'Could not toggle PayOS status.' : 'Không thể thay đổi trạng thái PayOS.', type: 'error' });
+      toast({
+        title: isEn ? 'Toggle Error' : 'Lỗi cập nhật trạng thái',
+        description: err?.response?.data?.error?.message || err?.message || (isEn ? 'Could not toggle PayOS status.' : 'Không thể thay đổi trạng thái PayOS.'),
+        type: 'error',
+      });
+    } finally {
+      setTogglingPayos(false);
     }
   };
 
@@ -834,86 +986,956 @@ export function SettingsPage() {
 
         {/* PAYMENT TAB */}
         {activeTab === 'payment' && (
-          <div className="st-fade" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <div className="st-card" style={{ padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-                  <div style={{ width: 52, height: 52, borderRadius: 14, background: payosConfigured ? '#f0fdf4' : '#f8fafc', border: `2px solid ${payosConfigured ? '#86efac' : '#e2e8f0'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <CreditCard size={22} color={payosConfigured ? '#16a34a' : '#94a3b8'} />
+          <div className="st-fade" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Header Card: Connection Status & Overview */}
+            <div className="st-card" style={{ padding: 24 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+                  <div style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 16,
+                    background: payosConfigured ? (payosActive ? '#ecfdf5' : '#f8fafc') : '#fffbeb',
+                    border: `2px solid ${payosConfigured ? (payosActive ? '#6ee7b7' : '#cbd5e1') : '#fde68a'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    boxShadow: payosConfigured && payosActive ? '0 4px 12px rgba(16, 185, 129, 0.15)' : 'none'
+                  }}>
+                    <QrCode size={26} color={payosConfigured ? (payosActive ? '#059669' : '#64748b') : '#d97706'} />
                   </div>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a' }}>PayOS — VietQR Code Payment</div>
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{isEn ? 'Automated bank transfer via VietQR dynamic QR code' : 'Cổng thanh toán chuyển khoản tự động qua VietQR'}</div>
-                    {payosConfigured && (
-                      <div style={{ marginTop: 5, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 99, background: payosActive ? '#dcfce7' : '#f1f5f9', color: payosActive ? '#16a34a' : '#64748b' }}>
-                          {payosActive ? (isEn ? '● Active' : '● Đang hoạt động') : (isEn ? '○ Inactive' : '○ Đã tắt')}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 800, fontSize: 16, color: '#0f172a' }}>
+                        {isEn ? 'PayOS — Automated VietQR Payment Gateway' : 'PayOS — Cổng thanh toán VietQR tự động'}
+                      </span>
+                      {/* Status Badge */}
+                      {!payosConfigured ? (
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '3px 10px',
+                          borderRadius: 99,
+                          background: '#fffbeb',
+                          color: '#b45309',
+                          border: '1px solid #fde68a',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5
+                        }}>
+                          <AlertTriangle size={12} />
+                          {isEn ? 'Not Configured' : 'Chưa cấu hình'}
                         </span>
-                        {payosClientIdMasked && <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 99, background: '#eff6ff', color: '#0284c7' }}>Client: {payosClientIdMasked}</span>}
+                      ) : payosActive ? (
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '3px 10px',
+                          borderRadius: 99,
+                          background: '#ecfdf5',
+                          color: '#047857',
+                          border: '1px solid #a7f3d0',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6
+                        }}>
+                          <span style={{ position: 'relative', display: 'flex', width: 8, height: 8 }}>
+                            <span style={{
+                              animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite',
+                              position: 'absolute',
+                              display: 'inline-flex',
+                              height: '100%',
+                              width: '100%',
+                              borderRadius: '9999px',
+                              background: '#34d399',
+                              opacity: 0.75
+                            }} />
+                            <span style={{
+                              position: 'relative',
+                              display: 'inline-flex',
+                              borderRadius: '9999px',
+                              width: 8,
+                              height: 8,
+                              background: '#059669'
+                            }} />
+                          </span>
+                          {isEn ? 'VietQR Active' : 'Đã kích hoạt VietQR'}
+                        </span>
+                      ) : (
+                        <span style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: '3px 10px',
+                          borderRadius: 99,
+                          background: '#f1f5f9',
+                          color: '#475569',
+                          border: '1px solid #cbd5e1',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5
+                        }}>
+                          <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#94a3b8' }} />
+                          {isEn ? 'VietQR Paused' : 'Đã tạm dừng VietQR'}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: 12.5, color: '#64748b', marginTop: 4 }}>
+                      {isEn
+                        ? 'Automated bank transfer via VietQR dynamic QR code on POS screen with real-time order completion.'
+                        : 'Thanh toán chuyển khoản tự động qua mã VietQR động tại quầy POS, tự động gạch nợ và xuất kho theo thời gian thực.'}
+                    </div>
+
+                    {payosConfigured && (
+                      <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                        {payosClientIdMasked && (
+                          <span style={{
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            padding: '3px 10px',
+                            borderRadius: 8,
+                            background: '#eff6ff',
+                            color: '#0284c7',
+                            border: '1px solid #bfdbfe',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 5
+                          }}>
+                            <KeyRound size={12} />
+                            Client ID: {payosClientIdMasked}
+                          </span>
+                        )}
+                        {(payosUpdatedAt || payosConfiguredAt) && (
+                          <span style={{
+                            fontSize: 11,
+                            color: '#64748b',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4
+                          }}>
+                            <Clock size={12} />
+                            {isEn ? 'Updated: ' : 'Cập nhật: '}
+                            {new Date(payosUpdatedAt || payosConfiguredAt).toLocaleString(isEn ? 'en-US' : 'vi-VN')}
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
+
+                {/* Switch Bật/Tắt thanh toán VietQR trên POS */}
                 {payosConfigured && (
-                  <button type="button" onClick={handleTogglePayos} className={payosActive ? 'st-btn-danger' : 'st-btn-secondary'} style={{ fontSize: 12 }}>
-                    {payosActive ? <X size={14} /> : <Check size={14} />} {payosActive ? (isEn ? 'Deactivate' : 'Vô hiệu hóa') : (isEn ? 'Reactivate' : 'Kích hoạt lại')}
-                  </button>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    background: '#f8fafc',
+                    padding: '8px 14px',
+                    borderRadius: 14,
+                    border: '1px solid #e2e8f0'
+                  }}>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.03em' }}>
+                        {isEn ? 'POS Checkout' : 'Thanh toán POS'}
+                      </div>
+                      <div style={{ fontSize: 12.5, fontWeight: 800, color: payosActive ? '#059669' : '#dc2626' }}>
+                        {payosActive ? (isEn ? 'VietQR ON' : 'Đang Bật') : (isEn ? 'VietQR OFF' : 'Đang Tắt')}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleTogglePayos}
+                      disabled={togglingPayos}
+                      style={{ background: 'none', border: 'none', cursor: togglingPayos ? 'not-allowed' : 'pointer', padding: 0 }}
+                      title={isEn ? 'Toggle VietQR checkout on POS' : 'Bật/Tắt thanh toán VietQR trên POS'}
+                    >
+                      <div className={`st-toggle-track ${payosActive ? 'on' : 'off'}`} style={{ opacity: togglingPayos ? 0.6 : 1 }}>
+                        <div className="st-toggle-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {togglingPayos && <Loader2 size={10} className="st-spinning" color="#0284c7" />}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
 
-            <div className="st-card" style={{ padding: 26 }}>
-              <div style={{ marginBottom: 18, paddingBottom: 16, borderBottom: '1px solid #f1f5f9' }}>
-                <div className="st-section-title"><Zap size={16} color="#f59e0b" />{payosConfigured ? (isEn ? 'Update PayOS Credentials' : 'Cập nhật thông tin PayOS') : (isEn ? 'Connect PayOS' : 'Kết nối PayOS')}</div>
-                <div className="st-section-desc">{isEn ? 'Enter API keys from your PayOS Dashboard at' : 'Nhập thông tin từ trang quản trị PayOS tại'} <strong>business.payos.vn</strong></div>
-              </div>
-              <div className="st-info-box" style={{ marginBottom: 18 }}>
-                <Info size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-                <span>{isEn ? 'Credentials are encrypted with AES-256 before saving. Full keys are never exposed again.' : 'Thông tin được mã hóa AES-256 trước khi lưu. Key đầy đủ sẽ không hiển thị lại sau khi lưu.'}</span>
-              </div>
-              <form onSubmit={handleSavePayos}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  <div>
-                    <label className="st-label">Client ID</label>
-                    <input className="st-input" value={payosClientId} onChange={e => setPayosClientId(e.target.value)} placeholder={payosConfigured ? (isEn ? `Current: ${payosClientIdMasked} — enter to change` : `Hiện tại: ${payosClientIdMasked} — nhập để thay đổi`) : (isEn ? 'Paste Client ID from PayOS Dashboard' : 'Dán Client ID từ PayOS Dashboard')} />
+            {/* STEP 1: Connect to PayOS */}
+            <div className="st-card" style={{ padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+                <div style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
+                }}>
+                  1
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="st-section-title" style={{ fontSize: 15, marginBottom: 4 }}>
+                    {isEn ? 'Step 1: Open PayOS Dashboard' : 'Bước 1: Mở cổng thanh toán PayOS'}
                   </div>
-                  <div>
-                    <label className="st-label">API Key</label>
-                    <div className="st-input-wrap">
-                      <input className="st-input" type={showApiKey ? 'text' : 'password'} value={payosApiKey} onChange={e => setPayosApiKey(e.target.value)} placeholder={isEn ? "Paste API Key from PayOS Dashboard" : "Dán API Key từ PayOS Dashboard"} />
-                      <button type="button" className="st-eye-btn" onClick={() => setShowApiKey(v => !v)}>{showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                  <div className="st-section-desc" style={{ fontSize: 13, lineHeight: 1.5 }}>
+                    {isEn
+                      ? 'Connect PayOS to let your customers pay using VietQR directly at your POS.'
+                      : 'Kết nối PayOS để khách hàng có thể thanh toán qua VietQR trực tiếp tại quầy POS của cửa hàng.'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', paddingLeft: 46 }}>
+                <a
+                  href="https://my.payos.vn"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="st-btn-primary"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <ExternalLink size={15} />
+                  <span>{isEn ? 'Open PayOS Dashboard ↗' : 'Mở PayOS Dashboard ↗'}</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPayosGuide(v => !v)}
+                  className="st-btn-secondary"
+                >
+                  <HelpCircle size={15} />
+                  <span>{isEn ? 'View Setup Instructions' : 'Xem hướng dẫn thiết lập'}</span>
+                  {showPayosGuide ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+              </div>
+
+              {/* Collapsible Step 1 Guidance */}
+              {showPayosGuide && (
+                <div style={{
+                  marginTop: 18,
+                  marginLeft: 46,
+                  padding: 18,
+                  borderRadius: 14,
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 14
+                }}>
+                  <div style={{ fontWeight: 800, fontSize: 13, color: '#0f172a' }}>
+                    {isEn ? '3 Steps to link PayOS to StockPilot:' : '3 bước kết nối PayOS vào StockPilot:'}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                    <div style={{ padding: 12, borderRadius: 10, background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ width: 20, height: 20, borderRadius: 6, background: '#0284c7', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>1</span>
+                        <span style={{ fontWeight: 800, fontSize: 12.5, color: '#0f172a' }}>{isEn ? 'Log into PayOS' : 'Đăng nhập PayOS'}</span>
+                      </div>
+                      <p style={{ fontSize: 11.5, color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+                        {isEn ? 'Go to my.payos.vn and log into your merchant account.' : 'Truy cập my.payos.vn và đăng nhập tài khoản chủ cửa hàng.'}
+                      </p>
                     </div>
-                  </div>
-                  <div>
-                    <label className="st-label">Checksum Key</label>
-                    <div className="st-input-wrap">
-                      <input className="st-input" type={showChecksumKey ? 'text' : 'password'} value={payosChecksumKey} onChange={e => setPayosChecksumKey(e.target.value)} placeholder={isEn ? "Paste Checksum Key from PayOS Dashboard" : "Dán Checksum Key từ PayOS Dashboard"} />
-                      <button type="button" className="st-eye-btn" onClick={() => setShowChecksumKey(v => !v)}>{showChecksumKey ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+
+                    <div style={{ padding: 12, borderRadius: 10, background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ width: 20, height: 20, borderRadius: 6, background: '#0284c7', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
+                        <span style={{ fontWeight: 800, fontSize: 12.5, color: '#0f172a' }}>{isEn ? 'Payment Channels' : 'Chọn Kênh thanh toán'}</span>
+                      </div>
+                      <p style={{ fontSize: 11.5, color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+                        {isEn ? 'Navigate to Payment Channels and open your active VietQR channel.' : 'Vào mục Kênh thanh toán -> Chọn kênh đã liên kết tài khoản ngân hàng của bạn.'}
+                      </p>
+                    </div>
+
+                    <div style={{ padding: 12, borderRadius: 10, background: '#ffffff', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ width: 20, height: 20, borderRadius: 6, background: '#0284c7', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>3</span>
+                        <span style={{ fontWeight: 800, fontSize: 12.5, color: '#0f172a' }}>{isEn ? 'Configure Webhook & Keys' : 'Dán Webhook & Lấy khóa'}</span>
+                      </div>
+                      <p style={{ fontSize: 11.5, color: '#64748b', margin: 0, lineHeight: 1.5 }}>
+                        {isEn ? 'Paste the Webhook URL from Step 2, then copy the 3 keys into Step 3 below.' : 'Dán Webhook URL ở Bước 2 bên dưới, sau đó copy bộ 3 mã bảo mật dán vào Bước 3.'}
+                      </p>
                     </div>
                   </div>
                 </div>
-                <div style={{ marginTop: 22, paddingTop: 18, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
-                  <button type="submit" className="st-btn-primary" disabled={saving || (!payosClientId && !payosApiKey && !payosChecksumKey)}>
-                    {saving ? <Loader2 size={14} className="st-spinning" /> : <Zap size={14} />} {payosConfigured ? (isEn ? 'Update PayOS' : 'Cập nhật PayOS') : (isEn ? 'Connect PayOS' : 'Kết nối PayOS')}
-                  </button>
-                </div>
-              </form>
+              )}
             </div>
 
-            <div className="st-card" style={{ padding: 22 }}>
-              <div className="st-section-title" style={{ marginBottom: 14 }}><CheckCircle2 size={16} color="#059669" /> {isEn ? 'Supported Payment Methods' : 'Phương thức thanh toán hỗ trợ'}</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {[
-                  { label: isEn ? 'Cash' : 'Tiền mặt', desc: isEn ? 'Always active, zero setup required' : 'Luôn hoạt động, không cần cấu hình', active: true, fixed: true },
-                  { label: isEn ? 'Manual Bank Transfer' : 'Chuyển khoản ngân hàng (thủ công)', desc: isEn ? 'Cashier manually confirms receipt' : 'Xác nhận thủ công bởi nhân viên', active: true, fixed: true },
-                  { label: isEn ? 'VietQR automated via PayOS' : 'QR VietQR qua PayOS', desc: isEn ? 'Requires PayOS credentials connected above' : 'Yêu cầu kết nối PayOS ở trên', active: payosActive, fixed: false },
-                ].map((m, i) => (
-                  <div key={i} className="st-toggle-wrapper" onClick={() => !m.fixed && handleTogglePayos()} style={{ cursor: m.fixed ? 'default' : 'pointer' }}>
+            {/* STEP 2: Configure the Callback / Webhook URL (PRIORITY: BEFORE CREDENTIALS) */}
+            <div className="st-card" style={{
+              padding: 24,
+              border: '2px solid #93c5fd',
+              background: 'linear-gradient(to bottom, #ffffff, #f0f9ff 120%)',
+              boxShadow: '0 4px 14px rgba(2, 132, 199, 0.08)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 16 }}>
+                <div style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
+                }}>
+                  2
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span className="st-section-title" style={{ fontSize: 15, margin: 0, color: '#0369a1' }}>
+                      {isEn ? 'Step 2: Configure PayOS Webhook' : 'Bước 2: Cấu hình Webhook PayOS'}
+                    </span>
+                    <span style={{
+                      fontSize: 10.5,
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: 99,
+                      background: '#dbeafe',
+                      color: '#1d4ed8',
+                      textTransform: 'uppercase',
+                      letterSpacing: '.04em'
+                    }}>
+                      {isEn ? 'Required' : 'Bắt buộc'}
+                    </span>
+                  </div>
+                  <div className="st-section-desc" style={{ fontSize: 13, lineHeight: 1.5, marginTop: 4 }}>
+                    {isEn
+                      ? 'Copy the URL below and paste it into the Webhook URL field on PayOS. This is the server address PayOS uses to notify StockPilot when a payment is received.'
+                      : 'Copy đường dẫn bên dưới và dán vào mục Webhook URL trong trang quản lý PayOS. Đây là địa chỉ PayOS sử dụng để gửi thông báo giao dịch về StockPilot.'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ paddingLeft: 46, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {/* Dynamically Generated URL Box with Copy Button */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  background: '#ffffff',
+                  border: '1.5px solid #93c5fd',
+                  borderRadius: 14,
+                  padding: '10px 14px',
+                  boxShadow: '0 2px 6px rgba(15, 23, 42, 0.04)',
+                  flexWrap: 'wrap'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                    <div style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 8,
+                      background: '#eff6ff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#0284c7',
+                      flexShrink: 0
+                    }}>
+                      <QrCode size={16} />
+                    </div>
+                    <code style={{
+                      fontFamily: 'Consolas, Monaco, monospace',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: '#0369a1',
+                      wordBreak: 'break-all',
+                      userSelect: 'all'
+                    }}>
+                      {payosWebhookUrl || `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5000'}/api/v1/pos/payos/webhook`}
+                    </code>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyWebhookUrl}
+                    className="st-btn-primary"
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: 12.5,
+                      background: copiedWebhook ? '#059669' : 'linear-gradient(135deg,#38bdf8,#0284c7)',
+                      boxShadow: copiedWebhook ? '0 2px 8px rgba(5, 150, 105, 0.3)' : undefined
+                    }}
+                  >
+                    {copiedWebhook ? <Check size={14} /> : <Copy size={14} />}
+                    <span>{copiedWebhook ? (isEn ? 'Copied!' : 'Đã sao chép') : (isEn ? 'Copy URL' : 'Sao chép URL')}</span>
+                  </button>
+                </div>
+
+                {/* Destination Navigation Guidance */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  fontSize: 12,
+                  color: '#475569',
+                  flexWrap: 'wrap'
+                }}>
+                  <span style={{ fontWeight: 700, color: '#0f172a' }}>
+                    {isEn ? 'Paste into:' : 'Vị trí dán trên PayOS:'}
+                  </span>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontWeight: 700, color: '#0284c7' }}>
+                    <span>PayOS Dashboard</span>
+                    <ArrowRight size={12} color="#94a3b8" />
+                    <span>{isEn ? 'Payment Channels' : 'Kênh thanh toán'}</span>
+                    <ArrowRight size={12} color="#94a3b8" />
+                    <span style={{ background: '#e0f2fe', padding: '2px 8px', borderRadius: 6, color: '#0369a1' }}>
+                      Webhook URL
+                    </span>
+                  </div>
+                </div>
+
+                {/* Technical Differentiation Callout */}
+                <div style={{
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  background: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  fontSize: 12,
+                  color: '#64748b',
+                  lineHeight: 1.55
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, color: '#334155', marginBottom: 4 }}>
+                    <Info size={14} color="#0284c7" />
+                    <span>{isEn ? 'Distinction between Webhook URL and Return URL:' : 'Phân biệt Webhook URL và Return / Cancel URL:'}</span>
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    <li>
+                      <strong style={{ color: '#0f172a' }}>Webhook URL:</strong> {isEn
+                        ? 'The backend server endpoint (/api/v1/pos/payos/webhook) that receives instant payment notifications from PayOS servers to settle orders and deduct stock automatically.'
+                        : 'Đường dẫn máy chủ backend (/api/v1/pos/payos/webhook) nhận thông báo thanh toán tự động (IPN) từ máy chủ PayOS để hoàn tất đơn và xuất kho ngay lập tức.'}
+                    </li>
+                    <li>
+                      <strong style={{ color: '#0f172a' }}>Return / Cancel URL:</strong> {isEn
+                        ? 'Customer browser redirect pages used in hosted checkout. Since StockPilot displays dynamic VietQR directly on your POS screen, Return/Cancel URLs are handled automatically by the POS flow.'
+                        : 'Trang chuyển hướng trình duyệt của khách hàng sau khi thanh toán. Vì StockPilot hiển thị mã QR động trực tiếp tại quầy POS, thu ngân không cần rời khỏi màn hình bán hàng.'}
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Localhost / Development Notice */}
+                {!payosIsPublicDomain && (
+                  <div style={{
+                    display: 'flex',
+                    gap: 10,
+                    padding: '12px 14px',
+                    borderRadius: 10,
+                    background: '#fffbeb',
+                    border: '1px solid #fde68a',
+                    fontSize: 12,
+                    color: '#92400e',
+                    lineHeight: 1.5
+                  }}>
+                    <AlertTriangle size={16} color="#d97706" style={{ flexShrink: 0, marginTop: 1 }} />
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{m.label}</div>
+                      <strong style={{ color: '#78350f' }}>
+                        {isEn ? 'Localhost Notice:' : 'Lưu ý môi trường thử nghiệm (Localhost):'}
+                      </strong>
+                      <span style={{ marginLeft: 6 }}>
+                        {isEn
+                          ? 'You are running on a local address. PayOS servers require a public HTTPS Webhook URL (such as your production domain or a tunnel like ngrok / Cloudflare Tunnel) to deliver real-time payment notifications.'
+                          : 'Hệ thống đang kết nối địa chỉ máy chủ cục bộ. Máy chủ PayOS yêu cầu một đường dẫn Webhook công khai có HTTPS (như domain máy chủ production hoặc địa chỉ tunnel ngrok/Cloudflare) để có thể gửi thông báo giao dịch về StockPilot theo thời gian thực.'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* STEP 3: Enter PayOS Credentials */}
+            <div className="st-card" style={{ padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 18, paddingBottom: 16, borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
+                }}>
+                  3
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="st-section-title" style={{ fontSize: 15, marginBottom: 4 }}>
+                    {payosConfigured
+                      ? (isEn ? 'Step 3: Update PayOS Security Credentials' : 'Bước 3: Cập nhật thông tin bảo mật PayOS')
+                      : (isEn ? 'Step 3: Enter PayOS Credentials' : 'Bước 3: Nhập thông tin kết nối PayOS')}
+                  </div>
+                  <div className="st-section-desc" style={{ fontSize: 13 }}>
+                    {isEn
+                      ? 'Enter the 3 credentials from PayOS Dashboard to authenticate and generate VietQR codes.'
+                      : 'Nhập Client ID, API Key và Checksum Key từ PayOS Dashboard để hệ thống xác thực và tạo mã VietQR.'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ paddingLeft: 46 }}>
+                {/* Verified AES-256 Encryption Notice */}
+                <div className="st-info-box" style={{ marginBottom: 20 }}>
+                  <Shield size={16} color="#0284c7" style={{ flexShrink: 0, marginTop: 1 }} />
+                  <span>
+                    {isEn
+                      ? 'StockPilot encrypts all credentials using AES-256 before saving to the database. Secret keys are never exposed in clear text.'
+                      : 'StockPilot mã hóa toàn bộ thông tin kết nối bằng thuật toán AES-256 trước khi lưu vào cơ sở dữ liệu. Khóa bảo mật sẽ không bao giờ hiển thị ở dạng văn bản thuần.'}
+                  </span>
+                </div>
+
+                {payosNeedsReentry && (
+                  <div
+                    className="st-info-box"
+                    role="alert"
+                    style={{ marginBottom: 20, background: '#fef2f2', borderColor: '#fecaca', color: '#991b1b' }}
+                  >
+                    <AlertTriangle size={16} color="#dc2626" style={{ flexShrink: 0, marginTop: 1 }} />
+                    <span>
+                      {isEn
+                        ? 'The saved PayOS credentials can no longer be read because the server encryption key changed. QR payments are paused until you enter Client ID, API Key and Checksum Key again.'
+                        : 'Không đọc được cấu hình PayOS đã lưu vì khóa mã hóa trên máy chủ đã thay đổi. Thanh toán QR tạm ngưng cho tới khi bạn nhập lại đầy đủ Client ID, API Key và Checksum Key bên dưới.'}
+                    </span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSavePayos} autoComplete="off">
+                  {/* Decoy inputs to prevent browser autofill */}
+                  <div
+                    style={{ position: 'absolute', opacity: 0, height: 0, width: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: -1 }}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  >
+                    <input type="text" name="chrome_decoy_username" tabIndex={-1} autoComplete="username" />
+                    <input type="password" name="chrome_decoy_password" tabIndex={-1} autoComplete="current-password" />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                    {/* Client ID */}
+                    <div>
+                      <label className="st-label" htmlFor="payosClientId">
+                        Client ID {!payosConfigured && <span style={{ color: '#ef4444' }}>*</span>}
+                      </label>
+                      <input
+                        id="payosClientId"
+                        name="payos_channel_client_id_token"
+                        className="st-input"
+                        type="text"
+                        value={payosClientId}
+                        onChange={e => setPayosClientId(e.target.value)}
+                        placeholder={
+                          payosConfigured
+                            ? (isEn ? `Configured: ${payosClientIdMasked} (Enter new to replace)` : `Đã lưu: ${payosClientIdMasked} (Nhập mới nếu muốn thay đổi)`)
+                            : (isEn ? 'e.g. 550e8400-e29b-41d4-a716-446655440000' : 'Ví dụ: 550e8400-e29b-41d4-a716-446655440000')
+                        }
+                        autoComplete="new-password"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck="false"
+                        data-lpignore="true"
+                        data-1p-ignore="true"
+                        data-form-type="other"
+                      />
+                      <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, margin: '4px 0 0 0' }}>
+                        {isEn
+                          ? 'Public identifier of your payment channel (found under Payment Channels in PayOS).'
+                          : 'Mã định danh công khai của kênh thanh toán (tìm thấy tại mục Kênh thanh toán trên PayOS).'}
+                      </p>
+                    </div>
+
+                    {/* API Key */}
+                    <div>
+                      <label className="st-label" htmlFor="payosApiKey">
+                        API Key {!payosConfigured && <span style={{ color: '#ef4444' }}>*</span>}
+                      </label>
+                      <div className="st-input-wrap">
+                        <input
+                          id="payosApiKey"
+                          name="payos_api_secret_token"
+                          className="st-input"
+                          type={showApiKey ? 'text' : 'password'}
+                          value={payosApiKey}
+                          onChange={e => setPayosApiKey(e.target.value)}
+                          placeholder={
+                            payosConfigured
+                              ? (isEn ? '•••••••••••••••••••••••• (Leave blank to keep existing)' : '•••••••••••••••••••••••• (Để trống nếu giữ nguyên khóa cũ)')
+                              : (isEn ? 'Paste API Key from PayOS Dashboard' : 'Dán API Key từ PayOS Dashboard')
+                          }
+                          autoComplete="new-password"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck="false"
+                          data-lpignore="true"
+                          data-1p-ignore="true"
+                          data-form-type="other"
+                        />
+                        <button
+                          type="button"
+                          className="st-eye-btn"
+                          onClick={() => setShowApiKey(v => !v)}
+                          title={showApiKey ? (isEn ? 'Hide API Key' : 'Ẩn API Key') : (isEn ? 'Show API Key' : 'Hiện API Key')}
+                        >
+                          {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                      <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, margin: '4px 0 0 0' }}>
+                        {isEn
+                          ? 'Secret key used to authenticate API requests to PayOS.'
+                          : 'Khóa bảo mật dùng để xác thực các yêu cầu gửi đến máy chủ PayOS.'}
+                      </p>
+                    </div>
+
+                    {/* Checksum Key */}
+                    <div>
+                      <label className="st-label" htmlFor="payosChecksumKey">
+                        Checksum Key {!payosConfigured && <span style={{ color: '#ef4444' }}>*</span>}
+                      </label>
+                      <div className="st-input-wrap">
+                        <input
+                          id="payosChecksumKey"
+                          name="payos_checksum_secret_token"
+                          className="st-input"
+                          type={showChecksumKey ? 'text' : 'password'}
+                          value={payosChecksumKey}
+                          onChange={e => setPayosChecksumKey(e.target.value)}
+                          placeholder={
+                            payosConfigured
+                              ? (isEn ? '•••••••••••••••••••••••• (Leave blank to keep existing)' : '•••••••••••••••••••••••• (Để trống nếu giữ nguyên khóa cũ)')
+                              : (isEn ? 'Paste Checksum Key from PayOS Dashboard' : 'Dán Checksum Key từ PayOS Dashboard')
+                          }
+                          autoComplete="new-password"
+                          autoCapitalize="none"
+                          autoCorrect="off"
+                          spellCheck="false"
+                          data-lpignore="true"
+                          data-1p-ignore="true"
+                          data-form-type="other"
+                        />
+                        <button
+                          type="button"
+                          className="st-eye-btn"
+                          onClick={() => setShowChecksumKey(v => !v)}
+                          title={showChecksumKey ? (isEn ? 'Hide Checksum Key' : 'Ẩn Checksum Key') : (isEn ? 'Show Checksum Key' : 'Hiện Checksum Key')}
+                        >
+                          {showChecksumKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                      <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, margin: '4px 0 0 0' }}>
+                        {isEn
+                          ? 'HMAC-SHA256 signature key to verify Webhook data integrity.'
+                          : 'Khóa tạo chữ ký HMAC-SHA256 để bảo vệ tính toàn vẹn và xác thực thông báo Webhook.'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                    <button
+                      type="submit"
+                      className="st-btn-primary"
+                      disabled={savingPayos || (!payosConfigured && (!payosClientId.trim() || !payosApiKey.trim() || !payosChecksumKey.trim()))}
+                    >
+                      {savingPayos ? (
+                        <>
+                          <Loader2 size={15} className="st-spinning" />
+                          <span>{isEn ? 'Saving Configuration...' : 'Đang Lưu Thông Tin...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Save size={15} />
+                          <span>{payosConfigured ? (isEn ? 'Save Connection Credentials' : 'Lưu thông tin kết nối') : (isEn ? 'Save Connection Credentials' : 'Lưu thông tin kết nối')}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            {/* STEP 4: Verify and Activate */}
+            <div className="st-card" style={{ padding: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 18, paddingBottom: 16, borderBottom: '1px solid #f1f5f9' }}>
+                <div style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: '#0284c7',
+                  color: '#ffffff',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 6px rgba(2, 132, 199, 0.3)'
+                }}>
+                  4
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div className="st-section-title" style={{ fontSize: 15, marginBottom: 4 }}>
+                    {isEn ? 'Step 4: Verify Connection & Activate' : 'Bước 4: Kiểm tra kết nối & Kích hoạt'}
+                  </div>
+                  <div className="st-section-desc" style={{ fontSize: 13 }}>
+                    {isEn
+                      ? 'Test the PayOS API integration to confirm your credentials before enabling POS checkout.'
+                      : 'Kiểm tra kết nối với máy chủ PayOS để đảm bảo thông tin xác thực chính xác trước khi bật thanh toán cho thu ngân.'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ paddingLeft: 46, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Connection Test Action */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: 16,
+                  borderRadius: 14,
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  flexWrap: 'wrap',
+                  gap: 12
+                }}>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0f172a' }}>
+                      {isEn ? 'Real-time PayOS Connection Test' : 'Xác minh kết nối PayOS thời gian thực'}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                      {isEn
+                        ? 'Sends an authenticated ping to PayOS API servers to verify credentials.'
+                        : 'Gửi yêu cầu xác thực tới máy chủ PayOS để kiểm tra tính hợp lệ của Client ID, API Key và Checksum Key.'}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleTestPayosConnection}
+                    disabled={testingPayos}
+                    className="st-btn-secondary"
+                    style={{
+                      border: '1.5px solid #0284c7',
+                      color: '#0284c7',
+                      fontWeight: 800,
+                      background: '#eff6ff'
+                    }}
+                  >
+                    {testingPayos ? (
+                      <>
+                        <Loader2 size={15} className="st-spinning" />
+                        <span>{isEn ? 'Verifying...' : 'Đang kiểm tra...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={15} />
+                        <span>{isEn ? 'Test PayOS Connection' : 'Kiểm tra kết nối PayOS'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Connection Test Feedback Result */}
+                {testResult && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 12,
+                    padding: '14px 16px',
+                    borderRadius: 12,
+                    background: testResult.success ? '#ecfdf5' : '#fef2f2',
+                    border: `1.5px solid ${testResult.success ? '#a7f3d0' : '#fecaca'}`,
+                    color: testResult.success ? '#047857' : '#b91c1c'
+                  }}>
+                    {testResult.success ? (
+                      <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: 1 }} />
+                    ) : (
+                      <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: 1 }} />
+                    )}
+                    <div style={{ flex: 1, fontSize: 12.5, lineHeight: 1.5 }}>
+                      <div style={{ fontWeight: 800, marginBottom: 2 }}>
+                        {testResult.success
+                          ? (isEn ? 'Connection Successful' : 'Xác thực kết nối thành công')
+                          : (isEn ? 'Connection Verification Failed' : 'Xác thực kết nối thất bại')}
+                      </div>
+                      <div>{testResult.message}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Activation Switch */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: 16,
+                  borderRadius: 14,
+                  background: payosActive ? '#f0fdf4' : '#ffffff',
+                  border: `1.5px solid ${payosActive ? '#86efac' : '#e2e8f0'}`,
+                  transition: 'all .2s'
+                }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>
+                        {isEn ? 'Enable VietQR payment on POS checkout' : 'Kích hoạt thanh toán VietQR trên màn hình POS'}
+                      </span>
+                      {payosActive && (
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 99, background: '#dcfce7', color: '#15803d' }}>
+                          {isEn ? 'Active' : 'Đang bật'}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                      {isEn
+                        ? 'When enabled, cashiers can generate dynamic VietQR transfer codes during checkout.'
+                        : 'Khi bật, nhân viên thu ngân có thể chọn phương thức thanh toán VietQR tự động khi tạo đơn hàng.'}
+                    </div>
+                  </div>
+
+                  <Toggle
+                    checked={payosActive}
+                    onChange={() => handleTogglePayos()}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Troubleshooting & FAQ Accordion */}
+            <div className="st-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div
+                onClick={() => setShowTroubleshoot(v => !v)}
+                style={{
+                  padding: '16px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  background: '#f8fafc',
+                  userSelect: 'none'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <HelpCircle size={18} color="#0284c7" />
+                  <span style={{ fontWeight: 800, fontSize: 13.5, color: '#0f172a' }}>
+                    {isEn ? 'Troubleshooting & Frequently Asked Questions' : 'Câu hỏi thường gặp & Khắc phục sự cố'}
+                  </span>
+                </div>
+                <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+                  {showTroubleshoot ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                </button>
+              </div>
+
+              {showTroubleshoot && (
+                <div style={{ padding: '20px 24px', borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
+                      {isEn
+                        ? '1. Customer paid successfully, but POS order does not complete automatically?'
+                        : '1. Khách đã chuyển khoản thành công nhưng đơn hàng POS không tự động hoàn tất?'}
+                    </div>
+                    <p style={{ fontSize: 12, color: '#64748b', margin: 0, lineHeight: 1.55 }}>
+                      {isEn
+                        ? 'Check whether the Webhook URL was correctly pasted in PayOS Dashboard under Payment Channels. Also verify that the Checksum Key in Step 3 matches your PayOS channel.'
+                        : 'Kiểm tra xem Webhook URL ở Bước 2 đã được dán chính xác vào mục Webhook URL trên PayOS Dashboard chưa. Đồng thời kiểm tra Checksum Key có đúng với tài khoản kênh thanh toán không.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
+                      {isEn
+                        ? '2. Error: "Invalid Signature" (Chữ ký không hợp lệ)?'
+                        : '2. Báo lỗi chữ ký không hợp lệ (Invalid Signature)?'}
+                    </div>
+                    <p style={{ fontSize: 12, color: '#64748b', margin: 0, lineHeight: 1.55 }}>
+                      {isEn
+                        ? 'Checksum Key is used to calculate and verify HMAC-SHA256 signatures. Ensure you copied the exact Checksum Key without leading or trailing spaces.'
+                        : 'Checksum Key được dùng để tạo và xác thực chữ ký HMAC-SHA256. Hãy copy lại chính xác Checksum Key từ PayOS Dashboard và nhấn "Lưu thông tin kết nối" lại.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>
+                      {isEn
+                        ? '3. How to test PayOS in a local development environment (Localhost)?'
+                        : '3. Cách thử nghiệm trong môi trường cục bộ (Localhost)?'}
+                    </div>
+                    <p style={{ fontSize: 12, color: '#64748b', margin: 0, lineHeight: 1.55 }}>
+                      {isEn
+                        ? 'Since PayOS cannot send webhooks to localhost directly, you can use a tunneling tool such as ngrok (`ngrok http 5000`) and set your public HTTPS URL in the PayOS Webhook configuration.'
+                        : 'Vì máy chủ PayOS không thể gửi webhook trực tiếp vào localhost, bạn có thể sử dụng công cụ tạo tunnel như ngrok (`ngrok http 5000`) và dán đường dẫn HTTPS ngrok kèm đuôi `/api/v1/pos/payos/webhook` vào PayOS.'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Supported Payment Methods on POS */}
+            <div className="st-card" style={{ padding: 24 }}>
+              <div className="st-section-title" style={{ marginBottom: 6 }}>
+                <CheckCircle2 size={16} color="#059669" />
+                {isEn ? 'POS Checkout Payment Methods' : 'Phương thức thanh toán trên quầy POS'}
+              </div>
+              <div className="st-section-desc" style={{ marginBottom: 16 }}>
+                {isEn
+                  ? 'Manage which payment options cashiers can use at checkout.'
+                  : 'Kiểm soát các phương thức thanh toán thu ngân có thể sử dụng khi tạo đơn hàng.'}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  {
+                    label: isEn ? 'Cash Payment (Tiền mặt)' : 'Tiền mặt',
+                    desc: isEn ? 'Standard cash transaction, cashier enters received amount' : 'Thu tiền mặt trực tiếp tại quầy, thu ngân nhập tiền khách đưa',
+                    active: true,
+                    fixed: true
+                  },
+                  {
+                    label: isEn ? 'Manual Bank Transfer (Chuyển khoản thủ công)' : 'Chuyển khoản ngân hàng (thủ công)',
+                    desc: isEn ? 'Cashier checks bank app manually and confirms payment' : 'Khách chuyển khoản theo số tài khoản thủ công, thu ngân tự xác nhận',
+                    active: true,
+                    fixed: true
+                  },
+                  {
+                    label: isEn ? 'VietQR Dynamic QR via PayOS' : 'Mã VietQR động tự động qua PayOS',
+                    desc: isEn ? 'Real-time payment verification with automated order completion' : 'Tự động tạo mã QR động đúng số tiền đơn hàng, tự động hoàn tất đơn khi khách quét mã',
+                    active: payosConfigured && payosActive,
+                    fixed: !payosConfigured
+                  },
+                ].map((m, i) => (
+                  <div
+                    key={i}
+                    className="st-toggle-wrapper"
+                    onClick={() => !m.fixed && handleTogglePayos()}
+                    style={{
+                      cursor: m.fixed ? 'default' : 'pointer',
+                      border: m.active && !m.fixed ? '1.5px solid #a7f3d0' : '1.5px solid #e2e8f0',
+                      background: m.active && !m.fixed ? '#f0fdf4' : '#fafbfc'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 700, color: '#0f172a' }}>{m.label}</div>
                       <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{m.desc}</div>
                     </div>
-                    <Toggle checked={m.active} onChange={() => !m.fixed && handleTogglePayos()} />
+                    {m.fixed ? (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#059669', background: '#dcfce7', padding: '2px 8px', borderRadius: 6 }}>
+                        {isEn ? 'Default' : 'Mặc định'}
+                      </span>
+                    ) : (
+                      <Toggle checked={m.active} onChange={() => handleTogglePayos()} />
+                    )}
                   </div>
                 ))}
               </div>

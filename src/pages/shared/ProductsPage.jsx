@@ -4,11 +4,12 @@ import {
   Trash2, Eye, RefreshCw,
   DollarSign, LayoutGrid, List,
   Calendar, Zap, ShoppingBag, X, ZoomIn, Check, Info,
-  Store, ChevronRight, Pencil, Upload, Camera
+  Store, ChevronRight, Pencil, Upload, Camera, FileUp
 } from "lucide-react";
 import { useProductStore, CATEGORIES } from "../../components/store/productStore";
 import { useAuthStore } from "../../store/authStore";
-import { canViewCostPrice, canDeleteProduct } from "../../config/permissions.config";
+import { canViewCostPrice, canDeleteProduct, normalizeRole } from "../../config/permissions.config";
+import { Link } from "react-router-dom";
 import { AddProduct } from "../../components/AddProduct";
 import { useToast } from "../../components/common/Toast";
 import { useTranslation } from "../../i18n/useTranslation";
@@ -29,28 +30,28 @@ function safeNum(val) {
 }
 
 function formatVND(val) {
-  return safeNum(val).toLocaleString("vi-VN") + " đ";
+  return safeNum(val).toLocaleString("vi-VN") + " ₫";
 }
 
 function getCategoryBadge(category) {
   const catKey = (typeof category === "string" ? category : category?.code || "").toLowerCase();
   const map = {
-    tpcn: { label: "Thực phẩm", icon: "🍞", color: "#10b981", bg: "#ecfdf5", border: "#a7f3d0" },
-    drink: { label: "Đồ uống", icon: "☕", color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe" },
-    spice: { label: "Gia vị & Đồ khô", icon: "🧂", color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
-    house: { label: "Đồ dùng gia đình", icon: "🧹", color: "#6366f1", bg: "#eef2ff", border: "#c7d2fe" },
-    care: { label: "Chăm sóc cá nhân", icon: "🧴", color: "#ec4899", bg: "#fdf2f8", border: "#fbcfe8" },
-    office: { label: "Đồ dùng văn phòng", icon: "📎", color: "#0ea5e9", bg: "#f0f9ff", border: "#bae6fd" },
-    misc: { label: "Tiêu dùng khác", icon: "🔌", color: "#64748b", bg: "#f8fafc", border: "#cbd5e1" },
-    "thuc-pham": { label: "Thực phẩm", icon: "🍞", color: "#10b981", bg: "#ecfdf5", border: "#a7f3d0" },
-    "do-an": { label: "Thực phẩm", icon: "🍞", color: "#10b981", bg: "#ecfdf5", border: "#a7f3d0" },
-    "do-uong": { label: "Đồ uống", icon: "☕", color: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe" },
-    "gia-vi": { label: "Gia vị & Đồ khô", icon: "🧂", color: "#f59e0b", bg: "#fffbeb", border: "#fde68a" },
-    "gia-dinh": { label: "Đồ dùng gia đình", icon: "🧹", color: "#6366f1", bg: "#eef2ff", border: "#c7d2fe" },
-    "ca-nhan": { label: "Chăm sóc cá nhân", icon: "🧴", color: "#ec4899", bg: "#fdf2f8", border: "#fbcfe8" },
-    "van-phong": { label: "Đồ dùng văn phòng", icon: "📎", color: "#0ea5e9", bg: "#f0f9ff", border: "#bae6fd" },
+    tpcn: { label: "Thực phẩm", icon: "🍞", color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", gradient: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)" },
+    drink: { label: "Đồ uống", icon: "☕", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", gradient: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)" },
+    spice: { label: "Gia vị", icon: "🧂", color: "#d97706", bg: "#fffbeb", border: "#fde68a", gradient: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)" },
+    house: { label: "Gia dụng", icon: "🧹", color: "#4f46e5", bg: "#eef2ff", border: "#c7d2fe", gradient: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)" },
+    care: { label: "Chăm sóc", icon: "🧴", color: "#db2777", bg: "#fdf2f8", border: "#fbcfe8", gradient: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)" },
+    tech: { label: "Điện tử", icon: "🔌", color: "#0284c7", bg: "#f0f9ff", border: "#bae6fd", gradient: "linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)" },
+    office: { label: "Văn phòng", icon: "📎", color: "#0891b2", bg: "#ecfeff", border: "#a5f3fc", gradient: "linear-gradient(135deg, #ecfeff 0%, #cffafe 100%)" },
+    misc: { label: "Tiêu dùng", icon: "📦", color: "#475569", bg: "#f8fafc", border: "#cbd5e1", gradient: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)" },
+    "thuc-pham": { label: "Thực phẩm", icon: "🍞", color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", gradient: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)" },
+    "do-an": { label: "Thực phẩm", icon: "🍞", color: "#059669", bg: "#ecfdf5", border: "#a7f3d0", gradient: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)" },
+    "do-uong": { label: "Đồ uống", icon: "☕", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", gradient: "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)" },
+    "gia-vi": { label: "Gia vị", icon: "🧂", color: "#d97706", bg: "#fffbeb", border: "#fde68a", gradient: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)" },
+    "gia-dinh": { label: "Gia dụng", icon: "🧹", color: "#4f46e5", bg: "#eef2ff", border: "#c7d2fe", gradient: "linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)" },
+    "ca-nhan": { label: "Chăm sóc", icon: "🧴", color: "#db2777", bg: "#fdf2f8", border: "#fbcfe8", gradient: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)" },
   };
-  return map[catKey] || { label: "Hàng hóa chung", icon: "📦", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" };
+  return map[catKey] || { label: "Hàng hóa", icon: "📦", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", gradient: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)" };
 }
 
 function getProductSocialStats(id) {
@@ -499,99 +500,104 @@ const PAGE_CSS = `
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
-/* ─── Product Card matching Screenshot 2 (no 'Kệ A1', with eye + trash) ─── */
+/* ─── Product Card Redesign ─── */
 .pp-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px;
 }
 .pp-card {
-  background: white;
-  border: 1.5px solid #f1f5f9;
-  border-radius: 18px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04), 0 4px 12px -2px rgba(15, 23, 42, 0.03);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
   position: relative;
 }
 .pp-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-4px);
   border-color: #cbd5e1;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 16px 32px -8px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.05);
 }
 .pp-card-img-box {
   position: relative;
-  aspect-ratio: 1;
+  aspect-ratio: 4 / 3;
   background: #f8fafc;
   overflow: hidden;
   cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
 }
 .pp-card-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.35s ease;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .pp-card:hover .pp-card-img {
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
-.pp-tag-discount {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%);
-  color: white;
-  font-size: 10.5px;
-  font-weight: 800;
-  padding: 4px 9px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35);
-  letter-spacing: 0.02em;
-  z-index: 2;
+.pp-card-fallback-box {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.4s ease;
+}
+.pp-card:hover .pp-card-fallback-box {
+  transform: scale(1.03);
 }
 .pp-tag-stock {
   position: absolute;
   top: 10px;
   right: 10px;
-  background: rgba(15, 23, 42, 0.78);
-  color: white;
+  background: rgba(255, 255, 255, 0.94);
+  color: #047857;
+  border: 1px solid rgba(167, 243, 208, 0.9);
   font-size: 11px;
   font-weight: 700;
-  padding: 4px 9px;
-  border-radius: 8px;
-  backdrop-filter: blur(4px);
+  padding: 3.5px 9px;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
   z-index: 2;
-}
-.pp-tag-stock.out {
-  background: rgba(220, 38, 38, 0.9);
-}
-.pp-tag-low {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  color: white;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 6px;
   display: flex;
   align-items: center;
-  gap: 4px;
-  z-index: 2;
+  gap: 5px;
+}
+.pp-tag-stock.low {
+  color: #b45309;
+  border-color: rgba(253, 230, 138, 0.9);
+  background: rgba(255, 251, 235, 0.96);
+}
+.pp-tag-stock.out {
+  color: #b91c1c;
+  border-color: rgba(254, 205, 211, 0.9);
+  background: rgba(255, 241, 242, 0.96);
+}
+.pp-stock-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 .pp-img-hover-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.25);
+  background: rgba(15, 23, 42, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.22s ease;
   z-index: 1;
+  backdrop-filter: blur(2px);
 }
 .pp-card-img-box:hover .pp-img-hover-overlay {
   opacity: 1;
@@ -600,47 +606,68 @@ const PAGE_CSS = `
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
   color: #0f172a;
-  padding: 7px 14px;
+  padding: 6px 14px;
   border-radius: 999px;
   font-size: 11.5px;
   font-weight: 700;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  transform: translateY(4px);
+  transition: transform 0.22s ease;
+}
+.pp-card-img-box:hover .pp-zoom-pill {
+  transform: translateY(0);
 }
 
 .pp-card-content {
-  padding: 14px;
+  padding: 13px 15px 15px;
   display: flex;
   flex-direction: column;
   flex: 1;
-  gap: 0px;
+}
+.pp-card-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
 }
 .pp-card-cat-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   font-size: 11px;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 2.5px 8px;
   border-radius: 6px;
-  width: fit-content;
-  height: 24px;
-  box-sizing: border-box;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+.pp-card-sku-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 2px 7px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
 .pp-card-title {
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 700;
   color: #0f172a;
   line-height: 1.4;
-  height: 52px;
-  margin: 0;
+  height: 39px;
+  margin: 0 0 8px 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   cursor: pointer;
-  transition: color 0.18s;
+  transition: color 0.18s ease;
 }
 .pp-card-title:hover {
   color: #2563eb;
@@ -648,87 +675,86 @@ const PAGE_CSS = `
 .pp-price-section {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 6px;
+  padding-top: 8px;
   border-top: 1px dashed #f1f5f9;
-  padding-top: 4px;
-  margin-top: 0px;
+  margin-top: auto;
 }
 .pp-sale-price {
-  font-size: 17px;
-  font-weight: 900;
+  font-size: 16.5px;
+  font-weight: 800;
   color: #0f172a;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
 }
 .pp-cost-price {
   font-size: 11px;
   color: #64748b;
   font-weight: 600;
+  white-space: nowrap;
 }
-
-/* ─── Card Actions: Margin tag on left, Eye & Trash icons on right ─── */
 .pp-card-actions-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: auto;
-  border-top: 1px solid #f1f5f9;
-  padding-top: 10px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid #f8fafc;
 }
 .pp-margin-tag {
-  font-size: 11.5px;
-  font-weight: 800;
-  color: #15803d;
-  background: #dcfce7;
-  padding: 3px 8px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 2.5px 7px;
   border-radius: 6px;
   display: inline-flex;
   align-items: center;
+  gap: 3px;
+  white-space: nowrap;
 }
 .pp-card-icon-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   margin-left: auto;
 }
 .pp-card-btn-icon {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.18s;
+  transition: all 0.18s ease;
   flex-shrink: 0;
-  border: 1px solid;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
 }
-.pp-card-btn-icon.zoom {
-  background: #eff6ff;
-  border-color: #dbeafe;
-  color: #2563eb;
+.pp-card-btn-icon:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
 }
 .pp-card-btn-icon.zoom:hover {
-  background: #dbeafe;
-  transform: scale(1.05);
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #2563eb;
 }
-.pp-card-btn-icon.edit {
+.pp-card-btn-icon.edit:hover {
   background: #fffbeb;
   border-color: #fde68a;
   color: #d97706;
 }
-.pp-card-btn-icon.edit:hover {
-  background: #fef3c7;
-  color: #b45309;
-  transform: scale(1.05);
-}
-.pp-card-btn-icon.trash {
+.pp-card-btn-icon.trash:hover {
   background: #fff1f2;
   border-color: #fecdd3;
   color: #e11d48;
-}
-.pp-card-btn-icon.trash:hover {
-  background: #ffe4e6;
-  color: #be123c;
-  transform: scale(1.05);
 }
 
 /* ─── Table View Mode ─── */
@@ -927,6 +953,7 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
             src={imgSrc}
             alt={prod.name}
             className="pp-card-img"
+            loading="lazy"
             onError={(e) => {
               e.target.style.display = "none";
               const fb = e.target.parentElement?.querySelector(".pp-card-fallback-box");
@@ -934,42 +961,92 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
             }}
           />
         ) : null}
+
+        {/* Elegant Fallback Artwork when no photo is provided */}
         <div
           className="pp-card-fallback-box"
           style={{
             display: imgSrc ? "none" : "flex",
-            width: "100%",
-            height: "100%",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
-            gap: 6,
+            background: badge.gradient || "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
           }}
         >
-          <span style={{ fontSize: 36 }}>{badge.icon || "📦"}</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>Chưa có ảnh</span>
-        </div>
-        <div className={`pp-tag-stock${isOut ? " out" : ""}`}>
-          {isOut ? t('outOfStock', 'Hết hàng') : `${t('tableStock', 'Tồn')}: ${prod.stock}`}
-        </div>
-        {isLow && !isOut && (
-          <div className="pp-tag-low">
-            <AlertTriangle style={{ width: 11, height: 11 }} /> {t('lowStock', 'Sắp hết')}
+          {/* Subtle background circles for depth */}
+          <div style={{
+            position: 'absolute',
+            width: 100,
+            height: 100,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.4)',
+            top: -20,
+            right: -20,
+            pointerEvents: 'none'
+          }} />
+          <div style={{
+            position: 'absolute',
+            width: 70,
+            height: 70,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.3)',
+            bottom: -15,
+            left: -15,
+            pointerEvents: 'none'
+          }} />
+
+          {/* Frosted emblem */}
+          <div style={{
+            width: 58,
+            height: 58,
+            borderRadius: 16,
+            background: 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255, 255, 255, 0.95)',
+            boxShadow: '0 8px 18px rgba(0,0,0,0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 28,
+            marginBottom: 6,
+            zIndex: 1,
+          }}>
+            {badge.icon || "📦"}
           </div>
-        )}
-        {imgSrc && (
-          <div className="pp-img-hover-overlay">
-            <div className="pp-zoom-pill">
-              <ZoomIn style={{ width: 13, height: 13 }} /> {t('zoomImage', 'Phóng to xem ảnh')}
-            </div>
+
+          <span style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: badge.color,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            zIndex: 1
+          }}>
+            {badge.label}
+          </span>
+        </div>
+
+        {/* Status stock pill with dot indicator */}
+        <div className={`pp-tag-stock${isOut ? " out" : isLow ? " low" : ""}`}>
+          <span className="pp-stock-dot" />
+          <span>
+            {isOut
+              ? t('outOfStock', 'Hết hàng')
+              : isLow
+              ? `${t('lowStock', 'Còn')} ${prod.stock}`
+              : `${t('tableStock', 'Tồn kho')}: ${prod.stock}`}
+          </span>
+        </div>
+
+        {/* Hover Zoom pill */}
+        <div className="pp-img-hover-overlay">
+          <div className="pp-zoom-pill">
+            <ZoomIn style={{ width: 13, height: 13 }} />
+            <span>{t('zoomImage', 'Xem chi tiết ảnh')}</span>
           </div>
-        )}
+        </div>
       </div>
 
       <div className="pp-card-content">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-          <div
+        <div className="pp-card-meta-row">
+          <span
             className="pp-card-cat-badge"
             style={{
               background: badge.bg,
@@ -979,18 +1056,9 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
           >
             <span>{badge.icon}</span>
             <span>{badge.label}</span>
-          </div>
-          <span style={{
-            fontSize: '11px',
-            fontWeight: 800,
-            color: '#2563eb',
-            background: '#eff6ff',
-            border: '1px solid #bfdbfe',
-            padding: '2px 7px',
-            borderRadius: '6px',
-            letterSpacing: '0.02em',
-          }}>
-            {prod.code || `SP${prod.id}`}
+          </span>
+          <span className="pp-card-sku-badge" title="Mã sản phẩm / SKU">
+            {prod.code || prod.sku || `SP${prod.id}`}
           </span>
         </div>
 
@@ -1005,14 +1073,18 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
         <div className="pp-price-section">
           <span className="pp-sale-price">{formatVND(prod.salePrice)}</span>
           {canSeeCost && (
-            <span className="pp-cost-price">{t('costPrice', 'Giá vốn')}: {formatVND(prod.costPrice)}</span>
+            <span className="pp-cost-price" title="Giá nhập / Giá vốn">
+              {t('costPrice', 'Vốn')}: {formatVND(prod.costPrice)}
+            </span>
           )}
         </div>
 
         <div className="pp-card-actions-bar">
           <div>
             {marginPct !== null && (
-              <span className="pp-margin-tag">+{marginPct}%</span>
+              <span className="pp-margin-tag" title="Biên lợi nhuận gộp">
+                +{marginPct}% LN
+              </span>
             )}
           </div>
           <div className="pp-card-icon-actions">
@@ -1032,7 +1104,7 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
                 e.stopPropagation();
                 onEdit(prod);
               }}
-              title={t('edit', 'Sửa')}
+              title={t('edit', 'Sửa sản phẩm')}
             >
               <Pencil style={{ width: 13, height: 13 }} />
             </button>
@@ -1043,7 +1115,7 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
                   e.stopPropagation();
                   onDelete(prod.id);
                 }}
-                title={t('delete', 'Xóa')}
+                title={t('delete', 'Xóa sản phẩm')}
               >
                 <Trash2 style={{ width: 14, height: 14 }} />
               </button>
@@ -1278,6 +1350,11 @@ export function ProductsPage() {
           >
             <RefreshCw style={{ width: 14, height: 14 }} /> {t('refresh', 'Làm mới')}
           </button>
+          {normalizeRole(user?.role) === "store_owner" && (
+            <Link to="/import?type=PRODUCTS" className="pp-btn-refresh" style={{ textDecoration: "none" }}>
+              <FileUp style={{ width: 14, height: 14 }} /> {t('importFromFile', 'Nhập từ file')}
+            </Link>
+          )}
           <button className="pp-btn-add" onClick={() => setViewMode("add")}>
             <Plus style={{ width: 16, height: 16, strokeWidth: 3 }} /> {t('addNewProduct', 'Thêm sản phẩm mới')}
           </button>
