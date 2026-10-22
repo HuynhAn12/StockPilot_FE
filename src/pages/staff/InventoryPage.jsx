@@ -2,13 +2,14 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   Boxes, ArrowDownToLine, ArrowUpFromLine, SlidersHorizontal, RefreshCw,
   Search, ClipboardList, Package, DollarSign, AlertTriangle, ShieldOff,
-  TrendingUp, X, Check, ArrowRight, Activity, BarChart3
+  TrendingUp, X, Check, ArrowRight, Activity, BarChart3, FileUp
 } from 'lucide-react';
 import { useProductStore, formatCategoryName, formatUnit } from '../../components/store/productStore';
 import { useInventoryStore } from '../../components/store/inventoryStore';
 import { useToast } from '../../components/common/Toast';
 import { useAuthStore } from '../../store/authStore';
-import { canViewCostPrice } from '../../config/permissions.config';
+import { canViewCostPrice, normalizeRole } from '../../config/permissions.config';
+import { Link } from 'react-router-dom';
 import { useTranslation } from '../../i18n/useTranslation';
 
 /* ─────────────────────────── helpers ─────────────────────────── */
@@ -282,6 +283,11 @@ export function InventoryPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexShrink: 0, flexWrap: 'wrap', position: 'relative', zIndex: 1 }}>
+          {normalizeRole(user?.role) === 'store_owner' && (
+            <Link to="/import?type=PRODUCTS" className="inv-btn-primary" style={{ textDecoration: 'none' }}>
+              <FileUp style={{ width: 13, height: 13 }} /> {isEn ? 'Import from file' : 'Nhập từ file'}
+            </Link>
+          )}
           <button className="inv-btn-primary" onClick={async () => { await fetchProducts(); await fetchMovements({ limit: 50 }); toast({ type: 'info', title: isEn ? 'Refreshed' : 'Đã làm mới', message: isEn ? 'Inventory data updated.' : 'Dữ liệu kho đã được cập nhật.' }); }}>
             <RefreshCw style={{ width: 13, height: 13 }} /> {isEn ? 'Refresh' : 'Làm mới'}
           </button>

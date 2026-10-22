@@ -34,9 +34,15 @@ export const translations = {
     navAnalytics: 'Phân tích & Báo cáo',
     navAiPilot: 'Trợ lý AI Pilot',
     navUsers: 'Người dùng & Quyền',
+    navStores: 'Cửa hàng',
     navAuditLog: 'Nhật ký kiểm toán',
+    navLeads: 'Khách hàng tiềm năng',
+    navSystem: 'Hệ thống & AI',
     navStaff: 'Nhân viên',
     navSettings: 'Cài đặt hệ thống',
+    navImport: 'Nhập dữ liệu',
+    navSupport: 'Hỗ trợ',
+    navAdminSupport: 'Hỗ trợ khách hàng',
 
     // POS Page
     posTitle: 'Bán hàng tại quầy',
@@ -223,9 +229,15 @@ export const translations = {
     navAnalytics: 'Analytics & Reports',
     navAiPilot: 'AI Pilot Assistant',
     navUsers: 'Users & Roles',
+    navStores: 'Stores',
     navAuditLog: 'Audit Logs',
+    navLeads: 'Potential Leads',
+    navSystem: 'System & AI',
     navStaff: 'Staff Management',
     navSettings: 'System Settings',
+    navImport: 'Import Data',
+    navSupport: 'Support',
+    navAdminSupport: 'Customer Support',
 
     // POS Page
     posTitle: 'Point of Sale (POS)',

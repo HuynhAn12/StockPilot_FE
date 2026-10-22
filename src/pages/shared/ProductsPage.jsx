@@ -4,11 +4,12 @@ import {
   Trash2, Eye, RefreshCw,
   DollarSign, LayoutGrid, List,
   Calendar, Zap, ShoppingBag, X, ZoomIn, Check, Info,
-  Store, ChevronRight, Pencil, Upload, Camera
+  Store, ChevronRight, Pencil, Upload, Camera, FileUp
 } from "lucide-react";
 import { useProductStore, CATEGORIES } from "../../components/store/productStore";
 import { useAuthStore } from "../../store/authStore";
-import { canViewCostPrice, canDeleteProduct } from "../../config/permissions.config";
+import { canViewCostPrice, canDeleteProduct, normalizeRole } from "../../config/permissions.config";
+import { Link } from "react-router-dom";
 import { AddProduct } from "../../components/AddProduct";
 import { useToast } from "../../components/common/Toast";
 import { useTranslation } from "../../i18n/useTranslation";
@@ -1349,6 +1350,11 @@ export function ProductsPage() {
           >
             <RefreshCw style={{ width: 14, height: 14 }} /> {t('refresh', 'Làm mới')}
           </button>
+          {normalizeRole(user?.role) === "store_owner" && (
+            <Link to="/import?type=PRODUCTS" className="pp-btn-refresh" style={{ textDecoration: "none" }}>
+              <FileUp style={{ width: 14, height: 14 }} /> {t('importFromFile', 'Nhập từ file')}
+            </Link>
+          )}
           <button className="pp-btn-add" onClick={() => setViewMode("add")}>
             <Plus style={{ width: 16, height: 16, strokeWidth: 3 }} /> {t('addNewProduct', 'Thêm sản phẩm mới')}
           </button>
