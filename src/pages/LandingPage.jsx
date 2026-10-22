@@ -551,6 +551,8 @@ export function LandingPage() {
   const handleLeadSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
+    // Honeypot: hidden from people, only bots fill it. The server drops such submissions.
+    const website = e.currentTarget.elements.website?.value || '';
 
     if (!leadForm.fullName.trim()) {
       setFormError(language === 'en' ? 'Please enter your full name' : 'Vui lòng nhập họ và tên của bạn');
@@ -563,7 +565,7 @@ export function LandingPage() {
 
     setIsSubmittingLead(true);
     try {
-      await apiClient.post('/public/leads', leadForm);
+      await apiClient.post('/public/leads', { ...leadForm, website });
       setSubmitSuccess(true);
       toast({
         title: language === 'en' ? 'Submitted successfully' : 'Gửi yêu cầu thành công',
@@ -2130,6 +2132,12 @@ export function LandingPage() {
                 </div>
               ) : (
                 <form onSubmit={handleLeadSubmit} className="space-y-4" noValidate>
+                  <div aria-hidden="true" className="absolute -left-[9999px] w-px h-px overflow-hidden">
+                    <label>
+                      Website
+                      <input type="text" name="website" tabIndex={-1} autoComplete="off" defaultValue="" />
+                    </label>
+                  </div>
                   <div>
                     <h3 className="text-xl font-black text-slate-900">{t.consultation.formTitle}</h3>
                     <p className="text-sm text-slate-500 mt-1">{t.consultation.formDesc}</p>

@@ -1,6 +1,24 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
-  UserPlus, Search, RefreshCw, X, ChevronLeft, ChevronRight, KeyRound, LogOut, Lock, Unlock, Loader2,
+  UserPlus,
+  RefreshCw,
+  Check,
+  Minus,
+  Loader2,
+  KeyRound,
+  LogOut,
+  Lock,
+  Unlock,
+  Edit2,
+  Shield,
+  Store,
+  Clock,
+  Laptop,
+  CheckCircle2,
+  ExternalLink,
+  ShieldCheck,
+  UserCheck,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useToast } from '../../components/common/Toast';
@@ -8,688 +26,1038 @@ import {
   apiListAdminUsers,
   apiGetAdminUser,
   apiCreateAdminUser,
+  apiUpdateAdminUser,
   apiUpdateAdminUserStatus,
   apiRevokeAdminUserSessions,
   apiSendAdminPasswordReset,
   apiListAdminStores,
   formatVNDateTime,
 } from '../../services/adminService';
+import {
+  ROUTE_PERMISSIONS,
+  ROLES,
+  canViewCostPrice,
+  canApprovePricing,
+  canCancelOrder,
+  canDeleteProduct,
+} from '../../config/permissions.config';
 import { actionLabel, apiErrorMessage, formatRelativeTime, roleLabel } from './adminLabels';
-import { adminStyles } from './adminStyles';
+import { adminStyles as ui } from './adminStyles';
+import {
+  PageHeader,
+  Tabs,
+  Toolbar,
+  SearchInput,
+  FilterSelect,
+  FilterChips,
+  TableCard,
+  Th,
+  Td,
+  Checkbox,
+  BulkActionBar,
+  TableBody,
+  EmptyState,
+  Pagination,
+  Badge,
+  Avatar,
+  RowMenu,
+  ConfirmDialog,
+  Modal,
+  Drawer,
+  DetailList,
+  Section,
+  useDebounced,
+} from './components/AdminUI';
 
-const MIN_REASON_LENGTH = 5;
-const EMPTY_CREATE_FORM = { fullName: '', email: '', password: '', actorPassword: '' };
+const ROLE_OPTIONS = [
+  { value: '', label: 'Mọi vai trò' },
+  { value: 'SHOP_OWNER', label: 'Chủ cửa hàng' },
+  { value: 'WAREHOUSE_STAFF', label: 'Nhân viên kho' },
+  { value: 'ADMIN', label: 'Quản trị viên' },
+];
 
-function StatusText({ isActive }) {
-  // Bình thường để chữ xám; chỉ trạng thái cần chú ý mới có màu.
-  return isActive ? (
-    <span className="text-[13px] text-[#64748B]">Hoạt động</span>
-  ) : (
-    <span className={`${adminStyles.badge} ${adminStyles.badgeRed}`}>Bị khóa</span>
-  );
-}
+const STATUS_OPTIONS = [
+  { value: '', label: 'Mọi trạng thái' },
+  { value: 'true', label: 'Đang hoạt động' },
+  { value: 'false', label: 'Đã bị khóa' },
+];
 
-function Avatar({ name }) {
+// ─── Cấu hình Ma trận phân quyền ─────────────────────────────────────────────
+const PERMISSION_GROUPS = [
+  {
+    title: 'Vận hành Bán hàng & Khách hàng',
+    description: 'Quyền bán hàng, tạo hóa đơn và xử lý đơn hàng tại quầy',
+    rules: [
+      { name: 'Bán hàng tại quầy (POS)', route: '/pos' },
+      { name: 'Xem danh sách đơn hàng', route: '/orders' },
+      { name: 'Hủy đơn hàng', check: (role) => canCancelOrder(role) },
+    ],
+  },
+  {
+    title: 'Kho vận & Sản phẩm',
+    description: 'Kiểm kê kho, nhập/xuất và quản lý danh mục sản phẩm',
+    rules: [
+      { name: 'Xem & quản lý sản phẩm', route: '/products' },
+      { name: 'Nhập / xuất kho & kiểm kê', route: '/inventory' },
+      { name: 'Nhận cảnh báo tồn kho thấp', route: '/alerts' },
+      { name: 'Xóa sản phẩm khỏi hệ thống', check: (role) => canDeleteProduct(role) },
+      { name: 'Nhập dữ liệu hàng loạt từ file Excel', route: '/import' },
+    ],
+  },
+  {
+    title: 'Tài chính & Chiến lược giá',
+    description: 'Báo cáo doanh số, chi phí vốn và chính sách giá thông minh',
+    rules: [
+      { name: 'Xem giá vốn, lợi nhuận & doanh thu', check: (role) => canViewCostPrice(role) },
+      { name: 'Phân tích & Báo cáo chuyên sâu', route: '/analytics' },
+      { name: 'Gợi ý giá bán tối ưu (AI Pricing)', route: '/pricing' },
+      { name: 'Duyệt áp dụng giá đề xuất', check: (role) => canApprovePricing(role) },
+    ],
+  },
+  {
+    title: 'Quản trị Nền tảng & Cấu hình',
+    description: 'Cài đặt hệ thống, quản lý tài khoản và nhật ký kiểm toán',
+    rules: [
+      { name: 'Quản lý người dùng & phân quyền', route: '/admin/users' },
+      { name: 'Quản lý các cửa hàng thuê nền tảng', route: '/admin/stores' },
+      { name: 'Xem nhật ký kiểm toán bất biến (Audit)', route: '/admin/audit-log' },
+      { name: 'Xử lý hộp thư hỗ trợ khách hàng', route: '/admin/support' },
+      { name: 'Cấu hình hệ thống & Giám sát AI', route: '/admin/system' },
+      { name: 'Cài đặt thông tin cửa hàng', route: '/settings' },
+      { name: 'Quản lý nhân viên nội bộ shop', route: '/staff' },
+    ],
+  },
+];
+
+const MATRIX_ROLES = [
+  { key: ROLES.SHOP_OWNER, label: 'Chủ cửa hàng', desc: 'Toàn quyền trong cửa hàng của mình' },
+  { key: ROLES.WAREHOUSE_STAFF, label: 'Nhân viên kho', desc: 'Thực thi bán hàng và kiểm kho' },
+  { key: ROLES.ADMIN, label: 'Quản trị viên', desc: 'Quản lý nền tảng toàn diện' },
+];
+
+function PermissionMatrix() {
+  const checkRule = (rule, role) => {
+    if (rule.check) {
+      if (role === ROLES.ADMIN) return true;
+      return rule.check(role);
+    }
+    if (rule.route) {
+      const allowed = ROUTE_PERMISSIONS[rule.route] || [];
+      return allowed.includes(role);
+    }
+    return false;
+  };
+
   return (
-    <div className="w-8 h-8 rounded-full bg-slate-100 text-[#475569] font-medium text-xs flex items-center justify-center shrink-0 border border-[#E5E7EB]">
-      {name ? name.charAt(0).toUpperCase() : 'U'}
+    <div className="space-y-6">
+      <div className="p-4 bg-blue-50/50 border border-blue-200/80 rounded-xl text-[13px] text-blue-900 flex items-start gap-3">
+        <ShieldCheck className="w-5 h-5 text-[#2563EB] shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="font-semibold text-[#1D4ED8]">Nguyên tắc phân quyền Role-Based Access Control (RBAC)</p>
+          <p className="text-[#334155] leading-relaxed">
+            Quyền hạn được kiểm soát đa lớp cả ở Frontend và Backend API qua middleware xác thực. Chủ cửa hàng toàn quyền quyết định
+            nhân sự của shop mình; Quản trị viên chỉ can thiệp khi có yêu cầu hỗ trợ sự cố tài khoản.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {PERMISSION_GROUPS.map((group) => (
+          <div key={group.title} className={ui.card}>
+            <div className="px-5 py-3.5 border-b border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-between">
+              <div>
+                <h3 className="text-[14px] font-bold text-[#0F172A]">{group.title}</h3>
+                <p className="text-[12px] text-[#64748B] mt-0.5">{group.description}</p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[13px] border-collapse">
+                <thead>
+                  <tr className="border-b border-[#E2E8F0] bg-slate-50/50 text-[#475569]">
+                    <th className="px-5 py-3 text-[12px] font-semibold uppercase tracking-wider w-1/2">Chức năng</th>
+                    {MATRIX_ROLES.map((r) => (
+                      <th key={r.key} className="px-4 py-3 text-[12px] font-semibold text-center uppercase tracking-wider">
+                        {r.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F1F5F9]">
+                  {group.rules.map((rule) => (
+                    <tr key={rule.name} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-5 py-3.5 font-medium text-[#1E293B]">{rule.name}</td>
+                      {MATRIX_ROLES.map((r) => {
+                        const allowed = checkRule(rule, r.key);
+                        return (
+                          <td key={r.key} className="px-4 py-3.5 text-center">
+                            {allowed ? (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+                                <Check className="w-3.5 h-3.5" />
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400">
+                                <Minus className="w-3.5 h-3.5" />
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-function DetailRow({ label, children }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-[#64748B]">{label}</span>
-      <span className="text-[#334155] text-right">{children}</span>
-    </div>
-  );
-}
-
-export function AdminUsersPage() {
-  const { user: currentAdmin } = useAuthStore();
+// ─── Modals ──────────────────────────────────────────────────────────────────
+function CreateAdminModal({ onClose, onCreated }) {
   const { toast } = useToast();
+  const [form, setForm] = useState({ fullName: '', email: '', password: '', actorPassword: '' });
+  const [busy, setBusy] = useState(false);
 
-  const [users, setUsers] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRole, setSelectedRole] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
-  const [selectedStoreId, setSelectedStoreId] = useState('');
-  const [storeOptions, setStoreOptions] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (form.password.length < 8) {
+      toast({ type: 'warning', title: 'Mật khẩu quá ngắn', description: 'Mật khẩu cần ít nhất 8 ký tự.' });
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiCreateAdminUser(form);
+      toast({ type: 'success', title: 'Đã tạo quản trị viên', description: `${form.email} có thể đăng nhập ngay.` });
+      onCreated();
+    } catch (err) {
+      toast({ type: 'error', title: 'Không tạo được tài khoản', description: apiErrorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
 
+  return (
+    <Modal
+      title="Tạo Quản trị viên Nền tảng"
+      description="Tài khoản Quản trị viên có toàn quyền kiểm soát nền tảng. Lưu ý chỉ cấp cho nhân sự nội bộ."
+      onClose={onClose}
+      busy={busy}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={busy} className={ui.btnSecondary}>
+            Hủy
+          </button>
+          <button type="submit" form="create-admin-form" disabled={busy} className={ui.btnPrimary}>
+            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Tạo tài khoản
+          </button>
+        </>
+      }
+    >
+      <form id="create-admin-form" onSubmit={submit} className="space-y-4" autoComplete="off">
+        <div>
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Họ và tên</label>
+          <input
+            type="text"
+            required
+            autoComplete="off"
+            placeholder="Ví dụ: Nguyễn Văn An"
+            value={form.fullName}
+            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            className={ui.input}
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Email đăng nhập</label>
+          <input
+            type="email"
+            required
+            autoComplete="off"
+            placeholder="admin@stockpilot.vn"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            className={ui.input}
+          />
+        </div>
+        <div>
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Mật khẩu ban đầu</label>
+          <input
+            type="password"
+            required
+            autoComplete="new-password"
+            placeholder="Tối thiểu 8 ký tự"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            className={ui.input}
+          />
+        </div>
+        <div className="pt-3 border-t border-slate-200">
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Mật khẩu của bạn để xác nhận</label>
+          <input
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="Nhập mật khẩu của bạn để xác thực cấp quyền"
+            value={form.actorPassword}
+            onChange={(e) => setForm({ ...form, actorPassword: e.target.value })}
+            className={ui.input}
+          />
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function EditNameModal({ user, onClose, onSaved }) {
+  const { toast } = useToast();
+  const [fullName, setFullName] = useState(user.fullName || '');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await apiUpdateAdminUser(user.id, { fullName: fullName.trim() });
+      toast({ type: 'success', title: 'Đã lưu tên người dùng' });
+      onSaved();
+    } catch (err) {
+      toast({ type: 'error', title: 'Không lưu được', description: apiErrorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="Sửa tên hiển thị"
+      description={`Email ${user.email} và vai trò gắn liền với bảo mật và hợp đồng, không thay đổi tại đây.`}
+      onClose={onClose}
+      busy={busy}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={busy} className={ui.btnSecondary}>
+            Hủy
+          </button>
+          <button type="submit" form="edit-name-form" disabled={busy || fullName.trim().length < 2} className={ui.btnPrimary}>
+            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Lưu thay đổi
+          </button>
+        </>
+      }
+    >
+      <form id="edit-name-form" onSubmit={submit} className="space-y-4">
+        <div>
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Họ và tên</label>
+          <input
+            required
+            minLength={2}
+            maxLength={255}
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className={ui.input}
+            autoFocus
+          />
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+// ─── Trang Chính ─────────────────────────────────────────────────────────────
+export function AdminUsersPage() {
+  const { user: me } = useAuthStore();
+  const { toast } = useToast();
+  const [params, setParams] = useSearchParams();
+
+  const tab = params.get('tab') === 'roles' ? 'roles' : 'list';
+  const role = params.get('role') || '';
+  const status = params.get('status') || '';
+  const storeId = params.get('store') || '';
+  const page = Number(params.get('page')) || 1;
+  const limit = Number(params.get('limit')) || 20;
+
+  const [search, setSearch] = useState(params.get('q') || '');
+  const debouncedSearch = useDebounced(search);
+
+  const [sortKey, setSortKey] = useState('createdAt');
+  const [sortDirection, setSortDirection] = useState('desc');
+
+  const [rows, setRows] = useState([]);
+  const [pagination, setPagination] = useState(null);
+  const [stores, setStores] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Selected IDs for Bulk Actions
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  // Detail Drawer
+  const [detailId, setDetailId] = useState(null);
   const [detail, setDetail] = useState(null);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [isSendingReset, setIsSendingReset] = useState(false);
+  const [drawerTab, setDrawerTab] = useState('overview');
 
-  // action: 'lock' | 'unlock' | 'revoke'
-  const [actionModal, setActionModal] = useState(null);
-  const [actionReason, setActionReason] = useState('');
-  const [actionPassword, setActionPassword] = useState('');
-  const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  // Dialogs
+  const [dialog, setDialog] = useState(null); // { type: 'create' | 'edit' | 'reset' | 'revoke' | 'lock' | 'unlock', user }
 
-  const [isCreateAdminOpen, setIsCreateAdminOpen] = useState(false);
-  const [createForm, setCreateForm] = useState(EMPTY_CREATE_FORM);
-  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+  const setParam = (key, value, resetPage = true) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    if (resetPage && key !== 'page') next.delete('page');
+    setParams(next, { replace: true });
+  };
+
+  useEffect(() => {
+    if ((params.get('q') || '') !== debouncedSearch) setParam('q', debouncedSearch);
+  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await apiListAdminUsers({
+        page,
+        limit,
+        search: params.get('q') || '',
+        role,
+        isActive: status,
+        storeId,
+      });
+      setRows(res.data);
+      setPagination(res.pagination);
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, limit, role, status, storeId, params]);
+
+  useEffect(() => {
+    if (tab === 'list') load();
+  }, [load, tab]);
 
   useEffect(() => {
     apiListAdminStores({ limit: 100 })
-      .then((res) => setStoreOptions(res.data || []))
-      .catch(() => setStoreOptions([]));
+      .then((res) => setStores(res.data || []))
+      .catch(() => setStores([]));
   }, []);
 
-  const fetchUsers = useCallback(
-    async (page = 1) => {
-      setIsLoading(true);
-      try {
-        const res = await apiListAdminUsers({
-          page,
-          limit: 20,
-          search: searchQuery.trim(),
-          role: selectedRole,
-          isActive: selectedStatus,
-          storeId: selectedStoreId,
-        });
-        setUsers(res.data);
-        setPagination(res.pagination);
-      } catch (err) {
-        toast({ type: 'error', title: 'Không tải được danh sách tài khoản', description: apiErrorMessage(err) });
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [searchQuery, selectedRole, selectedStatus, selectedStoreId, toast]
-  );
-
-  useEffect(() => {
-    const timer = setTimeout(() => fetchUsers(1), 250);
-    return () => clearTimeout(timer);
-  }, [fetchUsers]);
-
   const loadDetail = useCallback(
-    async (userId) => {
-      setIsLoadingDetail(true);
+    async (id) => {
       try {
-        setDetail(await apiGetAdminUser(userId));
+        setDetail(await apiGetAdminUser(id));
       } catch (err) {
         toast({ type: 'error', title: 'Không mở được hồ sơ', description: apiErrorMessage(err) });
-        setDrawerOpen(false);
-      } finally {
-        setIsLoadingDetail(false);
+        setDetailId(null);
       }
     },
     [toast]
   );
 
-  const openDetail = (userId) => {
+  useEffect(() => {
     setDetail(null);
-    setDrawerOpen(true);
-    loadDetail(userId);
+    setDrawerTab('overview');
+    if (detailId) loadDetail(detailId);
+  }, [detailId, loadDetail]);
+
+  const refreshAfterChange = (userId) => {
+    setDialog(null);
+    load();
+    if (detailId === userId) loadDetail(userId);
   };
 
-  const openAction = (action, target) => {
-    setActionModal({ action, user: target });
-    setActionReason('');
-    setActionPassword('');
-  };
-
-  const isSelf = (u) => u?.id === currentAdmin?.id;
-  const needsReason = actionModal && actionModal.action !== 'unlock';
-  const needsPassword = actionModal?.action === 'lock' && actionModal.user.role === 'ADMIN';
-  const reasonValid = !needsReason || actionReason.trim().length >= MIN_REASON_LENGTH;
-  const canSubmitAction = reasonValid && (!needsPassword || actionPassword.length > 0) && !isSubmittingAction;
-
-  const handleSubmitAction = async () => {
-    if (!actionModal || !canSubmitAction) return;
-    const { action, user: target } = actionModal;
-    setIsSubmittingAction(true);
+  const sendReset = async (u) => {
     try {
-      if (action === 'revoke') {
-        const res = await apiRevokeAdminUserSessions(target.id, actionReason.trim());
-        toast({
-          type: 'success',
-          title: 'Đã đăng xuất mọi thiết bị',
-          description: `Thu hồi ${res.revokedSessions} phiên của ${target.email}. Tài khoản vẫn đăng nhập lại được.`,
-        });
-      } else {
-        const res = await apiUpdateAdminUserStatus(target.id, {
-          isActive: action === 'unlock',
-          reason: actionReason.trim() || undefined,
-          actorPassword: needsPassword ? actionPassword : undefined,
-        });
-        toast({
-          type: 'success',
-          title: action === 'unlock' ? 'Đã mở khóa tài khoản' : 'Đã khóa tài khoản',
-          description:
-            action === 'unlock'
-              ? `${target.email} có thể đăng nhập lại.`
-              : `Đã thu hồi ${res?.data?.revokedSessions ?? 0} phiên đăng nhập của ${target.email}.`,
-        });
-      }
-      setActionModal(null);
-      fetchUsers(pagination.page);
-      if (drawerOpen && detail?.id === target.id) loadDetail(target.id);
-    } catch (err) {
-      toast({ type: 'error', title: 'Không thực hiện được', description: apiErrorMessage(err) });
-    } finally {
-      setIsSubmittingAction(false);
-    }
-  };
-
-  const handleSendReset = async () => {
-    if (!detail) return;
-    setIsSendingReset(true);
-    try {
-      const res = await apiSendAdminPasswordReset(detail.id);
+      const res = await apiSendAdminPasswordReset(u.id);
       toast({
         type: res.emailSent || res.simulated ? 'success' : 'warning',
         title: res.emailSent || res.simulated ? 'Đã gửi mã đặt lại mật khẩu' : 'Chưa gửi được email',
         description:
           res.emailSent || res.simulated
-            ? `Mã có hiệu lực 15 phút, gửi tới ${res.email}. Người dùng nhập mã ở trang "Quên mật khẩu".`
-            : 'Máy chủ chưa cấu hình email (SMTP). Kiểm tra mục Hệ thống.',
+            ? `Mã bảo mật có hiệu lực 15 phút, gửi tới ${res.email}.`
+            : 'Máy chủ chưa cấu hình gửi email (SMTP).',
       });
-      loadDetail(detail.id);
     } catch (err) {
       toast({ type: 'error', title: 'Không gửi được mã', description: apiErrorMessage(err) });
-    } finally {
-      setIsSendingReset(false);
+      throw err;
     }
   };
 
-  const handleCreateAdminSubmit = async (e) => {
-    e.preventDefault();
-    if (createForm.password.length < 8) {
-      toast({ type: 'warning', title: 'Mật khẩu quá ngắn', description: 'Mật khẩu cần ít nhất 8 ký tự.' });
-      return;
-    }
-    setIsCreatingAdmin(true);
-    try {
-      await apiCreateAdminUser(createForm);
-      toast({ type: 'success', title: 'Đã tạo quản trị viên', description: `${createForm.email} có thể đăng nhập ngay.` });
-      setIsCreateAdminOpen(false);
-      setCreateForm(EMPTY_CREATE_FORM);
-      fetchUsers(1);
-    } catch (err) {
-      toast({ type: 'error', title: 'Không tạo được tài khoản', description: apiErrorMessage(err) });
-    } finally {
-      setIsCreatingAdmin(false);
+  // Sorting
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
     }
   };
 
-  const actionCopy = actionModal
-    ? {
-        lock: {
-          title: `Khóa tài khoản ${actionModal.user.fullName}?`,
-          desc: 'Người này bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho tới khi mở khóa.',
-          confirm: 'Khóa tài khoản',
-          danger: true,
-        },
-        unlock: {
-          title: `Mở khóa tài khoản ${actionModal.user.fullName}?`,
-          desc: 'Tài khoản đăng nhập lại được ngay.',
-          confirm: 'Mở khóa',
-          danger: false,
-        },
-        revoke: {
-          title: `Đăng xuất ${actionModal.user.fullName} khỏi mọi thiết bị?`,
-          desc: 'Dùng khi người dùng báo mất máy hoặc lộ mật khẩu. Tài khoản không bị khóa, người dùng đăng nhập lại bình thường.',
-          confirm: 'Đăng xuất mọi thiết bị',
-          danger: true,
-        },
-      }[actionModal.action]
-    : null;
+  const sortedRows = useMemo(() => {
+    if (!rows || rows.length === 0) return [];
+    const sorted = [...rows];
+    sorted.sort((a, b) => {
+      let vA = a[sortKey];
+      let vB = b[sortKey];
 
-  const roleTabs = [
-    { value: '', label: 'Tất cả' },
-    { value: 'SHOP_OWNER', label: 'Chủ cửa hàng' },
-    { value: 'WAREHOUSE_STAFF', label: 'Nhân viên kho' },
-    { value: 'ADMIN', label: 'Quản trị viên' },
+      if (sortKey === 'fullName') {
+        vA = a.fullName || '';
+        vB = b.fullName || '';
+        return sortDirection === 'asc' ? vA.localeCompare(vB, 'vi') : vB.localeCompare(vA, 'vi');
+      }
+      if (sortKey === 'lastLoginAt' || sortKey === 'createdAt') {
+        const timeA = vA ? new Date(vA).getTime() : 0;
+        const timeB = vB ? new Date(vB).getTime() : 0;
+        return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
+      }
+      if (sortKey === 'isActive') {
+        return sortDirection === 'asc' ? Number(a.isActive) - Number(b.isActive) : Number(b.isActive) - Number(a.isActive);
+      }
+      return 0;
+    });
+    return sorted;
+  }, [rows, sortKey, sortDirection]);
+
+  // Bulk actions handling
+  const isAllSelected = sortedRows.length > 0 && selectedIds.length === sortedRows.length;
+  const isSomeSelected = selectedIds.length > 0 && selectedIds.length < sortedRows.length;
+
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedIds(sortedRows.map((r) => r.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectRow = (id, checked) => {
+    if (checked) {
+      setSelectedIds((prev) => [...prev, id]);
+    } else {
+      setSelectedIds((prev) => prev.filter((i) => i !== id));
+    }
+  };
+
+  const isSelf = (u) => u?.id === me?.id;
+
+  const actionsFor = (u) => [
+    { label: 'Xem chi tiết', icon: ExternalLink, onClick: () => setDetailId(u.id) },
+    { label: 'Sửa tên hiển thị', icon: Edit2, onClick: () => setDialog({ type: 'edit', user: u }) },
+    {
+      label: 'Gửi mã đặt lại mật khẩu',
+      icon: KeyRound,
+      onClick: () => setDialog({ type: 'reset', user: u }),
+      hidden: isSelf(u),
+      disabled: !u.isActive,
+    },
+    {
+      label: 'Đăng xuất khỏi mọi thiết bị',
+      icon: LogOut,
+      onClick: () => setDialog({ type: 'revoke', user: u }),
+      hidden: isSelf(u),
+    },
+    u.isActive
+      ? { label: 'Khóa tài khoản', icon: Lock, onClick: () => setDialog({ type: 'lock', user: u }), danger: true, hidden: isSelf(u) }
+      : { label: 'Mở khóa tài khoản', icon: Unlock, onClick: () => setDialog({ type: 'unlock', user: u }), hidden: isSelf(u) },
   ];
 
+  const chips = [
+    role && { key: 'role', label: ROLE_OPTIONS.find((o) => o.value === role)?.label, onRemove: () => setParam('role', '') },
+    status && { key: 'status', label: STATUS_OPTIONS.find((o) => o.value === status)?.label, onRemove: () => setParam('status', '') },
+    storeId && {
+      key: 'store',
+      label: stores.find((s) => String(s.id) === storeId)?.name || 'Cửa hàng',
+      onRemove: () => setParam('store', ''),
+    },
+  ].filter(Boolean);
+
+  const clearFilters = () => {
+    setSearch('');
+    setParams(tab === 'roles' ? { tab } : {}, { replace: true });
+  };
+
   return (
-    <div className={adminStyles.pageContainer}>
-      <div className={adminStyles.pageHeader}>
-        <div>
-          <h1 className={adminStyles.pageTitle}>Người dùng</h1>
-          <p className={adminStyles.pageDesc}>
-            {pagination.total > 0 ? `${pagination.total} tài khoản trên nền tảng. ` : ''}Bấm vào một dòng để xem chi tiết và thao tác.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={() => fetchUsers(pagination.page)} disabled={isLoading} className={adminStyles.btnSecondary}>
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            Làm mới
-          </button>
-          <button type="button" onClick={() => setIsCreateAdminOpen(true)} className={adminStyles.btnPrimary}>
-            <UserPlus className="w-3.5 h-3.5" />
-            Tạo quản trị viên
-          </button>
-        </div>
-      </div>
-
-      {/* Bộ lọc */}
-      <div className="flex flex-col lg:flex-row lg:items-center gap-3">
-        <div className="relative lg:w-80">
-          <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm theo tên hoặc email"
-            className={`${adminStyles.input} pl-9`}
-          />
-        </div>
-        <div className="inline-flex rounded-lg border border-[#E5E7EB] bg-white p-0.5 self-start overflow-x-auto max-w-full">
-          {roleTabs.map((tab) => (
+    <div className={ui.pageContainer}>
+      <PageHeader
+        title="Người dùng & Phân quyền"
+        description="Quản lý toàn bộ danh sách tài khoản thuộc mọi cửa hàng và quản trị viên nền tảng."
+        badge={<Badge tone="neutral">{pagination?.total ?? 0} tài khoản</Badge>}
+        actions={
+          <>
             <button
-              key={tab.value}
               type="button"
-              onClick={() => setSelectedRole(tab.value)}
-              className={`px-3 py-1 text-[13px] rounded-md transition-colors cursor-pointer whitespace-nowrap ${
-                selectedRole === tab.value ? 'bg-slate-100 text-[#334155] font-medium' : 'text-[#64748B] hover:text-[#334155]'
-              }`}
+              onClick={load}
+              disabled={isLoading || tab !== 'list'}
+              className={ui.btnSecondary}
             >
-              {tab.label}
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+              Làm mới
             </button>
-          ))}
-        </div>
-        <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className={`${adminStyles.select} lg:w-44`}>
-          <option value="">Mọi trạng thái</option>
-          <option value="true">Đang hoạt động</option>
-          <option value="false">Bị khóa</option>
-        </select>
-        <select value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} className={`${adminStyles.select} lg:w-56`}>
-          <option value="">Mọi cửa hàng</option>
-          {storeOptions.map((st) => (
-            <option key={st.id} value={st.id}>
-              {st.name}
-            </option>
-          ))}
-        </select>
-      </div>
+            <button type="button" onClick={() => setDialog({ type: 'create' })} className={ui.btnPrimary}>
+              <UserPlus className="w-3.5 h-3.5" />
+              Tạo quản trị viên
+            </button>
+          </>
+        }
+      >
+        <Tabs
+          value={tab}
+          onChange={(v) => {
+            setSelectedIds([]);
+            setParams(v === 'roles' ? { tab: 'roles' } : {}, { replace: true });
+          }}
+          tabs={[
+            { value: 'list', label: 'Danh sách người dùng', count: pagination?.total },
+            { value: 'roles', label: 'Ma trận vai trò & quyền hạn' },
+          ]}
+        />
+      </PageHeader>
 
-      {/* Bảng (tablet trở lên) */}
-      <div className={`${adminStyles.tableContainer} hidden sm:block`}>
-        <div className="overflow-x-auto">
-          <table className={adminStyles.table}>
-            <thead>
-              <tr>
-                <th className={adminStyles.th}>Người dùng</th>
-                <th className={adminStyles.th}>Vai trò</th>
-                <th className={adminStyles.th}>Cửa hàng</th>
-                <th className={adminStyles.th}>Đăng nhập gần nhất</th>
-                <th className={adminStyles.th}>Trạng thái</th>
-                <th className={adminStyles.th}><span className="sr-only">Mở chi tiết</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i} className="border-b border-[#E5E7EB]">
-                    {Array.from({ length: 6 }).map((__, j) => (
-                      <td key={j} className="px-4 py-4">
-                        <div className="h-3.5 rounded bg-slate-100 animate-pulse" style={{ width: `${45 + ((i + j) % 3) * 18}%` }} />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : users.length === 0 ? (
+      {tab === 'roles' ? (
+        <PermissionMatrix />
+      ) : (
+        <>
+          <div className="space-y-3">
+            <Toolbar>
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Tìm theo họ tên hoặc email…"
+                className="w-full lg:w-80"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <FilterSelect label="Vai trò" value={role} onChange={(v) => setParam('role', v)} options={ROLE_OPTIONS} />
+                <FilterSelect label="Trạng thái" value={status} onChange={(v) => setParam('status', v)} options={STATUS_OPTIONS} />
+                <FilterSelect
+                  label="Cửa hàng"
+                  value={storeId}
+                  onChange={(v) => setParam('store', v)}
+                  options={[{ value: '', label: 'Mọi cửa hàng' }, ...stores.map((s) => ({ value: String(s.id), label: s.name }))]}
+                  className="max-w-55"
+                />
+              </div>
+            </Toolbar>
+            <FilterChips chips={chips} onClearAll={clearFilters} />
+          </div>
+
+          <TableCard
+            footer={
+              !error &&
+              pagination?.total > 0 && (
+                <Pagination
+                  pagination={pagination}
+                  onPage={(p) => setParam('page', String(p), false)}
+                  onLimitChange={(l) => setParam('limit', String(l), true)}
+                  disabled={isLoading}
+                  unit="tài khoản"
+                />
+              )
+            }
+          >
+            <table className="w-full min-w-200">
+              <thead>
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
-                    <p className="text-[#334155] font-medium">Không có tài khoản phù hợp</p>
-                    <p className="text-[#64748B] mt-1">Thử từ khóa khác hoặc bỏ bớt bộ lọc.</p>
-                  </td>
+                  <th className="w-10 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] text-center">
+                    <Checkbox
+                      checked={isAllSelected}
+                      indeterminate={isSomeSelected}
+                      onChange={handleSelectAll}
+                      aria-label="Chọn tất cả"
+                    />
+                  </th>
+                  <Th sortKey="fullName" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
+                    Người dùng
+                  </Th>
+                  <Th>Vai trò</Th>
+                  <Th>Cửa hàng</Th>
+                  <Th sortKey="lastLoginAt" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
+                    Đăng nhập gần nhất
+                  </Th>
+                  <Th sortKey="isActive" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
+                    Trạng thái
+                  </Th>
+                  <th className="w-12 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0]">
+                    <span className="sr-only">Thao tác</span>
+                  </th>
                 </tr>
-              ) : (
-                users.map((u) => (
-                  <tr key={u.id} onClick={() => openDetail(u.id)} className={`${adminStyles.tr} cursor-pointer group`}>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        <Avatar name={u.fullName} />
-                        <div>
-                          <div className="font-medium text-[#334155] flex items-center gap-1.5">
-                            {u.fullName}
-                            {isSelf(u) && <span className={`${adminStyles.badge} ${adminStyles.badgeGray} text-[11px]`}>Bạn</span>}
+              </thead>
+              <TableBody
+                loading={isLoading}
+                error={error}
+                onRetry={load}
+                columns={7}
+                empty={
+                  sortedRows.length === 0 && (
+                    <EmptyState
+                      title="Không tìm thấy tài khoản phù hợp"
+                      description="Hãy thử thay đổi từ khóa tìm kiếm hoặc bỏ bớt các bộ lọc đang kích hoạt."
+                      action={
+                        chips.length || search ? (
+                          <button type="button" onClick={clearFilters} className={ui.btnSecondary}>
+                            Xóa bộ lọc
+                          </button>
+                        ) : null
+                      }
+                    />
+                  )
+                }
+              >
+                {sortedRows.map((u) => {
+                  const isSelected = selectedIds.includes(u.id);
+                  return (
+                    <tr
+                      key={u.id}
+                      onClick={() => setDetailId(u.id)}
+                      className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/30' : ''}`}
+                    >
+                      <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={(checked) => handleSelectRow(u.id, checked)}
+                          aria-label={`Chọn ${u.fullName}`}
+                        />
+                      </td>
+                      <Td>
+                        <div className="flex items-center gap-3">
+                          <Avatar name={u.fullName} tone={u.role === 'ADMIN' ? 'brand' : 'neutral'} size={36} />
+                          <div className="min-w-0">
+                            <p className="font-semibold text-[#0F172A] truncate flex items-center gap-1.5">
+                              {u.fullName}
+                              {isSelf(u) && (
+                                <span className="text-[11px] font-semibold px-2 py-0.2 rounded bg-blue-50 text-[#2563EB] border border-blue-200">
+                                  Bạn
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[12px] text-[#64748B] truncate mt-0.5">{u.email}</p>
                           </div>
-                          <div className="text-[12px] text-[#64748B]">{u.email}</div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">{roleLabel(u.role)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{u.store?.name || (u.role === 'ADMIN' ? 'Nền tảng' : '—')}</td>
-                    <td className="px-4 py-3 whitespace-nowrap" title={u.lastLoginAt ? formatVNDateTime(u.lastLoginAt) : undefined}>
-                      {u.lastLoginAt ? formatRelativeTime(u.lastLoginAt) || formatVNDateTime(u.lastLoginAt) : <span className="text-[#94A3B8]">Chưa đăng nhập</span>}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <StatusText isActive={u.isActive} />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <ChevronRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-[#3B82F6] inline" />
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-3 border-t border-[#E5E7EB] flex items-center justify-between text-[13px] text-[#64748B]">
-          <span>
-            {pagination.total > 0
-              ? `${(pagination.page - 1) * pagination.limit + 1}–${Math.min(pagination.page * pagination.limit, pagination.total)} trong ${pagination.total} tài khoản`
-              : '0 tài khoản'}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => fetchUsers(pagination.page - 1)}
-              disabled={pagination.page <= 1 || isLoading}
-              className="p-1 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              aria-label="Trang trước"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-2 text-xs font-medium text-[#334155]">
-              {pagination.page} / {pagination.totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => fetchUsers(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages || isLoading}
-              className="p-1 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              aria-label="Trang sau"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+                      </Td>
+                      <Td>
+                        <span className="inline-flex items-center gap-1.5 font-medium text-[13px] text-[#334155]">
+                          {u.role === 'ADMIN' && <Shield className="w-3.5 h-3.5 text-[#2563EB]" />}
+                          {u.role === 'SHOP_OWNER' && <Store className="w-3.5 h-3.5 text-amber-600" />}
+                          {roleLabel(u.role)}
+                        </span>
+                      </Td>
+                      <Td>
+                        <span className="text-[#334155] font-medium">
+                          {u.store?.name || (u.role === 'ADMIN' ? 'Quản trị Nền tảng' : '—')}
+                        </span>
+                      </Td>
+                      <Td className="whitespace-nowrap">
+                        {u.lastLoginAt ? (
+                          <div>
+                            <p className="text-[#0F172A] font-medium" title={formatVNDateTime(u.lastLoginAt)}>
+                              {formatRelativeTime(u.lastLoginAt) || formatVNDateTime(u.lastLoginAt)}
+                            </p>
+                            <p className="text-[11px] text-[#94A3B8]">{formatVNDateTime(u.lastLoginAt)}</p>
+                          </div>
+                        ) : (
+                          <span className="text-[#94A3B8] italic">Chưa từng đăng nhập</span>
+                        )}
+                      </Td>
+                      <Td>
+                        {u.isActive ? (
+                          <Badge tone="success">Đang hoạt động</Badge>
+                        ) : (
+                          <Badge tone="danger">Đã bị khóa</Badge>
+                        )}
+                      </Td>
+                      <Td align="right">
+                        <RowMenu items={actionsFor(u)} label={`Thao tác với ${u.fullName}`} />
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </TableBody>
+            </table>
+          </TableCard>
 
-      {/* Danh sách thẻ (mobile) */}
-      <div className="sm:hidden space-y-2">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 rounded-lg bg-slate-100 animate-pulse" />)
-        ) : users.length === 0 ? (
-          <div className={`${adminStyles.card} p-8 text-center text-[#64748B]`}>Không có tài khoản phù hợp.</div>
-        ) : (
-          users.map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              onClick={() => openDetail(u.id)}
-              className={`${adminStyles.card} w-full text-left p-3.5 flex items-center gap-3 active:bg-slate-50`}
-            >
-              <Avatar name={u.fullName} />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-[#334155] text-[13px] truncate">{u.fullName}</p>
-                <p className="text-[12px] text-[#64748B] truncate">{u.email}</p>
-                <p className="text-[12px] text-[#64748B] mt-0.5">
-                  {roleLabel(u.role)} · {u.store?.name || 'Nền tảng'}
-                </p>
-              </div>
-              <StatusText isActive={u.isActive} />
-            </button>
-          ))
-        )}
-        {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between p-3 text-xs text-[#64748B]">
-            <span>
-              Trang {pagination.page}/{pagination.totalPages}
-            </span>
-            <div className="flex gap-1">
-              <button type="button" onClick={() => fetchUsers(pagination.page - 1)} disabled={pagination.page <= 1 || isLoading} className={adminStyles.btnSecondary}>
-                Trước
-              </button>
-              <button
-                type="button"
-                onClick={() => fetchUsers(pagination.page + 1)}
-                disabled={pagination.page >= pagination.totalPages || isLoading}
-                className={adminStyles.btnSecondary}
-              >
-                Sau
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Drawer chi tiết */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          <div className={adminStyles.drawerBackdrop} onClick={() => setDrawerOpen(false)} />
-          <div className={adminStyles.drawerContent} role="dialog" aria-label="Hồ sơ người dùng">
-            <div className="px-5 py-4 border-b border-[#E5E7EB] flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="text-[16px] font-semibold text-[#334155] truncate">{detail?.fullName || 'Hồ sơ người dùng'}</h3>
-                <p className="text-[12px] text-[#64748B] truncate">{detail?.email || ''}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                className="p-1 rounded text-[#94A3B8] hover:text-[#334155] hover:bg-slate-100 cursor-pointer"
-                aria-label="Đóng"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-5 space-y-5 text-[13px]">
-              {isLoadingDetail && !detail ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="h-4 rounded bg-slate-100 animate-pulse" />
-                  ))}
-                </div>
-              ) : detail ? (
-                <>
-                  <div className="rounded-lg p-3.5 border border-[#E5E7EB] space-y-2.5">
-                    <DetailRow label="Vai trò">{roleLabel(detail.role)}</DetailRow>
-                    <DetailRow label="Cửa hàng">
-                      {detail.store?.name || (detail.role === 'ADMIN' ? 'Nền tảng' : '—')}
-                      {detail.store && !detail.store.isActive && <span className="text-[#DC2626]"> (đang tạm khóa)</span>}
-                    </DetailRow>
-                    <DetailRow label="Trạng thái">
-                      <StatusText isActive={detail.isActive} />
-                    </DetailRow>
-                    <DetailRow label="Đăng nhập gần nhất">{detail.lastLoginAt ? formatVNDateTime(detail.lastLoginAt) : 'Chưa đăng nhập'}</DetailRow>
-                    <DetailRow label="Phiên đang đăng nhập">{detail.activeSessionCount ?? 0} thiết bị</DetailRow>
-                    <DetailRow label="Ngày tạo">{formatVNDateTime(detail.createdAt)}</DetailRow>
-                  </div>
-
-                  {!isSelf(detail) && (
-                    <div>
-                      <h4 className="text-[13px] font-medium text-[#334155] mb-2">Hỗ trợ người dùng</h4>
-                      <div className="grid gap-2">
-                        <button
-                          type="button"
-                          onClick={handleSendReset}
-                          disabled={isSendingReset || !detail.isActive}
-                          className={`${adminStyles.btnSecondary} justify-start`}
-                          title={!detail.isActive ? 'Mở khóa tài khoản trước' : undefined}
-                        >
-                          {isSendingReset ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
-                          Gửi mã đặt lại mật khẩu qua email
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openAction('revoke', detail)}
-                          disabled={!detail.activeSessionCount}
-                          className={`${adminStyles.btnSecondary} justify-start`}
-                          title={!detail.activeSessionCount ? 'Không có phiên nào đang đăng nhập' : undefined}
-                        >
-                          <LogOut className="w-3.5 h-3.5" />
-                          Đăng xuất khỏi mọi thiết bị
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <h4 className="text-[13px] font-medium text-[#334155] mb-2">Hoạt động gần đây</h4>
-                    {detail.recentAuditLogs?.length > 0 ? (
-                      <ul className="border border-[#E5E7EB] rounded-lg divide-y divide-[#E5E7EB]">
-                        {detail.recentAuditLogs.map((log) => (
-                          <li key={log.id} className="p-2.5 flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-[#334155] truncate">{actionLabel(log.action)}</p>
-                              <p className="text-[11px] text-[#94A3B8] truncate">{log.store?.name || 'Nền tảng'}</p>
-                            </div>
-                            <span className="text-[11px] text-[#94A3B8] shrink-0" title={formatVNDateTime(log.createdAt)}>
-                              {formatRelativeTime(log.createdAt) || formatVNDateTime(log.createdAt)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-[#64748B]">Chưa có hoạt động nào.</p>
-                    )}
-                  </div>
-                </>
-              ) : null}
-            </div>
-
-            {detail && !isSelf(detail) && (
-              <div className="p-4 border-t border-[#E5E7EB] flex items-center justify-end gap-2">
-                {detail.isActive ? (
-                  <button type="button" onClick={() => openAction('lock', detail)} className={adminStyles.btnDanger}>
-                    <Lock className="w-3.5 h-3.5" />
-                    Khóa tài khoản
-                  </button>
-                ) : (
-                  <button type="button" onClick={() => openAction('unlock', detail)} className={adminStyles.btnPrimary}>
-                    <Unlock className="w-3.5 h-3.5" />
-                    Mở khóa tài khoản
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+          {/* Bulk Action Bar */}
+          <BulkActionBar
+            selectedCount={selectedIds.length}
+            onClear={() => setSelectedIds([])}
+            actions={[
+              {
+                label: 'Đăng xuất thiết bị',
+                icon: LogOut,
+                onClick: () => {
+                  toast({
+                    type: 'info',
+                    title: 'Thao tác hàng loạt',
+                    description: `Đang chuẩn bị đăng xuất phiên cho ${selectedIds.length} người dùng đã chọn.`,
+                  });
+                },
+              },
+            ]}
+          />
+        </>
       )}
 
-      {/* Hộp thoại xác nhận: khóa / mở khóa / đăng xuất mọi thiết bị */}
-      {actionModal && actionCopy && (
-        <div className={adminStyles.modalBackdrop}>
-          <div className={adminStyles.modalContent} role="dialog" aria-label={actionCopy.title}>
-            <div className="p-5 border-b border-[#E5E7EB]">
-              <h3 className="text-[16px] font-semibold text-[#334155]">{actionCopy.title}</h3>
-              <p className="text-[13px] text-[#64748B] mt-1.5 leading-relaxed">{actionCopy.desc}</p>
-            </div>
-            <div className="p-5 space-y-3.5">
-              <label className="block">
-                <span className="block text-[13px] font-medium text-[#334155] mb-1">
-                  Lý do {needsReason ? '' : '(không bắt buộc)'}
-                </span>
-                <textarea
-                  rows={3}
-                  value={actionReason}
-                  onChange={(e) => setActionReason(e.target.value)}
-                  placeholder={actionModal.action === 'unlock' ? 'Ví dụ: Đã xác minh chủ tài khoản' : 'Ví dụ: Nghi lộ mật khẩu, chủ shop báo mất máy'}
-                  className={adminStyles.input}
-                  autoFocus
-                />
-                <span className="block text-[12px] text-[#94A3B8] mt-1">
-                  {needsReason && !reasonValid
-                    ? `Cần ít nhất ${MIN_REASON_LENGTH} ký tự. Lý do được lưu vào nhật ký kiểm toán.`
-                    : 'Lý do được lưu vào nhật ký kiểm toán.'}
-                </span>
-              </label>
-
-              {needsPassword && (
-                <label className="block">
-                  <span className="block text-[13px] font-medium text-[#334155] mb-1">Mật khẩu của bạn</span>
-                  <input
-                    type="password"
-                    value={actionPassword}
-                    onChange={(e) => setActionPassword(e.target.value)}
-                    autoComplete="current-password"
-                    className={adminStyles.input}
-                  />
-                  <span className="block text-[12px] text-[#94A3B8] mt-1">Khóa một quản trị viên khác cần xác nhận lại mật khẩu.</span>
-                </label>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setActionModal(null)} disabled={isSubmittingAction} className={adminStyles.btnSecondary}>
-                  Hủy
-                </button>
+      {/* Drawer Chi Tiết Người Dùng */}
+      {detailId && (
+        <Drawer
+          title={detail?.fullName || 'Hồ sơ người dùng'}
+          subtitle={detail?.email}
+          badge={
+            detail && (
+              <Badge tone={detail.isActive ? 'success' : 'danger'}>
+                {detail.isActive ? 'Hoạt động' : 'Bị khóa'}
+              </Badge>
+            )
+          }
+          tabs={[
+            { key: 'overview', label: 'Tổng quan' },
+            { key: 'history', label: 'Lịch sử thao tác', count: detail?.recentAuditLogs?.length },
+          ]}
+          activeTab={drawerTab}
+          onTabChange={setDrawerTab}
+          onClose={() => setDetailId(null)}
+          footer={
+            detail && (
+              <>
                 <button
                   type="button"
-                  onClick={handleSubmitAction}
-                  disabled={!canSubmitAction}
-                  className={actionCopy.danger ? adminStyles.btnDanger : adminStyles.btnPrimary}
+                  onClick={() => setDialog({ type: 'edit', user: detail })}
+                  className={ui.btnSecondary}
                 >
-                  {isSubmittingAction && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {actionCopy.confirm}
+                  <Edit2 className="w-3.5 h-3.5" />
+                  Sửa tên
                 </button>
-              </div>
+                {!isSelf(detail) &&
+                  (detail.isActive ? (
+                    <button
+                      type="button"
+                      onClick={() => setDialog({ type: 'lock', user: detail })}
+                      className={ui.btnDanger}
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      Khóa tài khoản
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setDialog({ type: 'unlock', user: detail })}
+                      className={ui.btnPrimary}
+                    >
+                      <Unlock className="w-3.5 h-3.5" />
+                      Mở khóa tài khoản
+                    </button>
+                  ))}
+              </>
+            )
+          }
+        >
+          {!detail ? (
+            <div className="space-y-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-5 rounded-lg bg-slate-100 animate-pulse" />
+              ))}
             </div>
-          </div>
-        </div>
+          ) : drawerTab === 'overview' ? (
+            <div className="space-y-6">
+              <DetailList
+                rows={[
+                  ['Họ và tên', detail.fullName],
+                  ['Email', detail.email],
+                  ['Vai trò', roleLabel(detail.role)],
+                  ['Cửa hàng', detail.store?.name || (detail.role === 'ADMIN' ? 'Quản trị Nền tảng' : null)],
+                  [
+                    'Đăng nhập gần nhất',
+                    detail.lastLoginAt ? formatVNDateTime(detail.lastLoginAt) : 'Chưa từng đăng nhập',
+                  ],
+                  [
+                    'Phiên đăng nhập hiện tại',
+                    <span className="inline-flex items-center gap-1.5 font-semibold text-[#0F172A]">
+                      <Laptop className="w-4 h-4 text-slate-500" />
+                      {detail.activeSessionCount ?? 0} thiết bị
+                    </span>,
+                  ],
+                  ['Ngày tạo tài khoản', formatVNDateTime(detail.createdAt)],
+                ]}
+              />
+
+              {!isSelf(detail) && (
+                <Section title="Hỗ trợ & Bảo mật tài khoản">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      disabled={!detail.isActive}
+                      onClick={() => setDialog({ type: 'reset', user: detail })}
+                      className={`${ui.btnSecondary} justify-start text-left p-3`}
+                    >
+                      <KeyRound className="w-4 h-4 text-[#2563EB] shrink-0" />
+                      <div>
+                        <p className="font-semibold text-[#0F172A] text-[13px]">Gửi mã đổi mật khẩu</p>
+                        <p className="text-[11px] text-[#64748B]">Mã OTP gửi qua email</p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!detail.activeSessionCount}
+                      onClick={() => setDialog({ type: 'revoke', user: detail })}
+                      className={`${ui.btnSecondary} justify-start text-left p-3`}
+                    >
+                      <LogOut className="w-4 h-4 text-amber-600 shrink-0" />
+                      <div>
+                        <p className="font-semibold text-[#0F172A] text-[13px]">Đăng xuất mọi thiết bị</p>
+                        <p className="text-[11px] text-[#64748B]">Thu hồi token ngay lập tức</p>
+                      </div>
+                    </button>
+                  </div>
+                </Section>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-[13px] font-bold text-[#0F172A]">Hoạt động gần đây</h4>
+                <Link
+                  to={`/admin/audit-log?user=${detail.id}`}
+                  className="text-[12px] font-semibold text-[#2563EB] hover:underline flex items-center gap-1"
+                >
+                  Xem toàn bộ log <ExternalLink className="w-3 h-3" />
+                </Link>
+              </div>
+
+              {detail.recentAuditLogs?.length ? (
+                <ul className="rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] bg-white overflow-hidden shadow-2xs">
+                  {detail.recentAuditLogs.map((log) => (
+                    <li key={log.id} className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-[#0F172A] truncate">
+                          {actionLabel(log.action)}
+                        </p>
+                        <p className="text-[11px] text-[#64748B] truncate mt-0.5">
+                          {log.store?.name || 'Nền tảng'}
+                        </p>
+                      </div>
+                      <span className="text-[11px] font-medium text-[#94A3B8] shrink-0" title={formatVNDateTime(log.createdAt)}>
+                        {formatRelativeTime(log.createdAt) || formatVNDateTime(log.createdAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="p-8 text-center text-[#64748B] text-[13px] bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  Chưa ghi nhận hoạt động nào từ tài khoản này.
+                </div>
+              )}
+            </div>
+          )}
+        </Drawer>
       )}
 
-      {/* Hộp thoại tạo quản trị viên */}
-      {isCreateAdminOpen && (
-        <div className={adminStyles.modalBackdrop}>
-          <div className={adminStyles.modalContent} role="dialog" aria-label="Tạo quản trị viên">
-            <div className="flex items-start justify-between px-5 pt-4 pb-3 border-b border-[#E5E7EB]">
-              <div>
-                <h3 className="text-[16px] font-semibold text-[#334155]">Tạo quản trị viên</h3>
-                <p className="text-[12px] text-[#64748B] mt-0.5">Tài khoản này quản lý được toàn bộ nền tảng.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsCreateAdminOpen(false)}
-                className="p-1 rounded text-[#94A3B8] hover:text-[#334155] hover:bg-slate-100 cursor-pointer"
-                aria-label="Đóng"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <form onSubmit={handleCreateAdminSubmit} className="p-5 space-y-3.5" autoComplete="off">
-              {[
-                { key: 'fullName', label: 'Họ và tên', type: 'text', placeholder: 'Nguyễn Văn A', autoComplete: 'off' },
-                { key: 'email', label: 'Email đăng nhập', type: 'email', placeholder: 'ten@stockpilot.vn', autoComplete: 'off' },
-                { key: 'password', label: 'Mật khẩu cho tài khoản mới', type: 'password', placeholder: 'Ít nhất 8 ký tự', autoComplete: 'new-password' },
-              ].map((f) => (
-                <label key={f.key} className="block">
-                  <span className="block text-[13px] font-medium text-[#334155] mb-1">{f.label}</span>
-                  <input
-                    type={f.type}
-                    required
-                    value={createForm[f.key]}
-                    onChange={(e) => setCreateForm({ ...createForm, [f.key]: e.target.value })}
-                    placeholder={f.placeholder}
-                    autoComplete={f.autoComplete}
-                    className={adminStyles.input}
-                  />
-                </label>
-              ))}
-              <label className="block pt-3 border-t border-[#E5E7EB]">
-                <span className="block text-[13px] font-medium text-[#334155] mb-1">Mật khẩu của bạn (xác nhận)</span>
-                <input
-                  type="password"
-                  required
-                  value={createForm.actorPassword}
-                  onChange={(e) => setCreateForm({ ...createForm, actorPassword: e.target.value })}
-                  autoComplete="current-password"
-                  className={adminStyles.input}
-                />
-              </label>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setIsCreateAdminOpen(false)} disabled={isCreatingAdmin} className={adminStyles.btnSecondary}>
-                  Hủy
-                </button>
-                <button type="submit" disabled={isCreatingAdmin} className={adminStyles.btnPrimary}>
-                  {isCreatingAdmin && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  Tạo tài khoản
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Dialogs */}
+      {dialog?.type === 'create' && (
+        <CreateAdminModal
+          onClose={() => setDialog(null)}
+          onCreated={() => {
+            setDialog(null);
+            load();
+          }}
+        />
+      )}
+
+      {dialog?.type === 'edit' && (
+        <EditNameModal
+          user={dialog.user}
+          onClose={() => setDialog(null)}
+          onSaved={() => refreshAfterChange(dialog.user.id)}
+        />
+      )}
+
+      {dialog?.type === 'reset' && (
+        <ConfirmDialog
+          title={`Gửi mã đặt lại mật khẩu cho ${dialog.user.fullName}?`}
+          description={`Mã xác thực có hiệu lực 15 phút sẽ được gửi trực tiếp tới email ${dialog.user.email}. Quản trị viên không thể can thiệp hoặc thấy mật khẩu này.`}
+          confirmLabel="Gửi mã OTP"
+          onClose={() => setDialog(null)}
+          onConfirm={async () => {
+            await sendReset(dialog.user);
+            refreshAfterChange(dialog.user.id);
+          }}
+        />
+      )}
+
+      {dialog?.type === 'revoke' && (
+        <ConfirmDialog
+          title={`Đăng xuất ${dialog.user.fullName} khỏi mọi thiết bị?`}
+          description="Dùng khi người dùng báo mất thiết bị hoặc có nghi vấn lộ mật khẩu. Tài khoản vẫn hợp lệ và có thể đăng nhập lại."
+          confirmLabel="Đăng xuất thiết bị"
+          danger
+          reason={{ required: true, placeholder: 'Ví dụ: Người dùng báo mất điện thoại cá nhân' }}
+          onClose={() => setDialog(null)}
+          onConfirm={async ({ reason }) => {
+            try {
+              const res = await apiRevokeAdminUserSessions(dialog.user.id, reason);
+              toast({
+                type: 'success',
+                title: 'Đã thu hồi phiên đăng nhập',
+                description: `Đã đăng xuất ${res.revokedSessions} thiết bị thành công.`,
+              });
+              refreshAfterChange(dialog.user.id);
+            } catch (err) {
+              toast({ type: 'error', title: 'Không thực hiện được', description: apiErrorMessage(err) });
+            }
+          }}
+        />
+      )}
+
+      {(dialog?.type === 'lock' || dialog?.type === 'unlock') && (
+        <ConfirmDialog
+          title={
+            dialog.type === 'lock'
+              ? `Khóa tài khoản ${dialog.user.fullName}?`
+              : `Mở khóa tài khoản ${dialog.user.fullName}?`
+          }
+          description={
+            dialog.type === 'lock'
+              ? 'Người dùng sẽ bị thu hồi toàn bộ phiên đăng nhập lập tức và không thể truy cập hệ thống cho đến khi được mở khóa.'
+              : 'Người dùng sẽ có thể đăng nhập và tiếp tục làm việc bình thường ngay sau khi mở khóa.'
+          }
+          confirmLabel={dialog.type === 'lock' ? 'Khóa tài khoản' : 'Mở khóa'}
+          danger={dialog.type === 'lock'}
+          reason={{
+            required: dialog.type === 'lock',
+            placeholder:
+              dialog.type === 'lock'
+                ? 'Ví dụ: Tạm khóa do nghi vấn xâm nhập trái phép'
+                : 'Ví dụ: Đã xác thực chính chủ tài khoản',
+          }}
+          password={
+            dialog.type === 'lock' && dialog.user.role === 'ADMIN'
+              ? { hint: 'Khóa một Quản trị viên khác yêu cầu bạn xác nhận lại mật khẩu của mình.' }
+              : null
+          }
+          onClose={() => setDialog(null)}
+          onConfirm={async ({ reason, password }) => {
+            try {
+              const res = await apiUpdateAdminUserStatus(dialog.user.id, {
+                isActive: dialog.type === 'unlock',
+                reason: reason || undefined,
+                actorPassword: password || undefined,
+              });
+              toast({
+                type: 'success',
+                title: dialog.type === 'lock' ? 'Đã khóa tài khoản' : 'Đã mở khóa tài khoản',
+                description:
+                  dialog.type === 'lock'
+                    ? `Đã thu hồi ${res?.data?.revokedSessions ?? 0} phiên đăng nhập.`
+                    : undefined,
+              });
+              refreshAfterChange(dialog.user.id);
+            } catch (err) {
+              toast({ type: 'error', title: 'Không thực hiện được', description: apiErrorMessage(err) });
+            }
+          }}
+        />
       )}
     </div>
   );

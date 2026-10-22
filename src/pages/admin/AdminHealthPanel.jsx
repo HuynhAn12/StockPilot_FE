@@ -1,9 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, Database, Activity, AlertTriangle, Cpu } from 'lucide-react';
+import {
+  RefreshCw,
+  Database,
+  Activity,
+  AlertTriangle,
+  Cpu,
+  CheckCircle2,
+  Copy,
+  Check,
+  Server,
+  Clock,
+  Layers,
+} from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
 import { apiGetAdminSystemHealth, formatVNDateTime } from '../../services/adminService';
 import { apiErrorMessage, formatRelativeTime } from './adminLabels';
-import { adminStyles } from './adminStyles';
+import { adminStyles as ui } from './adminStyles';
+import { StatCard, TableCard, Th, Td, Badge } from './components/AdminUI';
 
 function formatUptime(seconds) {
   if (!seconds && seconds !== 0) return '—';
@@ -15,24 +28,11 @@ function formatUptime(seconds) {
   return `${minutes} phút`;
 }
 
-function Tile({ icon: Icon, label, value, detail, tone = 'normal' }) {
-  const valueColor = tone === 'danger' ? 'text-[#DC2626]' : tone === 'warning' ? 'text-[#D97706]' : 'text-[#334155]';
-  return (
-    <div className={`${adminStyles.card} p-4`}>
-      <div className="flex items-center justify-between text-[13px] text-[#64748B]">
-        {label}
-        <Icon className="w-4 h-4 text-[#94A3B8]" />
-      </div>
-      <div className={`mt-1.5 text-[22px] font-semibold tabular-nums ${valueColor}`}>{value}</div>
-      <div className="text-[12px] text-[#64748B] mt-0.5">{detail}</div>
-    </div>
-  );
-}
-
 export function AdminHealthPanel() {
   const { toast } = useToast();
   const [health, setHealth] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [copiedId, setCopiedId] = useState(null);
 
   const fetchHealth = useCallback(async () => {
     setIsLoading(true);
@@ -49,99 +49,160 @@ export function AdminHealthPanel() {
     fetchHealth();
   }, [fetchHealth]);
 
+  const copyRequestId = (reqId) => {
+    if (!reqId) return;
+    navigator.clipboard.writeText(reqId);
+    setCopiedId(reqId);
+    toast({ type: 'success', title: 'Đã sao chép Request ID' });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   if (isLoading && !health) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-24 rounded-lg bg-slate-100 animate-pulse" />
+          <div key={i} className="h-28 rounded-xl bg-slate-100 animate-pulse" />
         ))}
       </div>
     );
   }
+
   if (!health) return null;
 
   const { database, http, process: proc } = health;
-  const errorPercent = (http.errorRate * 100).toFixed(1);
-  const errorTone = http.serverErrors === 0 ? 'normal' : http.errorRate > 0.05 ? 'danger' : 'warning';
+  const errorPercent = ((http.errorRate || 0) * 100).toFixed(1);
+  const isDbUp = database.status === 'UP';
+  const isHighError = (http.serverErrors || 0) > 0;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#64748B]">
-        <span>
-          Kiểm tra lúc {formatVNDateTime(health.checkedAt)}. Số liệu request tính từ {formatVNDateTime(http.since)} trên máy chủ này,
-          được đặt lại khi máy chủ khởi động lại.
-        </span>
-        <button type="button" onClick={fetchHealth} disabled={isLoading} className={adminStyles.btnSecondary}>
+    <div className="space-y-6">
+      {/* Thanh trạng thái kiểm tra */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-white rounded-xl border border-[#E2E8F0] text-[13px] text-[#64748B] shadow-2xs">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+          <span>
+            Kiểm tra lúc <strong className="text-[#0F172A]">{formatVNDateTime(health.checkedAt)}</strong>. Dữ liệu request tính từ{' '}
+            <strong className="text-[#0F172A]">{formatVNDateTime(http.since)}</strong>.
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={fetchHealth}
+          disabled={isLoading}
+          className={`${ui.btnSecondary} px-3 py-1.5 text-[12px] self-start sm:self-auto`}
+        >
           <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           Kiểm tra lại
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <Tile
+      {/* 4 Thẻ Sức Khỏe */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Cơ sở dữ liệu MySQL"
+          value={isDbUp ? 'Kết nối tốt' : 'Mất kết nối'}
+          subtitle={
+            isDbUp
+              ? database.latencyMs < 1
+                ? 'Độ trễ phản hồi < 1 ms'
+                : `Độ trễ phản hồi ${database.latencyMs} ms`
+              : 'Kiểm tra máy chủ MySQL ngay'
+          }
           icon={Database}
-          label="Cơ sở dữ liệu"
-          value={database.status === 'UP' ? 'Kết nối tốt' : 'Mất kết nối'}
-          detail={database.status === 'UP' ? database.latencyMs < 1 ? 'Phản hồi dưới 1 ms' : `Phản hồi trong ${database.latencyMs} ms` : 'Kiểm tra máy chủ MySQL ngay'}
-          tone={database.status === 'UP' ? 'normal' : 'danger'}
+          iconBg={isDbUp ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}
+          alert={!isDbUp}
         />
-        <Tile
+        <StatCard
+          title="Lưu lượng HTTP 24h"
+          value={(http.requests ?? 0).toLocaleString('vi-VN')}
+          subtitle={`Thời gian xử lý TB ${http.avgLatencyMs ?? 0} ms`}
           icon={Activity}
-          label="Request 24 giờ"
-          value={http.requests.toLocaleString('vi-VN')}
-          detail={`Thời gian xử lý trung bình ${http.avgLatencyMs} ms`}
+          iconBg="bg-blue-50 text-[#2563EB] border-blue-100"
         />
-        <Tile
+        <StatCard
+          title="Lỗi máy chủ (5xx)"
+          value={(http.serverErrors ?? 0).toLocaleString('vi-VN')}
+          subtitle={http.requests > 0 ? `${errorPercent}% trên tổng request` : 'Chưa có lỗi nào'}
           icon={AlertTriangle}
-          label="Lỗi máy chủ (5xx)"
-          value={http.serverErrors.toLocaleString('vi-VN')}
-          detail={http.requests > 0 ? `${errorPercent}% tổng số request` : 'Chưa có request'}
-          tone={errorTone}
+          iconBg={isHighError ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}
+          alert={isHighError}
         />
-        <Tile
-          icon={Cpu}
-          label="Máy chủ API"
+        <StatCard
+          title="Thời gian máy chủ chạy"
           value={formatUptime(proc.uptimeSeconds)}
-          detail={`Đã chạy liên tục · RAM ${proc.memoryRssMb} MB · Node ${proc.nodeVersion}`}
+          subtitle={`RAM: ${proc.memoryRssMb} MB · Node ${proc.nodeVersion}`}
+          icon={Cpu}
+          iconBg="bg-purple-50 text-purple-600 border-purple-100"
         />
       </div>
 
-      <section className={adminStyles.tableContainer}>
-        <div className={adminStyles.cardHeader}>
-          <h2 className={adminStyles.cardTitle}>Lỗi máy chủ gần đây</h2>
-          <span className="text-[12px] text-[#64748B]">Tối đa 20 lỗi trong 24 giờ</span>
-        </div>
-        {http.recentServerErrors.length === 0 ? (
-          <p className="px-4 py-8 text-center text-[13px] text-[#64748B]">Không có lỗi máy chủ nào trong 24 giờ qua.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className={adminStyles.table}>
-              <thead>
-                <tr>
-                  <th className={adminStyles.th}>Thời gian</th>
-                  <th className={adminStyles.th}>Request</th>
-                  <th className={adminStyles.th}>Mã lỗi</th>
-                  <th className={adminStyles.th}>Mã tra cứu log</th>
-                </tr>
-              </thead>
-              <tbody>
-                {http.recentServerErrors.map((e, i) => (
-                  <tr key={`${e.at}-${i}`} className={adminStyles.tr}>
-                    <td className={adminStyles.td} title={formatVNDateTime(e.at)}>
-                      {formatRelativeTime(e.at) || formatVNDateTime(e.at)}
-                    </td>
-                    <td className={`${adminStyles.td} font-mono text-[12px]`}>
-                      {e.method} {e.path}
-                    </td>
-                    <td className={`${adminStyles.td} text-[#DC2626]`}>{e.statusCode}</td>
-                    <td className={`${adminStyles.td} font-mono text-[12px] text-[#64748B]`}>{e.requestId || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Bảng lỗi máy chủ gần đây */}
+      <TableCard
+        header={
+          <div>
+            <h3 className="text-[14px] font-bold text-[#0F172A]">Lỗi máy chủ gần đây (Mã lỗi 5xx)</h3>
+            <p className="text-[12px] text-[#64748B]">Tối đa 20 sự kiện lỗi được lưu trữ tạm thời trong bộ nhớ máy chủ</p>
           </div>
+        }
+      >
+        {http.recentServerErrors.length === 0 ? (
+          <div className="p-8 text-center text-[13px] text-[#64748B]">
+            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+            <p className="font-semibold text-[#0F172A]">Không ghi nhận lỗi máy chủ nào</p>
+            <p className="text-[12px] text-[#64748B] mt-0.5">Tất cả request trong 24 giờ qua đều được xử lý thành công.</p>
+          </div>
+        ) : (
+          <table className="w-full min-w-175">
+            <thead>
+              <tr>
+                <Th>Thời điểm</Th>
+                <Th>Giao thức & Đường dẫn (API)</Th>
+                <Th>Mã lỗi HTTP</Th>
+                <Th>Mã tra cứu Request ID</Th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#F1F5F9]">
+              {http.recentServerErrors.map((e, idx) => (
+                <tr key={`${e.at}-${idx}`} className="hover:bg-slate-50/70 transition-colors">
+                  <Td className="whitespace-nowrap font-medium text-[#0F172A]" title={formatVNDateTime(e.at)}>
+                    {formatRelativeTime(e.at) || formatVNDateTime(e.at)}
+                  </Td>
+                  <Td>
+                    <span className="font-mono text-[12px] bg-slate-100 px-2 py-0.5 rounded text-[#334155] font-semibold mr-1.5">
+                      {e.method}
+                    </span>
+                    <span className="font-mono text-[12px] text-[#475569]">{e.path}</span>
+                  </Td>
+                  <Td>
+                    <span className="inline-flex items-center gap-1 font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                      {e.statusCode}
+                    </span>
+                  </Td>
+                  <Td>
+                    {e.requestId ? (
+                      <button
+                        type="button"
+                        onClick={() => copyRequestId(e.requestId)}
+                        className="inline-flex items-center gap-1.5 font-mono text-[12px] text-[#2563EB] hover:underline cursor-pointer group"
+                        title="Sao chép requestId"
+                      >
+                        {copiedId === e.requestId ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#2563EB]" />
+                        )}
+                        <span>{e.requestId}</span>
+                      </button>
+                    ) : (
+                      <span className="text-[#94A3B8]">—</span>
+                    )}
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
-      </section>
+      </TableCard>
     </div>
   );
 }

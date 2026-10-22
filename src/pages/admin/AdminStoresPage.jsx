@@ -1,18 +1,76 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Search, RefreshCw, X, ChevronLeft, ChevronRight, Lock, Unlock, Loader2, Phone, MapPin, Globe } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import {
+  RefreshCw,
+  Loader2,
+  Store,
+  Phone,
+  Mail,
+  Edit2,
+  Lock,
+  Unlock,
+  ExternalLink,
+  CreditCard,
+  Package,
+  Users,
+  ShoppingBag,
+  Clock,
+  Warehouse,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+} from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
-import { apiListAdminStores, apiGetAdminStore, apiUpdateAdminStoreStatus, formatVNDateTime } from '../../services/adminService';
+import {
+  apiListAdminStores,
+  apiGetAdminStore,
+  apiUpdateAdminStore,
+  apiUpdateAdminStoreStatus,
+  formatVNDateTime,
+} from '../../services/adminService';
 import { apiErrorMessage, formatRelativeTime } from './adminLabels';
-import { adminStyles } from './adminStyles';
+import { adminStyles as ui } from './adminStyles';
+import {
+  PageHeader,
+  Tabs,
+  Toolbar,
+  SearchInput,
+  FilterSelect,
+  FilterChips,
+  TableCard,
+  Th,
+  Td,
+  Checkbox,
+  BulkActionBar,
+  TableBody,
+  EmptyState,
+  Pagination,
+  Badge,
+  Avatar,
+  RowMenu,
+  ConfirmDialog,
+  Modal,
+  Drawer,
+  DetailList,
+  Section,
+  StatCard,
+  useDebounced,
+} from './components/AdminUI';
 
-const MIN_REASON_LENGTH = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const PAYOS_LABEL = {
-  ACTIVE: { text: 'PayOS đang dùng', className: 'text-emerald-700' },
-  DISABLED: { text: 'PayOS đã tắt', className: 'text-[#64748B]' },
-  NOT_CONFIGURED: { text: 'Chỉ tiền mặt', className: 'text-[#94A3B8]' },
+const PAYOS = {
+  ACTIVE: { label: 'VietQR (Đang bật)', tone: 'success' },
+  DISABLED: { label: 'VietQR (Đã tắt)', tone: 'neutral' },
+  NOT_CONFIGURED: { label: 'Chỉ tiền mặt', tone: 'neutral' },
 };
+
+const PAYOS_OPTIONS = [
+  { value: '', label: 'Mọi hình thức thanh toán' },
+  { value: 'ACTIVE', label: 'VietQR đang bật' },
+  { value: 'DISABLED', label: 'VietQR đã tắt' },
+  { value: 'NOT_CONFIGURED', label: 'Chỉ tiền mặt' },
+];
 
 function payosFromDetail(detail) {
   const config = detail?.paymentConfigs?.find((c) => c.provider === 'PAYOS');
@@ -20,559 +78,780 @@ function payosFromDetail(detail) {
   return config.isActive ? 'ACTIVE' : 'DISABLED';
 }
 
-function daysSince(value) {
-  return value ? Math.floor((Date.now() - new Date(value).getTime()) / DAY_MS) : null;
-}
+function EditStoreModal({ store, onClose, onSaved }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({
+    name: store.name || '',
+    phone: store.phone || '',
+    address: store.address || '',
+  });
+  const [busy, setBusy] = useState(false);
 
-function LastActive({ value, idleDays }) {
-  if (!value) return <span className="text-[#94A3B8]">Chưa đăng nhập</span>;
-  const idle = daysSince(value) >= idleDays;
+  const submit = async (e) => {
+    e.preventDefault();
+    const payload = {};
+    if (form.name.trim() !== (store.name || '')) payload.name = form.name.trim();
+    if (form.phone.trim() !== (store.phone || '')) payload.phone = form.phone.trim();
+    if (form.address.trim() !== (store.address || '')) payload.address = form.address.trim();
+
+    if (Object.keys(payload).length === 0) {
+      onClose();
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await apiUpdateAdminStore(store.id, payload);
+      toast({ type: 'success', title: 'Đã lưu thông tin cửa hàng' });
+      onSaved();
+    } catch (err) {
+      toast({ type: 'error', title: 'Không lưu được', description: apiErrorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <span className={idle ? 'text-[#D97706]' : 'text-[#475569]'} title={formatVNDateTime(value)}>
-      {formatRelativeTime(value) || formatVNDateTime(value)}
-    </span>
-  );
-}
-
-function StatusText({ isActive }) {
-  return isActive ? (
-    <span className="text-[13px] text-[#64748B]">Hoạt động</span>
-  ) : (
-    <span className={`${adminStyles.badge} ${adminStyles.badgeRed}`}>Tạm khóa</span>
-  );
-}
-
-function SummaryTile({ label, value, detail, tone, active, onClick }) {
-  const valueColor = tone === 'danger' ? 'text-[#DC2626]' : tone === 'warning' ? 'text-[#D97706]' : 'text-[#334155]';
-  const Tag = onClick ? 'button' : 'div';
-  return (
-    <Tag
-      type={onClick ? 'button' : undefined}
-      onClick={onClick}
-      className={`${adminStyles.card} p-3.5 text-left ${onClick ? 'cursor-pointer hover:border-[#93C5FD]' : ''} ${
-        active ? 'border-[#3B82F6] ring-1 ring-[#3B82F6]' : ''
-      }`}
+    <Modal
+      title="Sửa thông tin Cửa hàng"
+      description={`Mã cửa hàng (${store.code}) là định danh cố định không thể thay đổi. Mọi sửa đổi được lưu vào nhật ký kiểm toán.`}
+      onClose={onClose}
+      busy={busy}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={busy} className={ui.btnSecondary}>
+            Hủy
+          </button>
+          <button type="submit" form="edit-store-form" disabled={busy || form.name.trim().length < 2} className={ui.btnPrimary}>
+            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Lưu thay đổi
+          </button>
+        </>
+      }
     >
-      <div className="text-[12px] text-[#64748B]">{label}</div>
-      <div className={`text-[22px] font-semibold tabular-nums mt-0.5 ${valueColor}`}>{value}</div>
-      <div className="text-[12px] text-[#94A3B8] truncate">{detail}</div>
-    </Tag>
-  );
-}
-
-function DetailRow({ icon: Icon, label, children }) {
-  return (
-    <div className="flex items-start justify-between gap-3">
-      <span className="text-[#64748B] flex items-center gap-1.5 shrink-0">
-        {Icon && <Icon className="w-3.5 h-3.5 text-[#94A3B8]" />}
-        {label}
-      </span>
-      <span className="text-[#334155] text-right break-words">{children}</span>
-    </div>
+      <form id="edit-store-form" onSubmit={submit} className="space-y-4">
+        <div>
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Tên cửa hàng</label>
+          <input
+            required
+            minLength={2}
+            maxLength={255}
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className={ui.input}
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Số điện thoại liên hệ</label>
+          <input
+            inputMode="tel"
+            maxLength={20}
+            pattern="[0-9+.\s()\-]*"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            className={ui.input}
+            placeholder="09xx xxx xxx"
+          />
+        </div>
+        <div>
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Địa chỉ hoạt động</label>
+          <textarea
+            rows={2}
+            maxLength={500}
+            value={form.address}
+            onChange={(e) => setForm({ ...form, address: e.target.value })}
+            className={ui.input}
+            placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố"
+          />
+        </div>
+      </form>
+    </Modal>
   );
 }
 
 export function AdminStoresPage() {
   const { toast } = useToast();
+  const [params, setParams] = useSearchParams();
+
+  const status = params.get('status') || '';
+  const payos = params.get('payos') || '';
+  const page = Number(params.get('page')) || 1;
+  const limit = Number(params.get('limit')) || 20;
+
+  const [search, setSearch] = useState(params.get('q') || '');
+  const debouncedSearch = useDebounced(search);
+
+  const [sortKey, setSortKey] = useState('name');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   const [stores, setStores] = useState([]);
   const [summary, setSummary] = useState(null);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [pagination, setPagination] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
+  // Bulk Selection
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  // Detail Drawer
+  const [detailId, setDetailId] = useState(() => Number(params.get('id')) || null);
   const [detail, setDetail] = useState(null);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerTab, setDrawerTab] = useState('overview');
 
-  const [statusModalStore, setStatusModalStore] = useState(null);
-  const [statusReason, setStatusReason] = useState('');
-  const [statusPassword, setStatusPassword] = useState('');
-  const [isSubmittingStatus, setIsSubmittingStatus] = useState(false);
+  // Dialogs
+  const [dialog, setDialog] = useState(null); // { type: 'edit' | 'lock' | 'unlock', store }
 
-  const fetchStores = useCallback(
-    async (page = 1) => {
-      setIsLoading(true);
-      try {
-        const res = await apiListAdminStores({ page, limit: 20, search: searchQuery.trim(), isActive: selectedStatus });
-        setStores(res.data);
-        setPagination(res.pagination);
-        setSummary(res.summary);
-      } catch (err) {
-        toast({ type: 'error', title: 'Không tải được danh sách cửa hàng', description: apiErrorMessage(err) });
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [searchQuery, selectedStatus, toast]
-  );
+  const setParam = (key, value, resetPage = true) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    if (resetPage && key !== 'page') next.delete('page');
+    setParams(next, { replace: true });
+  };
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchStores(1), 250);
-    return () => clearTimeout(timer);
-  }, [fetchStores]);
+    if ((params.get('q') || '') !== debouncedSearch) setParam('q', debouncedSearch);
+  }, [debouncedSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const load = useCallback(async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await apiListAdminStores({
+        page,
+        limit,
+        search: params.get('q') || '',
+        isActive: status,
+        payos,
+      });
+      setStores(res.data);
+      setPagination(res.pagination);
+      setSummary(res.summary);
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page, limit, status, payos, params]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const loadDetail = useCallback(
-    async (storeId) => {
-      setIsLoadingDetail(true);
+    async (id) => {
       try {
-        setDetail(await apiGetAdminStore(storeId));
+        setDetail(await apiGetAdminStore(id));
       } catch (err) {
-        toast({ type: 'error', title: 'Không mở được cửa hàng', description: apiErrorMessage(err) });
-        setDrawerOpen(false);
-      } finally {
-        setIsLoadingDetail(false);
+        toast({ type: 'error', title: 'Không mở được thông tin cửa hàng', description: apiErrorMessage(err) });
+        setDetailId(null);
       }
     },
     [toast]
   );
 
-  const openDetail = (storeId) => {
+  useEffect(() => {
     setDetail(null);
-    setDrawerOpen(true);
-    loadDetail(storeId);
+    setDrawerTab('overview');
+    if (detailId) loadDetail(detailId);
+  }, [detailId, loadDetail]);
+
+  const refreshAfterChange = (storeId) => {
+    setDialog(null);
+    load();
+    if (detailId === storeId) loadDetail(storeId);
   };
 
-  const openStatusModal = (store) => {
-    setStatusModalStore(store);
-    setStatusReason('');
-    setStatusPassword('');
+  // Sorting
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection('asc');
+    }
   };
 
-  const isLockingModal = Boolean(statusModalStore?.isActive);
-  const canSubmitStatus =
-    !isSubmittingStatus && (!isLockingModal || (statusReason.trim().length >= MIN_REASON_LENGTH && statusPassword.length > 0));
+  const sortedStores = useMemo(() => {
+    if (!stores || stores.length === 0) return [];
+    const sorted = [...stores];
+    sorted.sort((a, b) => {
+      if (sortKey === 'name') {
+        const nA = a.name || '';
+        const nB = b.name || '';
+        return sortDirection === 'asc' ? nA.localeCompare(nB, 'vi') : nB.localeCompare(nA, 'vi');
+      }
+      if (sortKey === 'skus') {
+        const vA = a.stats?.skus || 0;
+        const vB = b.stats?.skus || 0;
+        return sortDirection === 'asc' ? vA - vB : vB - vA;
+      }
+      if (sortKey === 'orders') {
+        const vA = a.stats?.ordersLast30Days || 0;
+        const vB = b.stats?.ordersLast30Days || 0;
+        return sortDirection === 'asc' ? vA - vB : vB - vA;
+      }
+      if (sortKey === 'lastActiveAt') {
+        const tA = a.lastActiveAt ? new Date(a.lastActiveAt).getTime() : 0;
+        const tB = b.lastActiveAt ? new Date(b.lastActiveAt).getTime() : 0;
+        return sortDirection === 'asc' ? tA - tB : tB - tA;
+      }
+      if (sortKey === 'isActive') {
+        return sortDirection === 'asc' ? Number(a.isActive) - Number(b.isActive) : Number(b.isActive) - Number(a.isActive);
+      }
+      return 0;
+    });
+    return sorted;
+  }, [stores, sortKey, sortDirection]);
 
-  const handleConfirmStatusChange = async () => {
-    if (!statusModalStore || !canSubmitStatus) return;
-    setIsSubmittingStatus(true);
-    try {
-      const res = await apiUpdateAdminStoreStatus(statusModalStore.id, {
-        isActive: !isLockingModal,
-        reason: statusReason.trim() || undefined,
-        actorPassword: isLockingModal ? statusPassword : undefined,
-      });
-      toast({
-        type: 'success',
-        title: isLockingModal ? 'Đã tạm khóa cửa hàng' : 'Đã mở lại cửa hàng',
-        description: isLockingModal
-          ? `${statusModalStore.name}: đã đăng xuất ${res?.data?.revokedSessions ?? 0} phiên đăng nhập.`
-          : `${statusModalStore.name} hoạt động lại bình thường.`,
-      });
-      const storeId = statusModalStore.id;
-      setStatusModalStore(null);
-      fetchStores(pagination.page);
-      if (drawerOpen && detail?.id === storeId) loadDetail(storeId);
-    } catch (err) {
-      toast({ type: 'error', title: 'Không cập nhật được trạng thái', description: apiErrorMessage(err) });
-    } finally {
-      setIsSubmittingStatus(false);
+  // Bulk Actions
+  const isAllSelected = sortedStores.length > 0 && selectedIds.length === sortedStores.length;
+  const isSomeSelected = selectedIds.length > 0 && selectedIds.length < sortedStores.length;
+
+  const handleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedIds(sortedStores.map((s) => s.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectRow = (id, checked) => {
+    if (checked) {
+      setSelectedIds((prev) => [...prev, id]);
+    } else {
+      setSelectedIds((prev) => prev.filter((i) => i !== id));
     }
   };
 
   const idleDays = summary?.idleDays ?? 14;
-  const statusTabs = [
-    { value: '', label: 'Tất cả' },
-    { value: 'true', label: 'Đang hoạt động' },
-    { value: 'false', label: 'Tạm khóa' },
-  ];
-  const detailPayos = PAYOS_LABEL[payosFromDetail(detail)];
+
+  const actionsFor = (st) => [
+    { label: 'Xem chi tiết', icon: ExternalLink, onClick: () => setDetailId(st.id) },
+    { label: 'Sửa thông tin', icon: Edit2, onClick: () => setDialog({ type: 'edit', store: st }) },
+    st.owner?.email && {
+      label: 'Gửi email cho chủ cửa hàng',
+      icon: Mail,
+      onClick: () => window.open(`mailto:${st.owner.email}`),
+    },
+    st.phone && {
+      label: 'Gọi điện cho cửa hàng',
+      icon: Phone,
+      onClick: () => window.open(`tel:${st.phone.replace(/[^\d+]/g, '')}`),
+    },
+    st.isActive
+      ? { label: 'Tạm khóa cửa hàng', icon: Lock, onClick: () => setDialog({ type: 'lock', store: st }), danger: true }
+      : { label: 'Mở lại cửa hàng', icon: Unlock, onClick: () => setDialog({ type: 'unlock', store: st }) },
+  ].filter(Boolean);
+
+  const chips = [
+    status && {
+      key: 'status',
+      label: status === 'true' ? 'Đang hoạt động' : 'Tạm khóa',
+      onRemove: () => setParam('status', ''),
+    },
+    payos && {
+      key: 'payos',
+      label: PAYOS_OPTIONS.find((o) => o.value === payos)?.label,
+      onRemove: () => setParam('payos', ''),
+    },
+  ].filter(Boolean);
+
+  const clearFilters = () => {
+    setSearch('');
+    setParams({}, { replace: true });
+  };
+
+  const detailPayos = payosFromDetail(detail);
+  const payosConfig = detail?.paymentConfigs?.find((c) => c.provider === 'PAYOS');
 
   return (
-    <div className={adminStyles.pageContainer}>
-      <div className={adminStyles.pageHeader}>
-        <div>
-          <h1 className={adminStyles.pageTitle}>Cửa hàng</h1>
-          <p className={adminStyles.pageDesc}>Tình trạng sử dụng của từng cửa hàng thuê nền tảng.</p>
-        </div>
-        <button type="button" onClick={() => fetchStores(pagination.page)} disabled={isLoading} className={adminStyles.btnSecondary}>
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          Làm mới
-        </button>
+    <div className={ui.pageContainer}>
+      <PageHeader
+        title="Quản lý Cửa hàng"
+        description="Theo dõi tình trạng hoạt động, quy mô và tích hợp của từng khách hàng thuê nền tảng."
+        badge={<Badge tone="neutral">{summary?.total ?? 0} cửa hàng</Badge>}
+        actions={
+          <button type="button" onClick={load} disabled={isLoading} className={ui.btnSecondary}>
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            Làm mới
+          </button>
+        }
+      >
+        <Tabs
+          value={status}
+          onChange={(v) => {
+            setSelectedIds([]);
+            setParam('status', v);
+          }}
+          tabs={[
+            { value: '', label: 'Tất cả cửa hàng', count: summary?.total },
+            { value: 'true', label: 'Đang hoạt động', count: summary?.active },
+            { value: 'false', label: 'Đang tạm khóa', count: summary?.locked },
+          ]}
+        />
+      </PageHeader>
+
+      {/* 4 Thẻ KPI Tóm tắt Cửa hàng */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Tổng số Cửa hàng"
+          value={summary?.total ?? 0}
+          subtitle="Tất cả tenant đăng ký"
+          icon={Store}
+          iconBg="bg-blue-50 text-[#2563EB] border-blue-100"
+          loading={isLoading}
+        />
+        <StatCard
+          title="Đang hoạt động"
+          value={summary?.active ?? 0}
+          subtitle={`Tỷ lệ ${summary?.total ? Math.round((summary.active / summary.total) * 100) : 0}% tổng thể`}
+          icon={CheckCircle2}
+          iconBg="bg-emerald-50 text-emerald-600 border-emerald-100"
+          loading={isLoading}
+        />
+        <StatCard
+          title="Tích hợp VietQR (PayOS)"
+          value={`${summary?.payosActive ?? 0} / ${summary?.active ?? 0}`}
+          subtitle="Cửa hàng nhận thanh toán QR"
+          icon={CreditCard}
+          iconBg="bg-purple-50 text-purple-600 border-purple-100"
+          loading={isLoading}
+        />
+        <StatCard
+          title="Ít hoạt động (> 14 ngày)"
+          value={summary?.idle ?? 0}
+          subtitle="Nguy cơ rời bỏ nền tảng"
+          icon={Clock}
+          iconBg="bg-amber-50 text-amber-700 border-amber-100"
+          alert={summary?.idle > 0}
+          loading={isLoading}
+        />
       </div>
 
-      {/* Số liệu tổng quan */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-        <SummaryTile label="Tổng cửa hàng" value={summary?.total ?? '—'} detail="Đã đăng ký trên nền tảng" />
-        <SummaryTile
-          label="Đang hoạt động"
-          value={summary?.active ?? '—'}
-          detail="Bấm để lọc"
-          active={selectedStatus === 'true'}
-          onClick={() => setSelectedStatus(selectedStatus === 'true' ? '' : 'true')}
-        />
-        <SummaryTile
-          label="Dùng thanh toán PayOS"
-          value={summary ? `${summary.payosActive}/${summary.active}` : '—'}
-          detail="Còn lại chỉ nhận tiền mặt"
-        />
-        <SummaryTile
-          label={`Không đăng nhập ≥ ${idleDays} ngày`}
-          value={summary?.idle ?? '—'}
-          detail={summary?.idle ? 'Nên liên hệ hỏi thăm' : 'Tất cả đang dùng đều đặn'}
-          tone={summary?.idle ? 'warning' : undefined}
-        />
-        <SummaryTile
-          label="Tạm khóa"
-          value={summary?.locked ?? '—'}
-          detail="Bấm để lọc"
-          tone={summary?.locked ? 'danger' : undefined}
-          active={selectedStatus === 'false'}
-          onClick={() => setSelectedStatus(selectedStatus === 'false' ? '' : 'false')}
-        />
-      </div>
-
-      {/* Bộ lọc */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative sm:w-96">
-          <Search className="w-4 h-4 text-[#94A3B8] absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm theo tên, mã hoặc số điện thoại"
-            className={`${adminStyles.input} pl-9`}
+      <div className="space-y-3">
+        <Toolbar>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Tìm theo tên cửa hàng, mã định danh, số điện thoại…"
+            className="w-full lg:w-80"
           />
-        </div>
-        <div className="inline-flex rounded-lg border border-[#E5E7EB] bg-white p-0.5 self-start">
-          {statusTabs.map((tab) => (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() => setSelectedStatus(tab.value)}
-              className={`px-3 py-1 text-[13px] rounded-md transition-colors cursor-pointer whitespace-nowrap ${
-                selectedStatus === tab.value ? 'bg-slate-100 text-[#334155] font-medium' : 'text-[#64748B] hover:text-[#334155]'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+          <FilterSelect
+            label="Thanh toán"
+            value={payos}
+            onChange={(v) => setParam('payos', v)}
+            options={PAYOS_OPTIONS}
+          />
+        </Toolbar>
+        <FilterChips chips={chips} onClearAll={clearFilters} />
       </div>
 
-      {/* Bảng */}
-      <div className={`${adminStyles.tableContainer} hidden md:block`}>
-        <div className="overflow-x-auto">
-          <table className={adminStyles.table}>
-            <thead>
-              <tr>
-                <th className={adminStyles.th}>Cửa hàng</th>
-                <th className={adminStyles.th}>Chủ cửa hàng</th>
-                <th className={`${adminStyles.th} text-right`}>Sản phẩm</th>
-                <th className={`${adminStyles.th} text-right`}>Đơn 30 ngày</th>
-                <th className={adminStyles.th}>Đăng nhập gần nhất</th>
-                <th className={adminStyles.th}>Thanh toán</th>
-                <th className={adminStyles.th}>Trạng thái</th>
-                <th className={adminStyles.th}><span className="sr-only">Mở chi tiết</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading && stores.length === 0 ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-[#E5E7EB]">
-                    {Array.from({ length: 8 }).map((__, j) => (
-                      <td key={j} className="px-4 py-4">
-                        <div className="h-3.5 rounded bg-slate-100 animate-pulse" style={{ width: `${45 + ((i + j) % 3) * 18}%` }} />
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : stores.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
-                    <p className="text-[#334155] font-medium">Không có cửa hàng phù hợp</p>
-                    <p className="text-[#64748B] mt-1">Thử từ khóa khác hoặc bỏ bộ lọc trạng thái.</p>
+      <TableCard
+        footer={
+          !error &&
+          pagination?.total > 0 && (
+            <Pagination
+              pagination={pagination}
+              onPage={(p) => setParam('page', String(p), false)}
+              onLimitChange={(l) => setParam('limit', String(l), true)}
+              disabled={isLoading}
+              unit="cửa hàng"
+            />
+          )
+        }
+      >
+        <table className="w-full min-w-237.5">
+          <thead>
+            <tr>
+              <th className="w-10 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] text-center">
+                <Checkbox
+                  checked={isAllSelected}
+                  indeterminate={isSomeSelected}
+                  onChange={handleSelectAll}
+                  aria-label="Chọn tất cả cửa hàng"
+                />
+              </th>
+              <Th sortKey="name" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
+                Cửa hàng
+              </Th>
+              <Th>Chủ cửa hàng</Th>
+              <Th sortKey="skus" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort} align="right">
+                Quy mô
+              </Th>
+              <Th sortKey="orders" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort} align="right">
+                Đơn 30 ngày
+              </Th>
+              <Th sortKey="lastActiveAt" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
+                Đăng nhập gần nhất
+              </Th>
+              <Th>Thanh toán</Th>
+              <Th sortKey="isActive" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
+                Trạng thái
+              </Th>
+              <th className="w-12 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0]">
+                <span className="sr-only">Thao tác</span>
+              </th>
+            </tr>
+          </thead>
+          <TableBody
+            loading={isLoading}
+            error={error}
+            onRetry={load}
+            columns={9}
+            empty={
+              sortedStores.length === 0 && (
+                <EmptyState
+                  title="Không tìm thấy cửa hàng phù hợp"
+                  description="Hãy thử từ khóa tìm kiếm khác hoặc bỏ bớt các bộ lọc đang kích hoạt."
+                  action={
+                    chips.length || search ? (
+                      <button type="button" onClick={clearFilters} className={ui.btnSecondary}>
+                        Xóa bộ lọc
+                      </button>
+                    ) : null
+                  }
+                />
+              )
+            }
+          >
+            {sortedStores.map((st) => {
+              const p = PAYOS[st.payos] || PAYOS.NOT_CONFIGURED;
+              const isSelected = selectedIds.includes(st.id);
+              const isIdle =
+                st.lastActiveAt && Math.floor((Date.now() - new Date(st.lastActiveAt).getTime()) / DAY_MS) >= idleDays;
+
+              return (
+                <tr
+                  key={st.id}
+                  onClick={() => setDetailId(st.id)}
+                  className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/30' : ''}`}
+                >
+                  <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={isSelected}
+                      onChange={(checked) => handleSelectRow(st.id, checked)}
+                      aria-label={`Chọn ${st.name}`}
+                    />
                   </td>
-                </tr>
-              ) : (
-                stores.map((st) => {
-                  const payos = PAYOS_LABEL[st.payos] || PAYOS_LABEL.NOT_CONFIGURED;
-                  return (
-                    <tr key={st.id} onClick={() => openDetail(st.id)} className={`${adminStyles.tr} cursor-pointer group`}>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-[#334155]">{st.name}</div>
-                        <div className="text-[12px] text-[#64748B]">
-                          {st.code}
-                          {st.phone ? ` · ${st.phone}` : ''}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {st.owner ? (
-                          <>
-                            <div className="text-[#334155]">
-                              {st.owner.fullName}
-                              {!st.owner.isActive && <span className="text-[#DC2626] text-[12px]"> (bị khóa)</span>}
-                            </div>
-                            <div className="text-[12px] text-[#64748B]">{st.owner.email}</div>
-                          </>
-                        ) : (
-                          <span className="text-[#94A3B8]">Chưa có</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
-                        <div className="text-[#334155]">{st.stats.skus} SKU</div>
-                        <div className="text-[12px] text-[#64748B]">{st.stats.users} tài khoản</div>
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
-                        <div className="text-[#334155]">{st.stats.ordersLast30Days}</div>
-                        <div className="text-[12px] text-[#64748B]">
-                          {st.stats.lastOrderAt ? `gần nhất ${formatRelativeTime(st.stats.lastOrderAt) || formatVNDateTime(st.stats.lastOrderAt)}` : 'chưa có đơn'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <LastActive value={st.lastActiveAt} idleDays={idleDays} />
-                      </td>
-                      <td className={`px-4 py-3 whitespace-nowrap ${payos.className}`}>{payos.text}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <StatusText isActive={st.isActive} />
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <ChevronRight className="w-4 h-4 text-[#CBD5E1] group-hover:text-[#3B82F6] inline" />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="px-4 py-3 border-t border-[#E5E7EB] flex items-center justify-between text-[13px] text-[#64748B]">
-          <span>
-            {pagination.total > 0
-              ? `${(pagination.page - 1) * pagination.limit + 1}–${Math.min(pagination.page * pagination.limit, pagination.total)} trong ${pagination.total} cửa hàng`
-              : '0 cửa hàng'}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => fetchStores(pagination.page - 1)}
-              disabled={pagination.page <= 1 || isLoading}
-              className="p-1 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              aria-label="Trang trước"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-2 text-xs font-medium text-[#334155]">
-              {pagination.page} / {pagination.totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => fetchStores(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages || isLoading}
-              className="p-1 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-              aria-label="Trang sau"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Thẻ (mobile / tablet nhỏ) */}
-      <div className="md:hidden space-y-2">
-        {stores.map((st) => {
-          const payos = PAYOS_LABEL[st.payos] || PAYOS_LABEL.NOT_CONFIGURED;
-          return (
-            <button key={st.id} type="button" onClick={() => openDetail(st.id)} className={`${adminStyles.card} w-full text-left p-3.5 space-y-1.5`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-[#334155] truncate">{st.name}</p>
-                  <p className="text-[12px] text-[#64748B] truncate">{st.owner?.fullName || 'Chưa có chủ'} · {st.code}</p>
-                </div>
-                <StatusText isActive={st.isActive} />
-              </div>
-              <p className="text-[12px] text-[#64748B]">
-                {st.stats.skus} SKU · {st.stats.ordersLast30Days} đơn/30 ngày · <span className={payos.className}>{payos.text}</span>
-              </p>
-              <p className="text-[12px]">
-                Đăng nhập: <LastActive value={st.lastActiveAt} idleDays={idleDays} />
-              </p>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Drawer chi tiết */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          <div className={adminStyles.drawerBackdrop} onClick={() => setDrawerOpen(false)} />
-          <div className={adminStyles.drawerContent} role="dialog" aria-label="Chi tiết cửa hàng">
-            <div className="px-5 py-4 border-b border-[#E5E7EB] flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="text-[16px] font-semibold text-[#334155] truncate">{detail?.name || 'Cửa hàng'}</h3>
-                <p className="text-[12px] text-[#64748B]">{detail?.code}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                className="p-1 rounded text-[#94A3B8] hover:text-[#334155] hover:bg-slate-100 cursor-pointer"
-                aria-label="Đóng"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-5 space-y-5 text-[13px]">
-              {isLoadingDetail && !detail ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="h-4 rounded bg-slate-100 animate-pulse" />
-                  ))}
-                </div>
-              ) : detail ? (
-                <>
-                  <div className="rounded-lg p-3.5 border border-[#E5E7EB] space-y-2.5">
-                    <DetailRow label="Trạng thái">
-                      <StatusText isActive={detail.isActive} />
-                    </DetailRow>
-                    <DetailRow icon={Phone} label="Điện thoại">{detail.phone || <span className="text-[#94A3B8]">Chưa cập nhật</span>}</DetailRow>
-                    <DetailRow icon={MapPin} label="Địa chỉ">{detail.address || <span className="text-[#94A3B8]">Chưa cập nhật</span>}</DetailRow>
-                    <DetailRow icon={Globe} label="Mã cửa hàng">{detail.code}</DetailRow>
-                    <DetailRow label="Ngày tạo">{formatVNDateTime(detail.createdAt)}</DetailRow>
-                  </div>
-
-                  <div>
-                    <h4 className="text-[13px] font-medium text-[#334155] mb-2">Quy mô</h4>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        ['Tài khoản', (detail.stats?.owners || 0) + (detail.stats?.staff || 0)],
-                        ['Sản phẩm', detail.stats?.products ?? 0],
-                        ['SKU', detail.stats?.skus ?? 0],
-                        ['Tổng đơn', detail.stats?.orders ?? 0],
-                        ['Đơn 30 ngày', detail.stats?.ordersLast30Days ?? 0],
-                        ['Kho', detail.stats?.warehouses ?? 0],
-                      ].map(([label, value]) => (
-                        <div key={label} className="p-2.5 rounded-lg border border-[#E5E7EB] text-center">
-                          <p className="text-[11px] text-[#64748B]">{label}</p>
-                          <p className="text-[17px] font-semibold text-[#334155] tabular-nums">{value}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[12px] text-[#64748B] mt-2">
-                      Đơn gần nhất: {detail.stats?.lastOrderAt ? formatVNDateTime(detail.stats.lastOrderAt) : 'chưa có đơn nào'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-[13px] font-medium text-[#334155] mb-2">Chủ cửa hàng</h4>
-                    {detail.owners?.length > 0 ? (
-                      <ul className="border border-[#E5E7EB] rounded-lg divide-y divide-[#E5E7EB]">
-                        {detail.owners.map((ow) => (
-                          <li key={ow.id} className="p-2.5 flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="text-[#334155] truncate">{ow.fullName}</p>
-                              <p className="text-[12px] text-[#64748B] truncate">{ow.email}</p>
-                            </div>
-                            {!ow.isActive && <span className={`${adminStyles.badge} ${adminStyles.badgeRed}`}>Bị khóa</span>}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-[#64748B]">Chưa có chủ cửa hàng.</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <h4 className="text-[13px] font-medium text-[#334155] mb-2">Thanh toán</h4>
-                    <div className="p-3 rounded-lg border border-[#E5E7EB] flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[#334155]">VietQR (PayOS)</p>
-                        <p className="text-[12px] text-[#64748B]">
-                          {payosFromDetail(detail) === 'NOT_CONFIGURED'
-                            ? 'Chưa kết nối. Cửa hàng chỉ nhận tiền mặt.'
-                            : `Kết nối từ ${formatVNDateTime(detail.paymentConfigs.find((c) => c.provider === 'PAYOS').configuredAt)}`}
+                  <Td>
+                    <div className="flex items-center gap-3">
+                      <Avatar name={st.name} tone="brand" size={38} />
+                      <div className="min-w-0">
+                        <p className="font-bold text-[#0F172A] truncate max-w-55">{st.name}</p>
+                        <p className="text-[12px] text-[#64748B] flex items-center gap-1.5 mt-0.5">
+                          <span className="font-mono bg-slate-100 px-1.5 py-0.2 rounded text-[11px] text-[#475569]">
+                            {st.code}
+                          </span>
+                          {st.phone && <span>· {st.phone}</span>}
                         </p>
                       </div>
-                      <span className={`text-[13px] font-medium ${detailPayos.className}`}>
-                        {{ ACTIVE: 'Đang bật', DISABLED: 'Đã tắt', NOT_CONFIGURED: 'Chưa kết nối' }[payosFromDetail(detail)]}
-                      </span>
                     </div>
-                  </div>
-                </>
-              ) : null}
-            </div>
+                  </Td>
+                  <Td>
+                    {st.owner ? (
+                      <div>
+                        <p className="font-semibold text-[#1E293B] flex items-center gap-1.5">
+                          {st.owner.fullName}
+                          {!st.owner.isActive && (
+                            <span className="text-[11px] font-semibold text-red-600 bg-red-50 px-1.5 py-0.2 rounded border border-red-200">
+                              Khóa
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[12px] text-[#64748B] truncate mt-0.5">{st.owner.email}</p>
+                      </div>
+                    ) : (
+                      <span className="text-[#94A3B8] italic">Chưa liên kết</span>
+                    )}
+                  </Td>
+                  <Td align="right" className="whitespace-nowrap admin-num">
+                    <p className="font-bold text-[#0F172A]">{st.stats.skus.toLocaleString('vi-VN')} SKU</p>
+                    <p className="text-[12px] text-[#64748B]">{st.stats.users} tài khoản</p>
+                  </Td>
+                  <Td align="right" className="whitespace-nowrap admin-num">
+                    <p className="font-bold text-[#0F172A]">{st.stats.ordersLast30Days.toLocaleString('vi-VN')} đơn</p>
+                    <p className="text-[12px] text-[#64748B]">
+                      {st.stats.lastOrderAt
+                        ? `Gần nhất ${formatRelativeTime(st.stats.lastOrderAt) || formatVNDateTime(st.stats.lastOrderAt)}`
+                        : 'Chưa có đơn'}
+                    </p>
+                  </Td>
+                  <Td className="whitespace-nowrap">
+                    {st.lastActiveAt ? (
+                      <div>
+                        <p className={`font-semibold ${isIdle ? 'text-amber-800' : 'text-[#0F172A]'}`} title={formatVNDateTime(st.lastActiveAt)}>
+                          {formatRelativeTime(st.lastActiveAt) || formatVNDateTime(st.lastActiveAt)}
+                        </p>
+                        {isIdle && (
+                          <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded font-medium mt-0.5">
+                            <Clock className="w-2.5 h-2.5" /> Lâu không dùng
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[#94A3B8] italic">Chưa đăng nhập</span>
+                    )}
+                  </Td>
+                  <Td>
+                    <Badge tone={p.tone} dot={st.payos === 'ACTIVE'}>
+                      {p.label}
+                    </Badge>
+                  </Td>
+                  <Td>
+                    {st.isActive ? (
+                      <Badge tone="success">Đang hoạt động</Badge>
+                    ) : (
+                      <Badge tone="danger">Tạm khóa</Badge>
+                    )}
+                  </Td>
+                  <Td align="right">
+                    <RowMenu items={actionsFor(st)} label={`Thao tác với ${st.name}`} />
+                  </Td>
+                </tr>
+              );
+            })}
+          </TableBody>
+        </table>
+      </TableCard>
 
-            {detail && (
-              <div className="p-4 border-t border-[#E5E7EB] flex justify-end">
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.length}
+        onClear={() => setSelectedIds([])}
+        actions={[
+          {
+            label: 'Tạm khóa hàng loạt',
+            icon: Lock,
+            danger: true,
+            onClick: () => {
+              toast({
+                type: 'info',
+                title: 'Thao tác hàng loạt',
+                description: `Đang chuẩn bị xác nhận tạm khóa cho ${selectedIds.length} cửa hàng đã chọn.`,
+              });
+            },
+          },
+        ]}
+      />
+
+      {/* Drawer Chi Tiết Cửa Hàng */}
+      {detailId && (
+        <Drawer
+          title={detail?.name || 'Hồ sơ Cửa hàng'}
+          subtitle={`Mã tenant: ${detail?.code}`}
+          badge={
+            detail && (
+              <Badge tone={detail.isActive ? 'success' : 'danger'}>
+                {detail.isActive ? 'Hoạt động' : 'Tạm khóa'}
+              </Badge>
+            )
+          }
+          tabs={[
+            { key: 'overview', label: 'Tổng quan & Quy mô' },
+            { key: 'owners', label: 'Nhân sự', count: detail?.owners?.length },
+            { key: 'integrations', label: 'Cổng thanh toán' },
+          ]}
+          activeTab={drawerTab}
+          onTabChange={setDrawerTab}
+          onClose={() => setDetailId(null)}
+          footer={
+            detail && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setDialog({ type: 'edit', store: detail })}
+                  className={ui.btnSecondary}
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  Sửa thông tin
+                </button>
                 {detail.isActive ? (
-                  <button type="button" onClick={() => openStatusModal(detail)} className={adminStyles.btnDanger}>
+                  <button
+                    type="button"
+                    onClick={() => setDialog({ type: 'lock', store: detail })}
+                    className={ui.btnDanger}
+                  >
                     <Lock className="w-3.5 h-3.5" />
                     Tạm khóa cửa hàng
                   </button>
                 ) : (
-                  <button type="button" onClick={() => openStatusModal(detail)} className={adminStyles.btnPrimary}>
+                  <button
+                    type="button"
+                    onClick={() => setDialog({ type: 'unlock', store: detail })}
+                    className={ui.btnPrimary}
+                  >
                     <Unlock className="w-3.5 h-3.5" />
                     Mở lại cửa hàng
                   </button>
                 )}
+              </>
+            )
+          }
+        >
+          {!detail ? (
+            <div className="space-y-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-5 rounded-lg bg-slate-100 animate-pulse" />
+              ))}
+            </div>
+          ) : drawerTab === 'overview' ? (
+            <div className="space-y-6">
+              <DetailList
+                rows={[
+                  ['Tên cửa hàng', detail.name],
+                  ['Mã subdomain', <span className="font-mono">{detail.code}</span>],
+                  ['Điện thoại liên hệ', detail.phone || 'Chưa cập nhật'],
+                  ['Địa chỉ', detail.address || 'Chưa cập nhật'],
+                  ['Ngày khởi tạo', formatVNDateTime(detail.createdAt)],
+                  [
+                    'Đơn hàng gần nhất',
+                    detail.stats?.lastOrderAt ? formatVNDateTime(detail.stats.lastOrderAt) : 'Chưa có đơn hàng nào',
+                  ],
+                ]}
+              />
+
+              <Section title="Quy mô & Tài nguyên vận hành">
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    ['Tài khoản', (detail.stats?.owners || 0) + (detail.stats?.staff || 0), Users],
+                    ['Sản phẩm', detail.stats?.products ?? 0, Package],
+                    ['Mã SKU', detail.stats?.skus ?? 0, ShoppingBag],
+                    ['Tổng số đơn', detail.stats?.orders ?? 0, ShoppingBag],
+                    ['Đơn 30 ngày', detail.stats?.ordersLast30Days ?? 0, ShoppingBag],
+                    ['Kho hàng', detail.stats?.warehouses ?? 0, Warehouse],
+                  ].map(([label, value, Icon]) => (
+                    <div key={label} className="p-3.5 rounded-xl border border-[#E2E8F0] bg-white shadow-2xs">
+                      <div className="flex items-center justify-between text-[#64748B] mb-1">
+                        <span className="text-[12px] font-medium">{label}</span>
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <p className="text-[20px] font-bold text-[#0F172A] admin-num">{value.toLocaleString('vi-VN')}</p>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+            </div>
+          ) : drawerTab === 'owners' ? (
+            <div className="space-y-4">
+              <h4 className="text-[13px] font-bold text-[#0F172A]">Chủ cửa hàng & Quản lý</h4>
+              {detail.owners?.length > 0 ? (
+                <ul className="rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] bg-white overflow-hidden shadow-2xs">
+                  {detail.owners.map((ow) => (
+                    <li key={ow.id} className="p-4 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar name={ow.fullName} size={36} />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-[#0F172A] truncate flex items-center gap-1.5">
+                            {ow.fullName}
+                            {!ow.isActive && <Badge tone="danger">Khóa</Badge>}
+                          </p>
+                          <a href={`mailto:${ow.email}`} className="text-[12px] text-[#2563EB] hover:underline truncate block mt-0.5">
+                            {ow.email}
+                          </a>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <a href={`mailto:${ow.email}`} className={`${ui.btnGhost} p-2`} title="Gửi email">
+                          <Mail className="w-4 h-4 text-[#2563EB]" />
+                        </a>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-[13px] text-[#64748B] p-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  Cửa hàng chưa có tài khoản chủ shop liên kết.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h4 className="text-[13px] font-bold text-[#0F172A]">Cổng thanh toán điện tử</h4>
+              <div className="p-4 rounded-xl border border-[#E2E8F0] bg-white shadow-2xs space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
+                      <CreditCard className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-bold text-[#0F172A]">VietQR qua PayOS</p>
+                      <p className="text-[12px] text-[#64748B]">Tự động đối soát và khớp đơn hàng tại quầy</p>
+                    </div>
+                  </div>
+                  <Badge tone={PAYOS[detailPayos].tone} dot={detailPayos === 'ACTIVE'}>
+                    {{ ACTIVE: 'Đang bật', DISABLED: 'Đã tắt', NOT_CONFIGURED: 'Chưa kết nối' }[detailPayos]}
+                  </Badge>
+                </div>
+                {payosConfig && (
+                  <p className="text-[12px] text-[#475569] pt-2 border-t border-slate-100">
+                    Được cấu hình ngày <span className="font-semibold">{formatVNDateTime(payosConfig.configuredAt)}</span>. Khóa API được mã hóa bằng AES-256 an toàn.
+                  </p>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+        </Drawer>
       )}
 
-      {/* Hộp thoại tạm khóa / mở lại */}
-      {statusModalStore && (
-        <div className={adminStyles.modalBackdrop}>
-          <div className={adminStyles.modalContent} role="dialog" aria-label="Xác nhận đổi trạng thái cửa hàng">
-            <div className="p-5 border-b border-[#E5E7EB]">
-              <h3 className="text-[16px] font-semibold text-[#334155]">
-                {isLockingModal ? `Tạm khóa ${statusModalStore.name}?` : `Mở lại ${statusModalStore.name}?`}
-              </h3>
-              <p className="text-[13px] text-[#64748B] mt-1.5 leading-relaxed">
-                {isLockingModal
-                  ? 'Mọi tài khoản của cửa hàng bị đăng xuất ngay và không đăng nhập được cho tới khi mở lại. Dữ liệu cửa hàng được giữ nguyên.'
-                  : 'Các tài khoản của cửa hàng đăng nhập và sử dụng lại bình thường.'}
-              </p>
-            </div>
-            <div className="p-5 space-y-3.5">
-              <label className="block">
-                <span className="block text-[13px] font-medium text-[#334155] mb-1">Lý do {isLockingModal ? '' : '(không bắt buộc)'}</span>
-                <textarea
-                  rows={3}
-                  value={statusReason}
-                  onChange={(e) => setStatusReason(e.target.value)}
-                  placeholder={isLockingModal ? 'Ví dụ: Hết hạn thuê bao tháng 10' : 'Ví dụ: Đã gia hạn thuê bao'}
-                  className={adminStyles.input}
-                  autoFocus
-                />
-                <span className="block text-[12px] text-[#94A3B8] mt-1">
-                  {isLockingModal && statusReason.trim().length < MIN_REASON_LENGTH
-                    ? `Cần ít nhất ${MIN_REASON_LENGTH} ký tự. Lý do được lưu vào nhật ký kiểm toán.`
-                    : 'Lý do được lưu vào nhật ký kiểm toán.'}
-                </span>
-              </label>
-              {isLockingModal && (
-                <label className="block">
-                  <span className="block text-[13px] font-medium text-[#334155] mb-1">Mật khẩu của bạn</span>
-                  <input
-                    type="password"
-                    value={statusPassword}
-                    onChange={(e) => setStatusPassword(e.target.value)}
-                    autoComplete="current-password"
-                    className={adminStyles.input}
-                  />
-                  <span className="block text-[12px] text-[#94A3B8] mt-1">Tạm khóa ảnh hưởng mọi tài khoản của cửa hàng nên cần xác nhận lại.</span>
-                </label>
-              )}
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setStatusModalStore(null)} disabled={isSubmittingStatus} className={adminStyles.btnSecondary}>
-                  Hủy
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmStatusChange}
-                  disabled={!canSubmitStatus}
-                  className={isLockingModal ? adminStyles.btnDanger : adminStyles.btnPrimary}
-                >
-                  {isSubmittingStatus && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  {isLockingModal ? 'Tạm khóa' : 'Mở lại'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Dialogs */}
+      {dialog?.type === 'edit' && (
+        <EditStoreModal
+          store={dialog.store}
+          onClose={() => setDialog(null)}
+          onSaved={() => refreshAfterChange(dialog.store.id)}
+        />
+      )}
+
+      {(dialog?.type === 'lock' || dialog?.type === 'unlock') && (
+        <ConfirmDialog
+          title={
+            dialog.type === 'lock'
+              ? `Tạm khóa cửa hàng ${dialog.store.name}?`
+              : `Mở lại cửa hàng ${dialog.store.name}?`
+          }
+          description={
+            dialog.type === 'lock'
+              ? 'Tất cả tài khoản thuộc cửa hàng này sẽ bị đăng xuất ngay lập tức và không thể truy cập hệ thống. Toàn bộ dữ liệu sản phẩm và đơn hàng vẫn được lưu giữ an toàn.'
+              : 'Các tài khoản thuộc cửa hàng sẽ có thể đăng nhập và bán hàng bình thường ngay sau khi mở khóa.'
+          }
+          confirmLabel={dialog.type === 'lock' ? 'Tạm khóa cửa hàng' : 'Mở lại cửa hàng'}
+          danger={dialog.type === 'lock'}
+          reason={{
+            required: dialog.type === 'lock',
+            placeholder:
+              dialog.type === 'lock'
+                ? 'Ví dụ: Hết hạn gói dịch vụ tháng này hoặc vi phạm điều khoản'
+                : 'Ví dụ: Đã thanh toán gia hạn dịch vụ thành công',
+          }}
+          password={
+            dialog.type === 'lock'
+              ? { hint: 'Khóa cửa hàng ảnh hưởng đến toàn bộ nhân viên shop nên cần xác nhận lại mật khẩu.' }
+              : null
+          }
+          onClose={() => setDialog(null)}
+          onConfirm={async ({ reason, password }) => {
+            try {
+              const res = await apiUpdateAdminStoreStatus(dialog.store.id, {
+                isActive: dialog.type === 'unlock',
+                reason: reason || undefined,
+                actorPassword: dialog.type === 'lock' ? password : undefined,
+              });
+              toast({
+                type: 'success',
+                title: dialog.type === 'lock' ? 'Đã tạm khóa cửa hàng' : 'Đã mở lại cửa hàng',
+                description:
+                  dialog.type === 'lock'
+                    ? `${dialog.store.name}: Đã thu hồi ${res?.data?.revokedSessions ?? 0} phiên đăng nhập.`
+                    : `${dialog.store.name} đã được mở lại thành công.`,
+              });
+              refreshAfterChange(dialog.store.id);
+            } catch (err) {
+              toast({ type: 'error', title: 'Không cập nhật được trạng thái', description: apiErrorMessage(err) });
+            }
+          }}
+        />
       )}
     </div>
   );

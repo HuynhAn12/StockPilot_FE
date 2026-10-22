@@ -31,3 +31,8 @@ RULES.md
 *.tmp
 STOCKPILOT_*.md
 ADMIN_*.md
+
+# Excel & Data files (DO NOT COMMIT)
+*.xlsx
+*.xls
+public/sample_data/
