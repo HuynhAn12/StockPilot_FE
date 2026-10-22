@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   User, Mail, Lock, Eye, EyeOff, ArrowRight, Store,
   Phone, Globe2, MapPin, CheckCircle2, Circle, Shield,
@@ -443,21 +443,25 @@ export function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const [form, setForm] = useState({
+  // Admin "Tạo cửa hàng" from a lead opens /register?fullName&phone&email&storeName to prefill the form.
+  const [searchParams] = useSearchParams();
+  const prefill = (key, max) => (searchParams.get(key) || '').trim().slice(0, max);
+
+  const [form, setForm] = useState(() => ({
     // Step 1
-    name: '',
-    phone: '',
-    email: '',
+    name: prefill('fullName', 255),
+    phone: prefill('phone', 20),
+    email: prefill('email', 255),
     password: '',
     confirmPassword: '',
     // Step 2
-    storeName: '',
-    storeSlug: '',
+    storeName: prefill('storeName', 255),
+    storeSlug: slugify(prefill('storeName', 255)),
     storeSlugManual: false,
     storeAddress: '',
     industry: '',
     agreeTerms: false,
-  });
+  }));
 
   const onChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));

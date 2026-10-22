@@ -1,119 +1,330 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
-  Store, Users, FileText, UserCheck, RefreshCw, UserPlus, Download, ArrowRight,
-  AlertTriangle, CheckCircle2, CircleAlert, Mail, Image, CreditCard, Gauge, X, Loader2,
+  RefreshCw,
+  UserPlus,
+  Download,
+  Loader2,
+  X,
+  Phone,
+  Store,
+  Users,
+  LifeBuoy,
+  UserCheck,
+  Activity,
+  ShieldAlert,
+  AlertTriangle,
+  Database,
+  Mail,
+  ImageIcon,
+  Clock,
+  ArrowRight,
+  ExternalLink,
+  MessageCircle,
 } from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
+import { useAuthStore } from '../../store/authStore';
+import { usePolling } from '../../components/support/SupportChat';
 import {
   apiGetAdminDashboard,
   apiGetAdminSystemConfig,
+  apiGetAdminSystemHealth,
+  apiListAdminLeads,
   apiExportAdminAuditLogs,
   apiCreateAdminUser,
   formatVNDateTime,
 } from '../../services/adminService';
+import { apiAdminListTickets } from '../../services/supportService';
 import { actionLabel, apiErrorMessage, formatRelativeTime, isSensitiveAction, roleLabel } from './adminLabels';
-import { adminStyles } from './adminStyles';
+import { adminStyles as ui } from './adminStyles';
+import { StatCard, LiveIndicator, Avatar, Modal } from './components/AdminUI';
 
-function buildAttentionItems(data, config) {
+/** Severity configurations with distinctive icon badges and styling */
+const LEVEL_CONFIG = {
+  danger: {
+    border: 'border-l-4 border-l-red-500 bg-red-50/30',
+    badge: 'bg-red-50 text-red-700 border-red-200',
+    iconBg: 'bg-red-100 text-red-600',
+    tag: 'Khẩn cấp',
+  },
+  warning: {
+    border: 'border-l-4 border-l-amber-500 bg-amber-50/25',
+    badge: 'bg-amber-50 text-amber-800 border-amber-200',
+    iconBg: 'bg-amber-100 text-amber-700',
+    tag: 'Cần chú ý',
+  },
+  info: {
+    border: 'border-l-4 border-l-blue-500 bg-blue-50/20',
+    badge: 'bg-blue-50 text-blue-700 border-blue-200',
+    iconBg: 'bg-blue-100 text-blue-600',
+    tag: 'Thông tin',
+  },
+};
+
+function buildAttention({ data, config, health, leads, support }) {
   const items = [];
+  if (health && health.database?.status !== 'UP') {
+    items.push({
+      level: 'danger',
+      icon: Database,
+      title: 'Mất kết nối cơ sở dữ liệu',
+      detail: 'Cửa hàng không thể bán hàng và ghi nhận dữ liệu cho tới khi máy chủ MySQL hoạt động lại.',
+      to: '/admin/system',
+      action: 'Xem sức khỏe',
+    });
+  }
+  if (health?.http?.serverErrors > 0) {
+    items.push({
+      level: 'warning',
+      icon: AlertTriangle,
+      title: `${health.http.serverErrors} lỗi máy chủ (5xx) trong 24 giờ qua`,
+      detail: 'Xem danh sách lỗi gần đây và mã tra cứu requestId để tìm nguyên nhân.',
+      to: '/admin/system',
+      action: 'Xem mã lỗi',
+    });
+  }
   if (config?.auth?.usingDefaultJwtSecrets) {
-    items.push({ level: 'danger', text: 'Máy chủ đang dùng JWT secret mặc định. Cần đặt JWT_SECRET và JWT_REFRESH_SECRET trong file .env.', to: '/admin/system' });
+    items.push({
+      level: 'danger',
+      icon: ShieldAlert,
+      title: 'Khóa bảo mật đăng nhập JWT đang dùng giá trị mặc định',
+      detail: 'Cần đặt biến JWT_SECRET và JWT_REFRESH_SECRET an toàn trong file .env của máy chủ.',
+      to: '/admin/system',
+      action: 'Xem cấu hình',
+    });
+  }
+  if (support?.unread > 0) {
+    items.push({
+      level: 'warning',
+      icon: LifeBuoy,
+      title: `${support.unread} yêu cầu hỗ trợ có tin nhắn mới`,
+      detail: 'Cửa hàng đang chờ đội ngũ hỗ trợ kỹ thuật phản hồi.',
+      to: '/admin/support',
+      action: 'Trả lời ngay',
+    });
+  }
+  if (leads?.waitingOver24h > 0) {
+    items.push({
+      level: 'warning',
+      icon: UserCheck,
+      title: `${leads.waitingOver24h} khách tiềm năng chờ quá 24 giờ`,
+      detail: 'Họ đã để lại số điện thoại trên trang chủ nhưng chưa có nhân viên gọi lại.',
+      to: '/admin/leads',
+      action: 'Gọi khách ngay',
+    });
+  } else if (leads?.NEW > 0) {
+    items.push({
+      level: 'info',
+      icon: UserCheck,
+      title: `${leads.NEW} khách tiềm năng mới`,
+      detail: 'Vừa đăng ký nhận tư vấn mở cửa hàng trên trang chủ.',
+      to: '/admin/leads',
+      action: 'Xem khách',
+    });
   }
   if (config && !config.integrations?.smtp?.configured) {
-    items.push({ level: 'warning', text: 'Chưa cấu hình email (SMTP), người dùng sẽ không nhận được mã OTP.', to: '/admin/system' });
+    items.push({
+      level: 'warning',
+      icon: Mail,
+      title: 'Chưa cấu hình máy chủ gửi email (SMTP)',
+      detail: 'Người dùng sẽ không nhận được mã xác thực OTP khi đăng ký hoặc quên mật khẩu.',
+      to: '/admin/system',
+      action: 'Xem cấu hình',
+    });
   }
-  if (data?.newLeads > 0) {
-    items.push({ level: 'warning', text: `${data.newLeads} khách hàng tiềm năng đang chờ liên hệ.`, to: '/admin/leads' });
+  if (config && !config.integrations?.cloudinary?.configured) {
+    items.push({
+      level: 'info',
+      icon: ImageIcon,
+      title: 'Chưa cấu hình dịch vụ lưu trữ ảnh (Cloudinary)',
+      detail: 'Cửa hàng sẽ không tải được ảnh sản phẩm và ảnh đính kèm lên hệ thống.',
+      to: '/admin/system',
+      action: 'Xem cấu hình',
+    });
+  }
+  const idle = data?.growth?.idleStores ?? [];
+  if (idle.length > 0) {
+    items.push({
+      level: 'info',
+      icon: Clock,
+      title:
+        idle.length === 1
+          ? `${idle[0].name} không đăng nhập ${idle[0].daysIdle} ngày`
+          : `${idle.length} cửa hàng không đăng nhập từ 14 ngày trở lên`,
+      detail: 'Nên liên hệ hỏi thăm trước khi cửa hàng ngừng gia hạn dịch vụ.',
+      to: '/admin/stores',
+      action: 'Xem cửa hàng',
+    });
   }
   if (data?.stores?.inactive > 0) {
-    items.push({ level: 'info', text: `${data.stores.inactive} cửa hàng đang tạm khóa.`, to: '/admin/stores' });
-  }
-  if (data?.users?.locked > 0) {
-    items.push({ level: 'info', text: `${data.users.locked} tài khoản đang bị khóa.`, to: '/admin/users' });
+    items.push({
+      level: 'info',
+      icon: Store,
+      title: `${data.stores.inactive} cửa hàng đang tạm khóa`,
+      detail: 'Mở lại khi cửa hàng đã gia hạn dịch vụ hoặc khắc phục xong vi phạm.',
+      to: '/admin/stores',
+      action: 'Xem cửa hàng',
+    });
   }
   return items;
 }
 
-function StatCard({ icon: Icon, label, value, detail, onClick, loading }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="bg-white rounded-lg border border-[#E5E7EB] p-4 text-left hover:border-[#3B82F6]/50 transition-colors cursor-pointer group"
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-[13px] font-normal text-[#64748B]">{label}</span>
-        <span className="w-8 h-8 rounded-lg bg-slate-50 text-[#64748B] flex items-center justify-center border border-[#E5E7EB]">
-          <Icon className="w-4 h-4" />
-        </span>
-      </div>
-      <div className="mt-2 text-2xl font-semibold text-[#334155] tabular-nums">
-        {loading ? <span className="inline-block w-12 h-7 rounded bg-slate-100 animate-pulse align-middle" /> : value}
-      </div>
-      <div className="mt-1 flex items-center justify-between text-[12px] text-[#64748B]">
-        <span className="truncate">{detail}</span>
-        <ArrowRight className="w-3.5 h-3.5 text-[#94A3B8] group-hover:text-[#3B82F6] transition-colors shrink-0" />
-      </div>
-    </button>
-  );
+function greeting(name) {
+  const h = new Date().getHours();
+  const part = h < 11 ? 'Chào buổi sáng' : h < 14 ? 'Chào buổi trưa' : h < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
+  const fullName = String(name || '').replace(/\(.*?\)/g, '').trim();
+  return fullName ? `${part}, ${fullName}` : part;
 }
 
-function ConfigRow({ icon: Icon, label, ok, okText, badText }) {
+function todayLabel() {
+  const s = new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function CreateAdminDialog({ onClose, onCreated }) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ fullName: '', email: '', password: '', actorPassword: '' });
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (form.password.length < 8) {
+      toast({ type: 'warning', title: 'Mật khẩu quá ngắn', description: 'Mật khẩu mới cần ít nhất 8 ký tự.' });
+      return;
+    }
+    setBusy(true);
+    try {
+      await apiCreateAdminUser(form);
+      toast({ type: 'success', title: 'Đã tạo quản trị viên', description: `${form.email} có thể đăng nhập ngay.` });
+      onCreated();
+    } catch (err) {
+      toast({ type: 'error', title: 'Không tạo được tài khoản', description: apiErrorMessage(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <li className="flex items-center gap-2.5 py-2">
-      <Icon className="w-4 h-4 text-[#64748B] shrink-0" />
-      <span className="flex-1 text-[13px] text-[#475569]">{label}</span>
-      {ok ? (
-        <span className="inline-flex items-center gap-1 text-[12px] text-emerald-700">
-          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-          {okText}
-        </span>
-      ) : (
-        <span className="inline-flex items-center gap-1 text-[12px] font-medium text-[#D97706]">
-          <CircleAlert className="w-3.5 h-3.5" />
-          {badText}
-        </span>
-      )}
-    </li>
+    <Modal
+      title="Tạo tài khoản Quản trị viên"
+      description="Tài khoản Quản trị viên có toàn quyền kiểm soát nền tảng, quản lý mọi người dùng và cửa hàng."
+      onClose={onClose}
+      busy={busy}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={busy} className={ui.btnSecondary}>
+            Hủy
+          </button>
+          <button type="button" onClick={submit} disabled={busy} className={ui.btnPrimary}>
+            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Tạo tài khoản
+          </button>
+        </>
+      }
+    >
+      <form onSubmit={submit} className="space-y-4" autoComplete="off">
+        <div>
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Họ và tên</label>
+          <input
+            type="text"
+            required
+            autoComplete="off"
+            placeholder="Ví dụ: Nguyễn Văn An"
+            value={form.fullName}
+            onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+            className={ui.input}
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Email đăng nhập</label>
+          <input
+            type="email"
+            required
+            autoComplete="off"
+            placeholder="admin@stockpilot.vn"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            className={ui.input}
+          />
+        </div>
+        <div>
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Mật khẩu ban đầu</label>
+          <input
+            type="password"
+            required
+            autoComplete="new-password"
+            placeholder="Tối thiểu 8 ký tự"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            className={ui.input}
+          />
+        </div>
+        <div className="pt-3 border-t border-slate-200">
+          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Mật khẩu xác nhận của bạn</label>
+          <input
+            type="password"
+            required
+            autoComplete="current-password"
+            placeholder="Nhập mật khẩu của bạn để xác thực"
+            value={form.actorPassword}
+            onChange={(e) => setForm({ ...form, actorPassword: e.target.value })}
+            className={ui.input}
+          />
+          <span className="block text-[12px] text-[#64748B] mt-1.5">
+            Thao tác cấp quyền quản trị yêu cầu bạn nhập lại mật khẩu hiện tại.
+          </span>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
 export function AdminSystemDashboard() {
-  const navigate = useNavigate();
   const { toast } = useToast();
-
-  const [data, setData] = useState(null);
-  const [config, setConfig] = useState(null);
+  const { user } = useAuthStore();
+  const [state, setState] = useState({ data: null, config: null, health: null, leads: null, support: null });
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-
   const [createOpen, setCreateOpen] = useState(false);
-  const [createForm, setCreateForm] = useState({ fullName: '', email: '', password: '', actorPassword: '' });
-  const [isCreating, setIsCreating] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState('');
 
-  const fetchDashboard = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [dashboard, cfg] = await Promise.all([apiGetAdminDashboard(), apiGetAdminSystemConfig().catch(() => null)]);
-      setData(dashboard);
-      setConfig(cfg);
-    } catch (err) {
-      toast({ type: 'error', title: 'Không tải được tổng quan', description: apiErrorMessage(err) });
-    } finally {
-      setIsLoading(false);
+  const load = useCallback(async () => {
+    const [data, config, health, leads, support] = await Promise.allSettled([
+      apiGetAdminDashboard(),
+      apiGetAdminSystemConfig(),
+      apiGetAdminSystemHealth(),
+      apiListAdminLeads({ limit: 1 }),
+      apiAdminListTickets({ limit: 1 }),
+    ]);
+
+    if (data.status === 'rejected') {
+      toast({ type: 'error', title: 'Không tải được số liệu tổng quan', description: apiErrorMessage(data.reason) });
     }
+
+    const value = (r) => (r.status === 'fulfilled' ? r.value : null);
+    setState({
+      data: value(data),
+      config: value(config),
+      health: value(health),
+      leads: value(leads)?.summary ?? null,
+      support: value(support)?.summary ?? null,
+    });
+    setLastSyncTime(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    setIsLoading(false);
   }, [toast]);
 
   useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
+    load();
+  }, [load]);
+
+  usePolling(load, 60000);
 
   const handleExport = async () => {
     setIsExporting(true);
     try {
       await apiExportAdminAuditLogs({});
-      toast({ type: 'success', title: 'Đã tải file nhật ký', description: 'File CSV đã được lưu vào máy.' });
+      toast({ type: 'success', title: 'Đã xuất nhật ký kiểm toán', description: 'File CSV đã được tải xuống máy.' });
     } catch (err) {
       toast({ type: 'error', title: 'Không xuất được nhật ký', description: apiErrorMessage(err) });
     } finally {
@@ -121,288 +332,282 @@ export function AdminSystemDashboard() {
     }
   };
 
-  const handleCreateAdmin = async (e) => {
-    e.preventDefault();
-    if (createForm.password.length < 8) {
-      toast({ type: 'warning', title: 'Mật khẩu quá ngắn', description: 'Mật khẩu cần ít nhất 8 ký tự.' });
-      return;
-    }
-    setIsCreating(true);
-    try {
-      await apiCreateAdminUser(createForm);
-      toast({ type: 'success', title: 'Đã tạo quản trị viên', description: `${createForm.email} có thể đăng nhập ngay.` });
-      setCreateOpen(false);
-      setCreateForm({ fullName: '', email: '', password: '', actorPassword: '' });
-      fetchDashboard();
-    } catch (err) {
-      toast({ type: 'error', title: 'Không tạo được tài khoản', description: apiErrorMessage(err) });
-    } finally {
-      setIsCreating(false);
-    }
-  };
+  const { data, health, config, leads, support } = state;
+  const attention = buildAttention(state);
+  const stores = data?.stores ?? { total: 0, active: 0, inactive: 0 };
+  const idleStores = data?.growth?.idleStores ?? [];
+  const recentLogs = data?.recentAuditLogs ?? [];
+  const openTickets = support ? support.OPEN + support.IN_PROGRESS + support.WAITING_STORE : 0;
 
-  const stores = data?.stores || { total: 0, active: 0, inactive: 0 };
-  const users = data?.users || { total: 0, active: 0, locked: 0, byRole: {} };
-  const recentLogs = data?.recentAuditLogs || [];
-  const attention = buildAttentionItems(data, config);
+  const isHealthy = health?.database?.status === 'UP' && !config?.auth?.usingDefaultJwtSecrets;
 
   return (
-    <div className={adminStyles.pageContainer}>
-      {/* Header */}
-      <div className={adminStyles.pageHeader}>
+    <div className="w-full space-y-6 pb-16 text-[#334155]">
+      {/* Header chỉ huy chính */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-1">
         <div>
-          <h1 className={adminStyles.pageTitle}>Tổng quan hệ thống</h1>
-          <p className={adminStyles.pageDesc}>Tình hình các cửa hàng, tài khoản và hoạt động trên nền tảng.</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-[26px] sm:text-[30px] font-bold tracking-tight text-[#0F172A] leading-tight">
+              {greeting(user?.fullName)}
+            </h1>
+            <LiveIndicator
+              status={isHealthy ? 'synced' : 'error'}
+              lastUpdated={lastSyncTime}
+              onRefresh={() => {
+                setIsLoading(true);
+                load();
+              }}
+              loading={isLoading}
+            />
+          </div>
+          <p className="text-[13px] sm:text-[14px] text-[#64748B] mt-1">
+            {todayLabel()} · {attention.length > 0 ? `Hiện có ${attention.length} vấn đề cần lưu ý` : 'Hệ thống vận hành trơn tru'}
+          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={fetchDashboard} disabled={isLoading} className={adminStyles.btnSecondary}>
+
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setIsLoading(true);
+              load();
+            }}
+            disabled={isLoading}
+            className={ui.btnSecondary}
+            aria-label="Làm mới số liệu"
+          >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            <span>Làm mới</span>
+            Làm mới
           </button>
-          <button type="button" onClick={() => setCreateOpen(true)} className={adminStyles.btnPrimary}>
+          <button type="button" onClick={handleExport} disabled={isExporting} className={ui.btnSecondary}>
+            {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            Xuất nhật ký
+          </button>
+          <button type="button" onClick={() => setCreateOpen(true)} className={ui.btnPrimary}>
             <UserPlus className="w-3.5 h-3.5" />
-            <span>Tạo quản trị viên</span>
+            Tạo quản trị viên
           </button>
         </div>
       </div>
 
-      {/* Việc cần xử lý: chỉ hiện khi có */}
+      {/* Danh sách việc cần chú ý (Attention Feed) */}
       {!isLoading && attention.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-3.5">
-          <div className="flex items-center gap-2 text-[13px] font-medium text-[#D97706]">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            <span>Cần xử lý ({attention.length})</span>
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[14px] font-bold uppercase tracking-wider text-[#475569]">
+              Hành động cần ưu tiên ({attention.length})
+            </h2>
           </div>
-          <ul className="mt-2 space-y-1">
-            {attention.map((item) => (
-              <li key={item.text}>
-                <button
-                  type="button"
-                  onClick={() => navigate(item.to)}
-                  className={`text-left text-[13px] hover:underline cursor-pointer ${
-                    item.level === 'danger' ? 'text-[#DC2626] font-medium' : 'text-[#D97706]'
-                  }`}
+          <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] shadow-[0_1px_3px_rgba(15,23,42,0.06)] overflow-hidden">
+            {attention.map((item, idx) => {
+              const cfg = LEVEL_CONFIG[item.level] || LEVEL_CONFIG.info;
+              const Icon = item.icon || AlertTriangle;
+              return (
+                <div
+                  key={`${item.title}-${idx}`}
+                  className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors hover:bg-slate-50/80 ${cfg.border}`}
                 >
-                  • {item.text}
-                </button>
-              </li>
-            ))}
-          </ul>
+                  <div className="flex items-start gap-3.5 min-w-0">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${cfg.iconBg}`}>
+                      <Icon className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-[14px] font-semibold text-[#0F172A]">{item.title}</p>
+                        <span className={`text-[11px] font-semibold px-2 py-0.2 rounded-full border ${cfg.badge}`}>
+                          {cfg.tag}
+                        </span>
+                      </div>
+                      <p className="text-[13px] text-[#64748B] mt-0.5 leading-relaxed">{item.detail}</p>
+                    </div>
+                  </div>
+                  <Link to={item.to} className={`${ui.btnSecondary} shrink-0 self-start sm:self-center text-[12px]`}>
+                    {item.action}
+                    <ArrowRight className="w-3 h-3 ml-0.5" />
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Chỉ số chính: 4 thẻ đơn giản, icon xám, không tô mỗi thẻ một màu */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3.5">
+      {/* 4 Thẻ chỉ số chính (KPI Cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
+          title="Cửa hàng hoạt động"
+          value={`${stores.active} / ${stores.total}`}
+          subtitle={idleStores.length ? `${idleStores.length} shop ít đăng nhập` : 'Tất cả hoạt động đều'}
           icon={Store}
-          label="Cửa hàng"
-          value={stores.total}
-          detail={stores.inactive > 0 ? `${stores.active} hoạt động, ${stores.inactive} tạm khóa` : `${stores.active} đang hoạt động`}
-          onClick={() => navigate('/admin/stores')}
+          iconBg="bg-blue-50 text-[#2563EB] border-blue-100"
+          alert={idleStores.length > 0}
+          to="/admin/stores"
           loading={isLoading}
         />
         <StatCard
-          icon={Users}
-          label="Tài khoản"
-          value={users.total}
-          detail={`${users.byRole?.SHOP_OWNER ?? 0} chủ shop, ${users.byRole?.WAREHOUSE_STAFF ?? 0} nhân viên`}
-          onClick={() => navigate('/admin/users')}
-          loading={isLoading}
-        />
-        <StatCard
-          icon={FileText}
-          label="Thao tác hôm nay"
-          value={data?.auditEventsToday ?? 0}
-          detail="Xem nhật ký kiểm toán"
-          onClick={() => navigate('/admin/audit-log')}
-          loading={isLoading}
-        />
-        <StatCard
+          title="Khách tiềm năng mới"
+          value={leads?.NEW ?? 0}
+          subtitle={leads?.waitingOver24h ? `${leads.waitingOver24h} khách chờ > 24h` : `Tổng ${leads?.total ?? 0} khách`}
           icon={UserCheck}
-          label="Khách tiềm năng mới"
-          value={data?.newLeads ?? 0}
-          detail="Chưa được liên hệ"
-          onClick={() => navigate('/admin/leads')}
+          iconBg="bg-emerald-50 text-emerald-600 border-emerald-100"
+          alert={leads?.waitingOver24h > 0}
+          to="/admin/leads"
+          loading={isLoading}
+        />
+        <StatCard
+          title="Yêu cầu hỗ trợ mở"
+          value={openTickets}
+          subtitle={support?.unread ? `${support.unread} tin nhắn mới chưa đọc` : 'Đang xử lý ổn thỏa'}
+          icon={LifeBuoy}
+          iconBg="bg-amber-50 text-amber-600 border-amber-100"
+          alert={support?.unread > 0}
+          to="/admin/support"
+          loading={isLoading}
+        />
+        <StatCard
+          title="Thao tác hôm nay"
+          value={(data?.auditEventsToday ?? 0).toLocaleString('vi-VN')}
+          subtitle="Sự kiện kiểm toán ghi nhận"
+          icon={Activity}
+          iconBg="bg-purple-50 text-purple-600 border-purple-100"
+          to="/admin/audit-log"
           loading={isLoading}
         />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        {/* Hoạt động gần đây */}
-        <section className={`${adminStyles.card} xl:col-span-2 overflow-hidden`}>
-          <div className={adminStyles.cardHeader}>
-            <h2 className={adminStyles.cardTitle}>Hoạt động gần đây</h2>
-            <button
-              type="button"
-              onClick={() => navigate('/admin/audit-log')}
-              className="text-[13px] text-[#3B82F6] hover:text-[#2563EB] cursor-pointer"
-            >
-              Xem tất cả
-            </button>
+      {/* Bố cục 2 cột: Hoạt động gần đây + Cửa hàng cần quan tâm */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] gap-6 items-start">
+        {/* Panel 1: Hoạt động gần đây (Audit log stream) */}
+        <section className={`${ui.card} overflow-hidden`}>
+          <div className="px-5 py-4 border-b border-[#F1F5F9] flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-[15px] font-bold text-[#0F172A] tracking-tight">Hoạt động nền tảng gần đây</h2>
+              <p className="text-[12px] text-[#64748B]">Trích xuất trực tiếp từ nhật ký kiểm toán</p>
+            </div>
+            <Link to="/admin/audit-log" className="text-[13px] font-semibold text-[#2563EB] hover:text-[#1D4ED8] flex items-center gap-1">
+              Toàn bộ nhật ký <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
-          <div className="overflow-x-auto">
-            <table className={adminStyles.table}>
-              <thead>
-                <tr>
-                  <th className={adminStyles.th}>Thời gian</th>
-                  <th className={adminStyles.th}>Người thực hiện</th>
-                  <th className={adminStyles.th}>Hành động</th>
-                  <th className={adminStyles.th}>Cửa hàng</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E5E7EB]">
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i}>
-                      {Array.from({ length: 4 }).map((__, j) => (
-                        <td key={j} className="px-4 py-3">
-                          <div className="h-3.5 rounded bg-slate-100 animate-pulse" style={{ width: `${50 + ((i + j) % 3) * 15}%` }} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : recentLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-[#64748B]">
-                      Chưa có hoạt động nào.
-                    </td>
-                  </tr>
-                ) : (
-                  recentLogs.map((log) => (
-                    <tr key={log.id} className={adminStyles.tr}>
-                      <td className="px-4 py-2.5 whitespace-nowrap">
-                        <div className="text-[#334155]">{formatRelativeTime(log.createdAt) || formatVNDateTime(log.createdAt)}</div>
-                        <div className="text-[11px] text-[#94A3B8]">{formatVNDateTime(log.createdAt)}</div>
-                      </td>
-                      <td className="px-4 py-2.5 whitespace-nowrap">
-                        <div className="text-[#334155]">{log.user?.fullName || 'Hệ thống'}</div>
-                        <div className="text-[11px] text-[#94A3B8]">{log.user ? roleLabel(log.user.role) : 'Tác vụ tự động'}</div>
-                      </td>
-                      <td className={`px-4 py-2.5 whitespace-nowrap ${isSensitiveAction(log.action) ? 'text-[#DC2626] font-medium' : 'text-[#475569]'}`}>
-                        {actionLabel(log.action)}
-                      </td>
-                      <td className="px-4 py-2.5 whitespace-nowrap text-[#64748B]">{log.store?.name || '—'}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+
+          {isLoading ? (
+            <div className="p-5 space-y-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-full bg-slate-100 animate-pulse shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3.5 rounded bg-slate-100 animate-pulse w-3/4" />
+                    <div className="h-3 rounded bg-slate-100 animate-pulse w-1/3" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : recentLogs.length === 0 ? (
+            <p className="p-8 text-center text-[13px] text-[#64748B]">Chưa có hoạt động nào được ghi nhận hôm nay.</p>
+          ) : (
+            <ul className="divide-y divide-[#F1F5F9]">
+              {recentLogs.map((log) => {
+                const name = log.user?.fullName || 'Hệ thống';
+                const isAdmin = log.user?.role === 'ADMIN';
+                const sensitive = isSensitiveAction(log.action);
+
+                return (
+                  <li key={log.id} className="p-4 flex items-center gap-3.5 hover:bg-slate-50/70 transition-colors">
+                    <Avatar name={name} tone={isAdmin ? 'brand' : 'neutral'} size={34} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-[#334155] leading-snug truncate">
+                        <span className="font-semibold text-[#0F172A]">{name}</span>{' '}
+                        <span className={sensitive ? 'text-red-700 font-semibold' : 'text-[#475569]'}>
+                          {actionLabel(log.action).toLowerCase()}
+                        </span>
+                      </p>
+                      <p className="text-[12px] text-[#64748B] truncate mt-0.5">
+                        {log.store?.name || (log.user ? roleLabel(log.user.role) : 'Tác vụ máy chủ')}
+                      </p>
+                    </div>
+                    <time
+                      className="text-[12px] text-[#94A3B8] shrink-0 font-medium whitespace-nowrap"
+                      dateTime={log.createdAt}
+                      title={formatVNDateTime(log.createdAt)}
+                    >
+                      {formatRelativeTime(log.createdAt) || formatVNDateTime(log.createdAt)}
+                    </time>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
 
-        <div className="space-y-4">
-          {/* Cấu hình hệ thống (số liệu thật từ máy chủ) */}
-          <section className={adminStyles.card}>
-            <div className={adminStyles.cardHeader}>
-              <h2 className={adminStyles.cardTitle}>Cấu hình hệ thống</h2>
-              <button
-                type="button"
-                onClick={() => navigate('/admin/system')}
-                className="text-[13px] text-[#3B82F6] hover:text-[#2563EB] cursor-pointer"
-              >
-                Chi tiết
-              </button>
+        {/* Panel 2: Cửa hàng cần quan tâm (Churn Risk) */}
+        <section className={`${ui.card} overflow-hidden`}>
+          <div className="px-5 py-4 border-b border-[#F1F5F9] flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-[15px] font-bold text-[#0F172A] tracking-tight">Cửa hàng cần chăm sóc</h2>
+              <p className="text-[12px] text-[#64748B]">Không có hoạt động trên 14 ngày</p>
             </div>
-            <div className="p-4">
-              {!config ? (
-                <p className="text-[13px] text-[#64748B]">{isLoading ? 'Đang kiểm tra...' : 'Không đọc được cấu hình.'}</p>
-              ) : (
-                <ul className="divide-y divide-[#E5E7EB]">
-                  <ConfigRow icon={Mail} label="Email OTP (SMTP)" ok={config.integrations?.smtp?.configured} okText="Đã cấu hình" badText="Chưa cấu hình" />
-                  <ConfigRow icon={Image} label="Lưu trữ ảnh (Cloudinary)" ok={config.integrations?.cloudinary?.configured} okText="Đã cấu hình" badText="Chưa cấu hình" />
-                  <ConfigRow
-                    icon={CreditCard}
-                    label="Thanh toán PayOS"
-                    ok={config.integrations?.payos?.encryptionKeyConfigured}
-                    okText={`${config.integrations?.payos?.storesConfigured ?? 0} cửa hàng dùng`}
-                    badText="Thiếu khóa mã hóa"
-                  />
-                  <ConfigRow
-                    icon={Gauge}
-                    label="Giới hạn truy cập"
-                    ok={config.rateLimit?.enabled || config.environment !== 'production'}
-                    okText={config.rateLimit?.enabled ? 'Đang bật' : 'Tắt (môi trường dev)'}
-                    badText="Đang tắt"
-                  />
-                </ul>
-              )}
-            </div>
-          </section>
+            <Link to="/admin/stores" className="text-[13px] font-semibold text-[#2563EB] hover:text-[#1D4ED8] flex items-center gap-1">
+              Xem tất cả <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
 
-          {/* Lối tắt */}
-          <section className={adminStyles.card}>
-            <div className={adminStyles.cardHeader}>
-              <h2 className={adminStyles.cardTitle}>Lối tắt</h2>
+          {idleStores.length === 0 ? (
+            <div className="p-8 text-center text-[13px] text-[#64748B]">
+              <span className="inline-block p-2 rounded-full bg-emerald-50 text-emerald-600 mb-2">
+                <Store className="w-5 h-5" />
+              </span>
+              <p className="font-medium text-[#0F172A]">Tất cả cửa hàng đều đang hoạt động tốt</p>
+              <p className="text-[12px] text-[#64748B] mt-0.5">Mọi cửa hàng đều có phiên đăng nhập trong 14 ngày qua.</p>
             </div>
-            <div className="p-4 grid gap-2">
-              <button type="button" onClick={handleExport} disabled={isExporting} className={`${adminStyles.btnSecondary} w-full justify-start`}>
-                {isExporting ? <Loader2 className="w-4 h-4 animate-spin text-[#64748B]" /> : <Download className="w-4 h-4 text-[#64748B]" />}
-                <span>Xuất nhật ký kiểm toán (CSV)</span>
-              </button>
-              <button type="button" onClick={() => navigate('/admin/stores')} className={`${adminStyles.btnSecondary} w-full justify-start`}>
-                <Store className="w-4 h-4 text-[#64748B]" />
-                <span>Quản lý cửa hàng</span>
-              </button>
-              <button type="button" onClick={() => navigate('/admin/users')} className={`${adminStyles.btnSecondary} w-full justify-start`}>
-                <Users className="w-4 h-4 text-[#64748B]" />
-                <span>Khóa / mở khóa tài khoản</span>
-              </button>
-            </div>
-          </section>
-        </div>
+          ) : (
+            <ul className="divide-y divide-[#F1F5F9]">
+              {idleStores.slice(0, 6).map((st) => (
+                <li key={st.id} className="p-4 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-bold text-[#0F172A] truncate">{st.name}</p>
+                    <p className="text-[12px] text-[#64748B] truncate mt-0.5">
+                      Chủ shop: {st.owner?.fullName || 'Chưa liên kết'}
+                    </p>
+                    <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                      <Clock className="w-3 h-3" /> {st.daysIdle} ngày chưa đăng nhập
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {st.phone && (
+                      <a
+                        href={`tel:${st.phone}`}
+                        className={`${ui.btnSecondary} px-2.5 py-1.5 text-[12px]`}
+                        title={`Gọi ${st.phone}`}
+                        aria-label={`Gọi ${st.name}`}
+                      >
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="hidden sm:inline">Gọi</span>
+                      </a>
+                    )}
+                    <Link
+                      to={`/admin/stores?id=${st.id}`}
+                      className={`${ui.btnGhost} p-2`}
+                      title="Xem chi tiết cửa hàng"
+                      aria-label="Xem chi tiết"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
 
-      {/* Hộp thoại tạo quản trị viên */}
       {createOpen && (
-        <div className={adminStyles.modalBackdrop}>
-          <div className={adminStyles.modalContent}>
-            <div className="flex items-start justify-between px-5 pt-4 pb-3 border-b border-[#E5E7EB]">
-              <div>
-                <h3 className="text-[16px] font-semibold text-[#334155]">Tạo quản trị viên</h3>
-                <p className="text-[12px] text-[#64748B] mt-0.5">Tài khoản này quản lý được toàn bộ nền tảng.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setCreateOpen(false)}
-                className="p-1 rounded text-[#94A3B8] hover:text-[#334155] hover:bg-slate-100 cursor-pointer"
-                aria-label="Đóng"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateAdmin} className="p-5 space-y-3.5">
-              {[
-                { key: 'fullName', label: 'Họ và tên', type: 'text', placeholder: 'Nguyễn Văn A' },
-                { key: 'email', label: 'Email đăng nhập', type: 'email', placeholder: 'ten@stockpilot.vn' },
-                { key: 'password', label: 'Mật khẩu cho tài khoản mới', type: 'password', placeholder: 'Ít nhất 8 ký tự' },
-                { key: 'actorPassword', label: 'Mật khẩu của bạn (xác nhận)', type: 'password', placeholder: '' },
-              ].map((f) => (
-                <label key={f.key} className="block">
-                  <span className="block text-[13px] font-medium text-[#334155] mb-1">{f.label}</span>
-                  <input
-                    type={f.type}
-                    required
-                    value={createForm[f.key]}
-                    onChange={(e) => setCreateForm({ ...createForm, [f.key]: e.target.value })}
-                    placeholder={f.placeholder}
-                    className={adminStyles.input}
-                  />
-                </label>
-              ))}
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#E5E7EB]">
-                <button type="button" onClick={() => setCreateOpen(false)} className={adminStyles.btnSecondary}>
-                  Hủy
-                </button>
-                <button type="submit" disabled={isCreating} className={adminStyles.btnPrimary}>
-                  {isCreating && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Tạo tài khoản</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <CreateAdminDialog
+          onClose={() => setCreateOpen(false)}
+          onCreated={() => {
+            setCreateOpen(false);
+            load();
+          }}
+        />
       )}
     </div>
   );
