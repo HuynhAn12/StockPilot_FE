@@ -8,7 +8,7 @@ import {
 import { useToast } from '../../components/common/Toast';
 import { useProductStore } from '../../components/store/productStore';
 import { useAlertsStore } from '../../components/store/alertsStore';
-import { apiGetAnalyticsSummary } from '../../services/analyticsService';
+import { apiGetOrders } from '../../services/orderService';
 
 export function StaffOperationalDashboard() {
   const navigate = useNavigate();
@@ -16,7 +16,7 @@ export function StaffOperationalDashboard() {
   const { products, fetchProducts } = useProductStore();
   const { alerts, fetchAlerts } = useAlertsStore();
 
-  const [metrics, setMetrics] = useState(null);
+  const [orderCount, setOrderCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(() => {
@@ -27,7 +27,7 @@ export function StaffOperationalDashboard() {
   // Checklist state saved in local memory
   const [tasks, setTasks] = useState([
     { id: 1, text: 'Chuẩn bị máy quét barcode và kiểm tra giấy in nhiệt tại quầy POS', done: true },
-    { id: 2, text: 'Rà soát 4 mặt hàng cảnh báo (cận date hoặc sắp hết) để xử lý', done: false },
+    { id: 2, text: 'Rà soát các mặt hàng cảnh báo (cận date hoặc sắp hết) để xử lý', done: false },
     { id: 3, text: 'Bổ sung hàng từ kho lưu trữ lên các kệ trưng bày theo quy chuẩn', done: false },
     { id: 4, text: 'Xếp hàng hóa nhập mới theo nguyên tắc FIFO (hàng cũ xuất trước)', done: false },
     { id: 5, text: 'Kiểm đếm chênh lệch tồn thực tế cho nhóm hàng thực phẩm tươi sống', done: false },
@@ -36,10 +36,18 @@ export function StaffOperationalDashboard() {
 
   const loadData = async () => {
     try {
-      const summary = await apiGetAnalyticsSummary({ timeRange: 'today' });
-      setMetrics(summary);
-      await fetchProducts();
-      await fetchAlerts();
+      setLoading(true);
+      const results = await Promise.allSettled([
+        fetchProducts(),
+        fetchAlerts(),
+        apiGetOrders({ limit: 1 }),
+      ]);
+
+      const ordersRes = results[2];
+      if (ordersRes.status === 'fulfilled' && ordersRes.value) {
+        setOrderCount(ordersRes.value.pagination?.total ?? ordersRes.value.items?.length ?? 0);
+      }
+
       const now = new Date();
       setLastUpdated(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
     } catch (err) {
@@ -69,8 +77,8 @@ export function StaffOperationalDashboard() {
   const totalQuantity = products.reduce((acc, p) => acc + (p.stock || 0), 0);
   const lowStockCount = products.filter((p) => (p.stock || 0) <= (p.alertThreshold || 10) && (p.stock || 0) > 0).length;
   const outOfStockCount = products.filter((p) => (p.stock || 0) === 0).length;
-  const alertCount = (alerts || []).filter((a) => a.status === 'OPEN').length || (lowStockCount + outOfStockCount) || 4;
-  const completedOrdersCount = metrics?.orderCount ?? 0;
+  const alertCount = (alerts || []).filter((a) => a.status === 'OPEN').length || (lowStockCount + outOfStockCount) || 0;
+  const completedOrdersCount = orderCount;
 
   return (
     <div className="w-full space-y-6 pb-12 animate-in fade-in duration-300">
@@ -145,12 +153,12 @@ export function StaffOperationalDashboard() {
             </span>
             <div className="flex items-baseline gap-1.5 mt-0.5">
               <span className="text-2xl font-black text-slate-900">
-                {totalQuantity > 0 ? totalQuantity.toLocaleString('vi-VN') : '19.177'}
+                {loading ? '...' : totalQuantity.toLocaleString('vi-VN')}
               </span>
               <span className="text-xs font-bold text-slate-500">sản phẩm</span>
             </div>
             <span className="text-[11px] text-slate-500 font-semibold block mt-0.5">
-              Đang lưu trữ {products.length || 216} mặt hàng
+              Đang lưu trữ {loading ? '...' : products.length} mặt hàng
             </span>
           </div>
         </div>
@@ -295,7 +303,7 @@ export function StaffOperationalDashboard() {
                     <span className="text-[10px] text-slate-400 font-mono">{p.sku}</span>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="text-xs font-black text-slate-900 block">{p.stock ?? 15} sp</span>
+                    <span className="text-xs font-black text-slate-900 block">{p.stock ?? 0} sp</span>
                     <span className="text-[10px] font-bold text-amber-600">Ưu tiên xuất</span>
                   </div>
                 </div>
