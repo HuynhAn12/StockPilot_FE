@@ -19,7 +19,7 @@ export function MainLayout() {
         'min-h-screen flex flex-col font-sans transition-colors duration-200',
         isAdmin
           ? 'bg-[#FAFAFA] text-[#475569]'
-          : 'bg-gradient-to-br from-[#f0f6ff] via-[#f8fafc] to-[#eef4ff] text-foreground'
+          : 'bg-linear-to-br from-[#f0f6ff] via-[#f8fafc] to-[#eef4ff] text-foreground'
       )}
     >
       <Sidebar />

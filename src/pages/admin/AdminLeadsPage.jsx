@@ -271,7 +271,7 @@ export function AdminLeadsPage() {
                         </td>
 
                         {/* Ghi chú */}
-                        <td className="px-4 py-2.5 max-w-[200px] text-[12px] text-[#64748B]">
+                        <td className="px-4 py-2.5 max-w-50 text-[12px] text-[#64748B]">
                           <span className="truncate block" title={lead.notes || ''}>
                             {lead.notes || '—'}
                           </span>
@@ -361,7 +361,7 @@ export function AdminLeadsPage() {
                 </span>
               </div>
 
-              <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[600px]">
+              <div className="space-y-2.5 flex-1 overflow-y-auto max-h-150">
                 {col.items.length === 0 ? (
                   <p className="text-[12px] text-[#94A3B8] text-center py-6">Trống</p>
                 ) : (

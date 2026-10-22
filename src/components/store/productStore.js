@@ -92,7 +92,9 @@ function safeNum(val) {
 export function normalizeProduct(p) {
   if (!p) return null;
   const si = p.stockItems?.[0] || {};
-  const stockQty = si.balances?.reduce((sum, b) => sum + (b.quantity || 0), 0) ?? (p.stock || 0);
+  const stockQty = p.stockItems && p.stockItems.length > 0
+    ? p.stockItems.reduce((acc, item) => acc + (item.balances?.reduce((sum, b) => sum + (b.quantity || 0), 0) ?? 0), 0)
+    : (p.stock || 0);
   const cost = safeNum(si.costPrice ?? p.costPrice);
   const sale = safeNum(si.sellingPrice ?? p.salePrice ?? p.price);
   const rawCat = p.category?.code?.toLowerCase() || (typeof p.category === 'string' ? p.category.toLowerCase() : '') || 'misc';
