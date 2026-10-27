@@ -27,6 +27,8 @@ import {
   apiChangePassword,
 } from '../../services/analyticsService';
 import { apiClient } from '../../lib/apiClient';
+import { StoreDataExportPanel } from '../../components/settings/StoreDataExportPanel';
+import { Database } from 'lucide-react';
 
 /* ─── Inline CSS ─── */
 const CSS = `
@@ -780,6 +782,7 @@ export function SettingsPage() {
     { id: 'payment', label: isEn ? 'Payment Gateway' : 'Thanh toán', icon: <CreditCard size={14} /> },
     { id: 'notifications', label: isEn ? 'Notifications' : 'Thông báo', icon: <Bell size={14} /> },
     { id: 'account', label: isEn ? 'Account & Security' : 'Tài khoản & Bảo mật', icon: <Shield size={14} /> },
+    { id: 'data', label: isEn ? 'Data Export' : 'Dữ liệu', icon: <Database size={14} /> },
   ];
 
   const pwdStr = newPwd.length === 0 ? 0 : newPwd.length < 8 ? 1 : newPwd.length < 12 ? 2 : 3;
@@ -2018,6 +2021,8 @@ export function SettingsPage() {
         )}
 
         {/* ACCOUNT TAB */}
+        {activeTab === 'data' && <StoreDataExportPanel isEn={isEn} />}
+
         {activeTab === 'account' && (
           <div className="st-fade" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div className="st-card" style={{ padding: 22 }}>

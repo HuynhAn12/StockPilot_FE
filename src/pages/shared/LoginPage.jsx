@@ -28,6 +28,9 @@ export function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
+  // Xác thực 2 lớp: ô nhập mã chỉ hiện khi máy chủ báo tài khoản (admin) đã bật 2FA
+  const [needsOtp, setNeedsOtp] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,8 +43,12 @@ export function LoginPage() {
       setLoginError(isEn ? 'Please enter your password!' : 'Vui lòng nhập mật khẩu!');
       return;
     }
+    if (needsOtp && otpCode.trim().length < 6) {
+      setLoginError(isEn ? 'Enter the 6-digit code from your authenticator app.' : 'Vui lòng nhập mã 6 số từ ứng dụng xác thực.');
+      return;
+    }
     setIsLoading(true);
-    const result = await login({ email: email.trim(), password });
+    const result = await login({ email: email.trim(), password, otpCode: needsOtp ? otpCode.trim() : undefined });
     setIsLoading(false);
     if (result.success) {
       toast({
@@ -53,6 +60,9 @@ export function LoginPage() {
       });
       navigate('/dashboard');
     } else {
+      if (result.twoFactorRequired) {
+        setNeedsOtp(true);
+      }
       setLoginError(
         result.error ||
         (isEn ? 'Invalid email or password. Please try again.' : 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.')
@@ -194,6 +204,31 @@ export function LoginPage() {
               </div>
             </div>
 
+            {/* Xác thực 2 lớp (chỉ hiện với admin đã bật 2FA) */}
+            {needsOtp && (
+              <div>
+                <label htmlFor="otpCode" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  {isEn ? 'Authentication code' : 'Mã xác thực 2 lớp'}
+                </label>
+                <input
+                  id="otpCode"
+                  name="otpCode"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/[^0-9A-Za-z-]/g, '').slice(0, 20))}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="000000"
+                  autoFocus
+                  className="w-full px-3.5 py-2.5 bg-slate-50 text-slate-900 text-base rounded-xl border border-slate-200 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:text-slate-400 font-mono tracking-[0.3em] text-center"
+                />
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  {isEn
+                    ? 'Open your authenticator app, or enter one of your recovery codes.'
+                    : 'Mở ứng dụng xác thực trên điện thoại, hoặc nhập một mã khôi phục.'}
+                </p>
+              </div>
+            )}
+
             {/* Remember + Forgot */}
             <div className="flex items-center justify-between pt-1">
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -311,7 +346,7 @@ export function LoginPage() {
             to="/register"
             className="font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
           >
-            {isEn ? 'Start 30-Day Free Trial' : 'Đăng ký dùng thử'}
+            {isEn ? 'Start Free Trial' : 'Đăng ký dùng thử'}
           </Link>
         </div>
 
