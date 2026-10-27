@@ -31,6 +31,8 @@ const adminLabels = {
   leads: 'Khách hàng tiềm năng',
   system: 'Hệ thống',
   support: 'Hỗ trợ khách hàng',
+  ops: 'Vận hành nền tảng',
+  security: 'Bảo mật & Kiểm soát',
 };
 
 export function Breadcrumbs() {
