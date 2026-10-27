@@ -1,0 +1,141 @@
+/* ─────────────────────────────────────────────────────────────
+   FeatureScrollShowcase — animation cho phần demo tính năng theo cuộn.
+   Animation chỉ chạy khi demo có class .is-active (khi khách cuộn tới),
+   nên mỗi lần quay lại một tính năng, demo sẽ phát lại từ đầu.
+   Độ trễ từng phần tử đặt bằng biến --d (ví dụ class [--d:600ms]).
+   ───────────────────────────────────────────────────────────── */
+
+@keyframes sp-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sp-pop {
+  0%   { opacity: 0; transform: scale(0.92); }
+  60%  { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes sp-slide-in {
+  from { opacity: 0; transform: translateX(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sp-grow-y {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+@keyframes sp-scan-line {
+  0%, 100% { top: 14%; }
+  50%      { top: 80%; }
+}
+@keyframes sp-ring {
+  0%   { box-shadow: 0 0 0 0 rgb(0 111 255 / 0.45); }
+  100% { box-shadow: 0 0 0 10px rgb(0 111 255 / 0); }
+}
+@keyframes sp-ring-green {
+  0%   { box-shadow: 0 0 0 0 rgb(16 185 129 / 0.45); }
+  100% { box-shadow: 0 0 0 8px rgb(16 185 129 / 0); }
+}
+@keyframes sp-flash {
+  0%, 100% { background-color: transparent; }
+  40%      { background-color: rgb(0 111 255 / 0.10); }
+}
+@keyframes sp-drain {
+  from { width: var(--from); background-color: #006fff; }
+  70%  { background-color: #006fff; }
+  to   { width: var(--to); background-color: #f59e0b; }
+}
+@keyframes sp-move-left {
+  from { left: var(--from); }
+  to   { left: var(--to); }
+}
+@keyframes sp-typing {
+  0%   { opacity: 0; }
+  12%  { opacity: 1; }
+  85%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes sp-dot {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50%      { opacity: 1; transform: translateY(-2px); }
+}
+@keyframes sp-press {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(0.94); }
+}
+
+/* Trạng thái mặc định: các phần tử có hiệu ứng được ẩn cho tới khi demo active */
+.sp-demo .sp-a,
+.sp-demo .sp-a-pop,
+.sp-demo .sp-a-slide { opacity: 0; }
+
+.sp-demo.is-active .sp-a {
+  animation: sp-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.sp-demo.is-active .sp-a-pop {
+  animation: sp-pop 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.sp-demo.is-active .sp-a-slide {
+  animation: sp-slide-in 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.sp-demo.is-active .sp-bar {
+  transform-origin: bottom;
+  animation: sp-grow-y 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.sp-demo .sp-bar { transform: scaleY(0); transform-origin: bottom; }
+
+.sp-demo.is-active .sp-scan-line { animation: sp-scan-line 1.8s ease-in-out infinite; }
+.sp-demo.is-active .sp-ring { animation: sp-ring 1.4s ease-out infinite; animation-delay: var(--d, 0ms); }
+.sp-demo.is-active .sp-ring-green { animation: sp-ring-green 1.6s ease-out infinite; }
+.sp-demo.is-active .sp-flash { animation: sp-flash 1s ease-out both; animation-delay: var(--d, 0ms); }
+.sp-demo.is-active .sp-press { animation: sp-press 0.35s ease-in-out both; animation-delay: var(--d, 0ms); }
+
+.sp-demo .sp-drain { width: var(--from); }
+.sp-demo.is-active .sp-drain {
+  animation: sp-drain 1.8s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+.sp-demo .sp-move { left: var(--from); }
+.sp-demo.is-active .sp-move {
+  animation: sp-move-left 1.2s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+
+.sp-demo .sp-typing { opacity: 0; }
+.sp-demo.is-active .sp-typing {
+  animation: sp-typing 1.3s ease both;
+  animation-delay: var(--d, 0ms);
+}
+.sp-demo .sp-typing span { animation: sp-dot 0.9s ease-in-out infinite; }
+.sp-demo .sp-typing span:nth-child(2) { animation-delay: 0.15s; }
+.sp-demo .sp-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+/* Người dùng bật "giảm chuyển động": hiện ngay trạng thái cuối, không chạy animation */
+@media (prefers-reduced-motion: reduce) {
+  .sp-demo .sp-a,
+  .sp-demo .sp-a-pop,
+  .sp-demo .sp-a-slide,
+  .sp-demo.is-active .sp-a,
+  .sp-demo.is-active .sp-a-pop,
+  .sp-demo.is-active .sp-a-slide {
+    opacity: 1;
+    animation: none;
+    transform: none;
+  }
+  .sp-demo .sp-bar,
+  .sp-demo.is-active .sp-bar { transform: none; animation: none; }
+  .sp-demo .sp-drain,
+  .sp-demo.is-active .sp-drain { width: var(--to); background-color: #f59e0b; animation: none; }
+  .sp-demo .sp-move,
+  .sp-demo.is-active .sp-move { left: var(--to); animation: none; }
+  .sp-demo.is-active .sp-scan-line,
+  .sp-demo.is-active .sp-ring,
+  .sp-demo.is-active .sp-ring-green,
+  .sp-demo.is-active .sp-flash,
+  .sp-demo.is-active .sp-press,
+  .sp-demo .sp-typing span { animation: none; }
+  .sp-demo .sp-typing,
+  .sp-demo.is-active .sp-typing { display: none; }
+}
