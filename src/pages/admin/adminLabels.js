@@ -1,16 +1,64 @@
-// Nhãn tiếng Việt và hàm định dạng dùng chung cho các trang quản trị.
+// Nhãn song ngữ (Việt - Anh) và hàm định dạng dùng chung cho các trang quản trị.
+import { useUIStore } from '../../components/store/uiStore';
 
-export const ROLE_LABELS = {
+const getLang = (forcedLang) => {
+  if (forcedLang) return forcedLang;
+  try {
+    return useUIStore.getState()?.language || 'vi';
+  } catch {
+    return 'vi';
+  }
+};
+
+export const ROLE_LABELS_VI = {
   SHOP_OWNER: 'Chủ cửa hàng',
   WAREHOUSE_STAFF: 'Nhân viên kho',
   ADMIN: 'Quản trị viên',
 };
 
-export function roleLabel(role) {
-  return ROLE_LABELS[String(role || '').toUpperCase()] || 'Hệ thống';
+export const ROLE_LABELS_EN = {
+  SHOP_OWNER: 'Shop Owner',
+  WAREHOUSE_STAFF: 'Warehouse Staff',
+  ADMIN: 'Platform Admin',
+};
+
+function createLocalizedProxy(mapVi, mapEn) {
+  return new Proxy({}, {
+    get(target, prop) {
+      const isEn = getLang() === 'en';
+      const map = isEn ? mapEn : mapVi;
+      return map[prop];
+    },
+    ownKeys() {
+      const isEn = getLang() === 'en';
+      const map = isEn ? mapEn : mapVi;
+      return Reflect.ownKeys(map);
+    },
+    getOwnPropertyDescriptor(target, prop) {
+      const isEn = getLang() === 'en';
+      const map = isEn ? mapEn : mapVi;
+      if (prop in map) {
+        return {
+          value: map[prop],
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        };
+      }
+      return undefined;
+    },
+  });
 }
 
-export const ACTION_LABELS = {
+export const ROLE_LABELS = createLocalizedProxy(ROLE_LABELS_VI, ROLE_LABELS_EN);
+
+export function roleLabel(role, lang) {
+  const isEn = getLang(lang) === 'en';
+  const map = isEn ? ROLE_LABELS_EN : ROLE_LABELS_VI;
+  return map[String(role || '').toUpperCase()] || (isEn ? 'System' : 'Hệ thống');
+}
+
+export const ACTION_LABELS_VI = {
   USER_LOGIN: 'Đăng nhập',
   LOGIN: 'Đăng nhập',
   LOGOUT: 'Đăng xuất',
@@ -77,9 +125,80 @@ export const ACTION_LABELS = {
   AUDIT_LOG_EXPORTED: 'Xuất nhật ký kiểm toán',
 };
 
-export function actionLabel(action) {
-  if (!action) return 'Thao tác';
-  if (ACTION_LABELS[action]) return ACTION_LABELS[action];
+export const ACTION_LABELS_EN = {
+  USER_LOGIN: 'Signed in',
+  LOGIN: 'Signed in',
+  LOGOUT: 'Signed out',
+  PASSWORD_RESET: 'Password reset',
+  USER_CREATED: 'Created user account',
+  USER_UPDATED: 'Updated user account',
+  USER_DELETED: 'Deleted user account',
+  USER_DISABLED: 'Disabled user account',
+  USER_LOCKED: 'Locked user account',
+  USER_UNLOCKED: 'Unlocked user account',
+  USER_SESSIONS_REVOKED: 'Revoked all device sessions',
+  PASSWORD_RESET_SENT_BY_ADMIN: 'Sent password reset link',
+  SYSTEM_SETTING_UPDATED: 'Updated system setting',
+  SYSTEM_SETTING_RESTORED: 'Restored system setting',
+  LOGIN_FAILED: 'Failed login attempt',
+  LOGIN_BLOCKED: 'Login blocked (rate limited)',
+  LOGIN_LOCK_CLEARED: 'Cleared temporary login lock',
+  DECISION_RECALC_TRIGGERED_BY_ADMIN: 'Triggered Decision Engine recalc',
+  STORE_OWNER_TRANSFERRED: 'Transferred store ownership',
+  ANNOUNCEMENT_SENT: 'Sent platform announcement',
+  ADMIN_2FA_ENABLED: 'Enabled 2FA',
+  ADMIN_2FA_DISABLED: 'Disabled 2FA',
+  ADMIN_2FA_RESET: 'Reset 2FA credentials',
+  STORE_DATA_EXPORTED: 'Exported store data',
+  STORE_REGISTERED: 'Registered store',
+  STORE_LOCKED: 'Locked store',
+  STORE_UNLOCKED: 'Unlocked store',
+  STORE_UPDATED: 'Updated store profile',
+  ORDER_CREATED: 'Created order',
+  ORDER_CONFIRMED: 'Confirmed order',
+  ORDER_FULFILLED: 'Fulfilled order',
+  ORDER_CANCELED: 'Cancelled order',
+  POS_SALE_CREATED: 'POS retail sale',
+  RETURN_CREATED: 'Created return receipt',
+  PAYMENT_CREATED: 'Created payment',
+  PAYMENT_PAID: 'Recorded payment',
+  PAYMENT_CONFIG_UPDATED: 'Updated payment gateway',
+  PAYMENT_CONFIG_DISABLED: 'Disabled payment gateway',
+  PRODUCT_CREATED: 'Created product',
+  PRODUCT_DELETED: 'Deleted product',
+  PRODUCT_DEACTIVATED: 'Deactivated product',
+  PRODUCT_REACTIVATED: 'Reactivated product',
+  UPDATED_SKU: 'Updated SKU',
+  CATEGORY_CREATED: 'Created category',
+  CATEGORY_DELETED: 'Deleted category',
+  CATEGORY_DEACTIVATED: 'Hidden category',
+  CATEGORY_REACTIVATED: 'Restored category',
+  INVENTORY_INFLOW: 'Inventory inflow',
+  INVENTORY_OUTFLOW: 'Inventory outflow',
+  INVENTORY_AUDIT: 'Inventory audit adjustment',
+  STOCK_TAKE_COMPLETED: 'Completed stock take',
+  STOCK_TAKE_CANCELED: 'Cancelled stock take',
+  IMPORT_COMMITTED: 'Committed spreadsheet data',
+  HISTORICAL_SALES_IMPORT_COMMITTED: 'Imported historical sales',
+  PRICING_RECOMMENDATION_APPROVED: 'Approved price recommendation',
+  PRICING_RECOMMENDATION_REJECTED: 'Rejected price recommendation',
+  PRICING_RECOMMENDATION_MODIFIED: 'Modified price recommendation',
+  ALERT_ACKNOWLEDGED: 'Acknowledged alert',
+  ALERT_RESOLVED: 'Resolved alert',
+  LEAD_STATUS_UPDATED: 'Updated lead status',
+  LEAD_ASSIGNED: 'Assigned lead',
+  SUPPORT_TICKET_CREATED: 'Created support ticket',
+  SUPPORT_TICKET_UPDATED: 'Updated support ticket',
+  AUDIT_LOG_EXPORTED: 'Exported audit log CSV',
+};
+
+export const ACTION_LABELS = createLocalizedProxy(ACTION_LABELS_VI, ACTION_LABELS_EN);
+
+export function actionLabel(action, lang) {
+  const isEn = getLang(lang) === 'en';
+  if (!action) return isEn ? 'Action' : 'Thao tác';
+  const map = isEn ? ACTION_LABELS_EN : ACTION_LABELS_VI;
+  if (map[action]) return map[action];
   const text = action.toLowerCase().replace(/_/g, ' ');
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
@@ -89,7 +208,7 @@ export function isSensitiveAction(action) {
   return /LOCK|DELETE|DISABLE|CANCEL|REVOKE|EXPORT|SETTING/.test(String(action || '')) && !/UNLOCK/.test(String(action || ''));
 }
 
-export const ENTITY_LABELS = {
+export const ENTITY_LABELS_VI = {
   USER: 'Tài khoản',
   AUTH: 'Đăng nhập',
   STORE: 'Cửa hàng',
@@ -112,25 +231,56 @@ export const ENTITY_LABELS = {
   SUPPORT_TICKET: 'Hỗ trợ',
 };
 
-export function entityLabel(entityType) {
-  return ENTITY_LABELS[entityType] || entityType || 'Hệ thống';
+export const ENTITY_LABELS_EN = {
+  USER: 'User Account',
+  AUTH: 'Authentication',
+  STORE: 'Store',
+  ORDER: 'Order',
+  RETURN: 'Return Receipt',
+  PAYMENT: 'Payment',
+  STORE_PAYMENT_CONFIG: 'Payment Gateway',
+  PRODUCT: 'Product',
+  CATEGORY: 'Category',
+  INVENTORY: 'Inventory',
+  STOCK_TAKE: 'Stock Take',
+  IMPORT_JOB: 'Data Import',
+  PRICING: 'Pricing',
+  PRICING_RECOMMENDATION: 'Price Suggestion',
+  ALERT: 'Risk Alert',
+  CONTACT_LEAD: 'Lead',
+  AUDIT_LOG: 'Audit Log',
+  SYSTEM: 'System',
+  SYSTEM_SETTING: 'System Setting',
+  SUPPORT_TICKET: 'Support Ticket',
+};
+
+export const ENTITY_LABELS = createLocalizedProxy(ENTITY_LABELS_VI, ENTITY_LABELS_EN);
+
+export function entityLabel(entityType, lang) {
+  const isEn = getLang(lang) === 'en';
+  const map = isEn ? ENTITY_LABELS_EN : ENTITY_LABELS_VI;
+  return map[entityType] || entityType || (isEn ? 'System' : 'Hệ thống');
 }
 
-export function formatRelativeTime(value) {
+export function formatRelativeTime(value, lang) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
+  const isEn = getLang(lang) === 'en';
   const diffSec = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (diffSec < 60) return 'Vừa xong';
+
+  if (diffSec < 60) return isEn ? 'Just now' : 'Vừa xong';
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin} phút trước`;
+  if (diffMin < 60) return isEn ? `${diffMin}m ago` : `${diffMin} phút trước`;
   const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} giờ trước`;
+  if (diffHour < 24) return isEn ? `${diffHour}h ago` : `${diffHour} giờ trước`;
   const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 30) return `${diffDay} ngày trước`;
+  if (diffDay < 30) return isEn ? `${diffDay}d ago` : `${diffDay} ngày trước`;
   return '';
 }
 
-export function apiErrorMessage(err, fallback = 'Không kết nối được máy chủ. Vui lòng thử lại.') {
-  return err?.response?.data?.error?.message || err?.message || fallback;
+export function apiErrorMessage(err, fallback) {
+  const isEn = getLang() === 'en';
+  const defaultFallback = isEn ? 'Unable to connect to the server. Please try again.' : 'Không kết nối được máy chủ. Vui lòng thử lại.';
+  return err?.response?.data?.error?.message || err?.message || fallback || defaultFallback;
 }
