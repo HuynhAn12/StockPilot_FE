@@ -4,22 +4,40 @@ import { useUIStore } from './components/store/uiStore';
 import { useAuthStore } from './components/store/authStore';
 import { MainLayout } from './components/layout/MainLayout';
 import { AuthLayout } from './components/layout/AuthLayout';
-import { LoginPage } from './pages/LoginPage';
-import { RegisterPage } from './pages/RegisterPage';
-import { DashboardPage } from './pages/DashboardPage';
-import { ProductsPage } from './pages/ProductsPage';
-import { CategoriesPage } from './pages/CategoriesPage';
-import { PosPage } from './pages/PosPage';
-import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
-import { AIAssistantPage } from './pages/AIAssistantPage';
-import { OrdersPage } from './pages/OrdersPage';
-import { InventoryPage } from './pages/InventoryPage';
-import { AlertsPage } from './pages/AlertsPage';
-import { PricingPage } from './pages/PricingPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { AdminUsersPage } from './pages/AdminUsersPage';
-import { AdminAuditPage } from './pages/AdminAuditPage';
+// Landing Page
+import { LandingPage } from './pages/LandingPage';
+
+// Shared Pages (Dùng chung / Auth)
+import { LoginPage } from './pages/shared/LoginPage';
+import { RegisterPage } from './pages/shared/RegisterPage';
+import { ForgotPasswordPage } from './pages/shared/ForgotPasswordPage';
+import { DashboardPage } from './pages/shared/DashboardPage';
+import { ProductsPage } from './pages/shared/ProductsPage';
+import { CategoriesPage } from './pages/shared/CategoriesPage';
+import { AlertsPage } from './pages/shared/AlertsPage';
+import { AIAssistantPage } from './pages/shared/AIAssistantPage';
+
+// Owner Pages (Chủ shop)
+import { OrdersPage } from './pages/owner/OrdersPage';
+import { PricingPage } from './pages/owner/PricingPage';
+import { AnalyticsPage } from './pages/owner/AnalyticsPage';
+import { SettingsPage } from './pages/owner/SettingsPage';
+import { StaffPage } from './pages/owner/StaffPage';
+
+// Staff Pages (Nhân viên)
+import { PosPage } from './pages/staff/PosPage';
+import { InventoryPage } from './pages/staff/InventoryPage';
+
+// Admin Pages (Quản trị hệ thống)
+import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { AdminStoresPage } from './pages/admin/AdminStoresPage';
+import { AdminAuditPage } from './pages/admin/AdminAuditPage';
+import { AdminLeadsPage } from './pages/admin/AdminLeadsPage';
+import { AdminSystemPage } from './pages/admin/AdminSystemPage';
+import { AdminSupportPage } from './pages/admin/AdminSupportPage';
+import { SupportPage } from './pages/shared/SupportPage';
+import { ImportDataPage } from './pages/owner/ImportDataPage';
+import { LegalPage } from './pages/LegalPage';
 import { ToastContainer } from './components/common/Toast';
 
 // ─── Error Boundary: bắt lỗi render, hiển thị thông báo thay vì màn trắng ───
@@ -74,29 +92,56 @@ class ErrorBoundary extends Component {
 
 // ─── Protected route: yêu cầu đăng nhập ───
 export function ProtectedRoute({ children }) {
-  const { user, token } = useAuthStore();
+  const { user, token, isHydrated } = useAuthStore();
+
+  if (!isHydrated) {
+    return (
+      <div style={{
+        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#f8fafc'
+      }}>
+        <div style={{
+          width: '36px', height: '36px', border: '3px solid #e2e8f0',
+          borderTopColor: '#2563eb', borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite'
+        }} />
+      </div>
+    );
+  }
+
   if (!user || !token) return <Navigate to="/login" replace />;
   return children;
 }
 
 // ─── Role guard: chỉ cho phép role cụ thể ───
 export function RequireRole({ roles, children }) {
-  const { user } = useAuthStore();
+  const { user, isHydrated } = useAuthStore();
+  if (!isHydrated) return null;
   if (!user) return <Navigate to="/login" replace />;
-  if (!roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
+
+  const userRole = (user.role || '').toLowerCase().replace('shop_owner', 'store_owner');
+  const allowed = roles.map((r) => r.toLowerCase().replace('shop_owner', 'store_owner'));
+
+  if (!allowed.includes(userRole)) {
+    // If warehouse staff attempts restricted routes, redirect to POS
+    const fallbackPath = userRole === 'warehouse_staff' ? '/pos' : '/dashboard';
+    return <Navigate to={fallbackPath} replace />;
+  }
   return children;
 }
 
 export default function App() {
-  const { token, fetchMe, clearUser } = useAuthStore();
+  const { token, fetchMe } = useAuthStore();
 
-  // Khi reload trang: nếu có token thì xác minh lại với server
+  // Khi reload trang: nếu có token thì cập nhật thông tin user mới nhất từ server ở chế độ nền
   useEffect(() => {
     document.documentElement.classList.remove('dark');
     if (token) {
-      fetchMe().catch(() => clearUser());
+      fetchMe().catch((err) => {
+        console.warn('[StockPilot] Background session check:', err?.message || err);
+      });
     }
-  }, []);
+  }, [token, fetchMe]);
 
   return (
     <ErrorBoundary>
@@ -120,16 +165,87 @@ export default function App() {
             }
           >
             <Route path="/dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-            <Route path="/products" element={<ErrorBoundary><ProductsPage /></ErrorBoundary>} />
-            <Route path="/pos" element={<ErrorBoundary><PosPage /></ErrorBoundary>} />
+            <Route
+              path="/products"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><ProductsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/pos"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><PosPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
             <Route path="/categories" element={<Navigate to="/pos" replace />} />
-            <Route path="/orders" element={<ErrorBoundary><OrdersPage /></ErrorBoundary>} />
-            <Route path="/inventory" element={<ErrorBoundary><InventoryPage /></ErrorBoundary>} />
-            <Route path="/alerts" element={<ErrorBoundary><AlertsPage /></ErrorBoundary>} />
-            <Route path="/pricing" element={<ErrorBoundary><PricingPage /></ErrorBoundary>} />
-            <Route path="/analytics" element={<ErrorBoundary><AnalyticsPage /></ErrorBoundary>} />
-            <Route path="/ai-assistant" element={<ErrorBoundary><AIAssistantPage /></ErrorBoundary>} />
-            <Route path="/settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
+            <Route
+              path="/orders"
+              element={
+                <RequireRole roles={['store_owner']}>
+                  <ErrorBoundary><OrdersPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/inventory"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><InventoryPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/alerts"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><AlertsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/pricing"
+              element={
+                <RequireRole roles={['store_owner']}>
+                  <ErrorBoundary><PricingPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/analytics"
+              element={
+                <RequireRole roles={['store_owner']}>
+                  <ErrorBoundary><AnalyticsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/ai-assistant"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><AIAssistantPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <RequireRole roles={['store_owner']}>
+                  <ErrorBoundary><SettingsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/staff"
+              element={
+                <RequireRole roles={['store_owner']}>
+                  <ErrorBoundary><StaffPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
 
             {/* Admin-only routes */}
             <Route
@@ -141,6 +257,14 @@ export default function App() {
               }
             />
             <Route
+              path="/admin/stores"
+              element={
+                <RequireRole roles={['admin']}>
+                  <ErrorBoundary><AdminStoresPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
               path="/admin/audit-log"
               element={
                 <RequireRole roles={['admin']}>
@@ -148,11 +272,52 @@ export default function App() {
                 </RequireRole>
               }
             />
+            <Route
+              path="/admin/leads"
+              element={
+                <RequireRole roles={['admin']}>
+                  <ErrorBoundary><AdminLeadsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/support"
+              element={
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                  <ErrorBoundary><SupportPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/import"
+              element={
+                <RequireRole roles={['store_owner']}>
+                  <ErrorBoundary><ImportDataPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/support"
+              element={
+                <RequireRole roles={['admin']}>
+                  <ErrorBoundary><AdminSupportPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/system"
+              element={
+                <RequireRole roles={['admin']}>
+                  <ErrorBoundary><AdminSystemPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
           </Route>
 
-          {/* Default redirect */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          {/* Landing page for root path */}
+          <Route path="/" element={<ErrorBoundary><LandingPage /></ErrorBoundary>} />
+          <Route path="/dieu-khoan/:slug" element={<ErrorBoundary><LegalPage /></ErrorBoundary>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
 
         {/* Global Toast Notifications */}

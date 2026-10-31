@@ -1,18 +1,25 @@
 import { apiClient } from '../lib/apiClient';
 
-// GET /orders
-export async function apiGetOrders({ page = 1, limit = 50, status = '', search = '' } = {}) {
+// GET /orders — backend trả { success, items, pagination, metrics, timeframeCounts }
+export async function apiGetOrders({ page = 1, limit = 50, status = '', search = '', from = '', to = '' } = {}) {
   const params = { page, limit };
-  if (status) params.status = status;
-  if (search) params.search = search;
+  if (status && status !== 'ALL') params.status = status;
+  if (search && search.trim()) params.search = search.trim();
+  if (from) params.from = from;
+  if (to) params.to = to;
   const { data } = await apiClient.get('/orders', { params });
-  return data.data;
+  return {
+    items: data.items || data.data || [],
+    pagination: data.pagination || { page: 1, limit, total: 0, totalPages: 1 },
+    metrics: data.metrics || null,
+    timeframeCounts: data.timeframeCounts || null,
+  };
 }
 
-// GET /orders/:id
+// GET /orders/:id — backend trả { success, data: order }
 export async function apiGetOrder(id) {
   const { data } = await apiClient.get(`/orders/${id}`);
-  return data.data;
+  return data.data || data;
 }
 
 // POST /orders
@@ -38,8 +45,9 @@ export async function apiFulfillOrder(id) {
 }
 
 // POST /orders/:id/cancel
-export async function apiCancelOrder(id, { reason = '' } = {}) {
-  const { data } = await apiClient.post(`/orders/${id}/cancel`, { reason }, {
+export async function apiCancelOrder(id, { reason = 'Khách hủy đơn' } = {}) {
+  const cancelReason = (typeof reason === 'string' && reason.trim()) ? reason.trim() : 'Khách hủy đơn';
+  const { data } = await apiClient.post(`/orders/${id}/cancel`, { cancelReason }, {
     headers: { 'Idempotency-Key': `cancel-${id}-${Date.now()}` },
   });
   return data.data;

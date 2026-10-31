@@ -1,8 +1,8 @@
 import { apiClient } from '../lib/apiClient';
 
-// GET /analytics/dashboard — tổng quan doanh thu, tồn kho
-export async function apiGetAnalyticsSummary() {
-  const { data } = await apiClient.get('/analytics/dashboard');
+// GET /analytics/dashboard — tổng quan doanh thu, tồn kho theo bộ lọc thời gian
+export async function apiGetAnalyticsSummary(params = {}) {
+  const { data } = await apiClient.get('/analytics/dashboard', { params });
   return data.data;
 }
 
@@ -84,12 +84,18 @@ export async function apiUpdatePaymentConfig(payload) {
   return data.data;
 }
 
-// GET /audit-logs (bảng audit_logs)
+// POST /store-payment-config/payos/test
+export async function apiTestPaymentConfig(payload = {}) {
+  const { data } = await apiClient.post('/store-payment-config/payos/test', payload);
+  return data;
+}
+
+// GET /admin/audit-logs (bảng audit_logs)
 export async function apiGetAuditLogs({ page = 1, limit = 50, entityType = 'ALL', search = '' } = {}) {
   const params = { page, limit };
   if (entityType && entityType !== 'ALL') params.entityType = entityType;
   if (search) params.search = search;
-  const { data } = await apiClient.get('/audit-logs', { params });
+  const { data } = await apiClient.get('/admin/audit-logs', { params });
   return data;
 }
 
@@ -119,4 +125,34 @@ export async function apiUpdateDecisionConfig(payload) {
   const { data } = await apiClient.put('/decision-engine/config', payload);
   return data.data;
 }
+
+// Toggle PayOS Active Status
+export async function apiTogglePaymentConfig(active) {
+  const { data } = await apiClient.post('/store-payment-config/payos/toggle', { active });
+  return data.data;
+}
+
+// Notification Settings
+export async function apiGetNotificationSettings() {
+  const { data } = await apiClient.get('/notifications/settings');
+  return data.data;
+}
+
+export async function apiUpdateNotificationSettings(payload) {
+  const { data } = await apiClient.put('/notifications/settings', payload);
+  return data.data;
+}
+
+// Store Profile
+export async function apiUpdateStoreProfile(payload) {
+  const { data } = await apiClient.patch('/auth/me/store', payload);
+  return data.data;
+}
+
+// Change Password
+export async function apiChangePassword(payload) {
+  const { data } = await apiClient.post('/auth/change-password', payload);
+  return data;
+}
+
 

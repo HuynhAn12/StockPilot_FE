@@ -1,7 +1,7 @@
 import { apiClient } from '../lib/apiClient';
 
-// GET /products?page=1&limit=50&search=&categoryId=
-export async function apiGetProducts({ page = 1, limit = 100, search = '', categoryId = '' } = {}) {
+// GET /products?page=1&limit=500&search=&categoryId=
+export async function apiGetProducts({ page = 1, limit = 500, search = '', categoryId = '' } = {}) {
   const params = { page, limit };
   if (search) params.search = search;
   if (categoryId) params.categoryId = categoryId;
@@ -35,8 +35,20 @@ export async function apiCreateProduct(payload) {
       catId = payload.categoryId;
     } else if (payload.category) {
       const categories = await apiGetCategories().catch(() => []);
-      const matched = (Array.isArray(categories) ? categories : []).find(
-        (c) => c.code?.toLowerCase() === String(payload.category).toLowerCase() || c.id === Number(payload.category)
+      const catList = Array.isArray(categories) ? categories : [];
+      // Map frontend value codes (tpcn, drink, ...) to DB codes (TPCN, DRINK, ...)
+      const catValueToCode = {
+        'tpcn': 'TPCN', 'thuc-pham': 'TPCN', 'do-an': 'TPCN',
+        'drink': 'DRINK', 'do-uong': 'DRINK',
+        'spice': 'SPICE', 'gia-vi': 'SPICE',
+        'house': 'HOUSE', 'gia-dinh': 'HOUSE', 'gia-dung': 'HOUSE',
+        'care': 'CARE', 'ca-nhan': 'CARE',
+        'office': 'OFFICE', 'van-phong': 'OFFICE',
+        'misc': 'MISC', 'tieu-dung': 'MISC',
+      };
+      const normalizedCode = catValueToCode[String(payload.category).toLowerCase()] || String(payload.category).toUpperCase();
+      const matched = catList.find(
+        (c) => c.code?.toUpperCase() === normalizedCode || c.id === Number(payload.category)
       );
       if (matched) catId = matched.id;
     }
@@ -45,6 +57,7 @@ export async function apiCreateProduct(payload) {
       name: payload.name.trim(),
       code,
       description: payload.description || undefined,
+      imageUrl: payload.imageUrl || undefined,
       categoryId: catId,
       items: [
         {
@@ -63,17 +76,16 @@ export async function apiCreateProduct(payload) {
   const { data } = await apiClient.post('/products', body);
   const created = data.data;
 
-  // If initial stock was provided, perform initial stock-in
+  // If initial stock was provided, perform initial stock-in via correct endpoint
   if (initialStock > 0 && created?.stockItems?.[0]?.id) {
     try {
       const stockItemId = created.stockItems[0].id;
-      const warehouseId = created.stockItems[0].balances?.[0]?.warehouseId || 3;
-      await apiClient.post('/inventory/in', {
+      const warehouseId = created.stockItems[0].balances?.[0]?.warehouseId;
+      if (!warehouseId) throw new Error('No warehouseId');
+      await apiClient.post('/inventory/inflow', {
         warehouseId,
-        stockItemId,
-        quantity: initialStock,
-        unitCost: Number(created.stockItems[0].costPrice || 0),
-        reason: 'Khởi tạo tồn kho ban đầu',
+        items: [{ stockItemId, quantity: initialStock }],
+        note: 'Khởi tạo tồn kho ban đầu',
       });
       if (created.stockItems[0].balances?.[0]) {
         created.stockItems[0].balances[0].quantity = initialStock;
@@ -110,8 +122,9 @@ export async function apiDeleteProduct(id) {
 // ─── Categories ───
 // GET /categories
 export async function apiGetCategories() {
-  const { data } = await apiClient.get('/categories');
-  return data.data;
+  const { data } = await apiClient.get('/categories?limit=50');
+  // Backend returns { success, items, pagination } — not data.data
+  return data.items || data.data || data || [];
 }
 
 // POST /categories

@@ -1,19 +1,20 @@
 import { apiClient } from '../lib/apiClient';
 
 // GET /inventory/balances (tồn kho hiện tại)
-export async function apiGetInventoryBalances({ page = 1, limit = 50, productId = '' } = {}) {
+// Backend trả về { success, items, pagination }
+export async function apiGetInventoryBalances({ page = 1, limit = 500, productId = '' } = {}) {
   const params = { page, limit };
   if (productId) params.productId = productId;
   const { data } = await apiClient.get('/inventory/balances', { params });
-  return data.data || data;
+  return data.items || data.data || data || [];
 }
 
 // GET /inventory/movements (lịch sử nhập/xuất)
-export async function apiGetInventoryMovements({ page = 1, limit = 50, productId = '' } = {}) {
+// Backend trả về { success, items, pagination }
+export async function apiGetInventoryMovements({ page = 1, limit = 50 } = {}) {
   const params = { page, limit };
-  if (productId) params.productId = productId;
   const { data } = await apiClient.get('/inventory/movements', { params });
-  return data.data || data;
+  return data.items || data.data || data || [];
 }
 
 // POST /inventory/inflow (nhập kho)
@@ -65,6 +66,18 @@ export async function apiGetAlerts({ page = 1, limit = 50, status = '', type = '
   if (type) params.type = type;
   const { data } = await apiClient.get('/alerts', { params });
   return data.data || data;
+}
+
+// GET /alerts/stats
+export async function apiGetAlertStats() {
+  const { data } = await apiClient.get('/alerts/stats');
+  return data.data || data;
+}
+
+// POST /decision-engine/recalculate — chạy lại Decision Engine để tạo/cập nhật alerts
+export async function apiRecalculateAlerts() {
+  const { data } = await apiClient.post('/decision-engine/recalculate');
+  return data.data;
 }
 
 // POST /alerts/:id/acknowledge (backend dùng POST không phải PATCH)

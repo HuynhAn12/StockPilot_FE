@@ -35,6 +35,11 @@
     --radius:        0.75rem;
     --success:       142 71% 45%;
     --warning:       38  92% 50%;
+
+    /* Typography from Analytics / Reports */
+    --font-ui:       "SF Pro Text", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-prose:    "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono:     "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   }
 
   * {
@@ -43,18 +48,63 @@
   }
 
   html {
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: var(--font-ui);
     font-size: 14px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
   }
 
   body {
+    font-family: var(--font-ui);
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     line-height: 1.6;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  button, input, select, textarea {
+    font-family: inherit;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-ui);
+    letter-spacing: normal;
+  }
+
+  /* Riêng các con số, số lượng, giá tiền giữ font Inter chuẩn, không bị ép đổi theo font chữ */
+  .stat-number,
+  .analytics-num,
+  .kpi-value,
+  .font-num,
+  [data-numeric="true"],
+  input[type="number"],
+  .tabular-nums {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    letter-spacing: normal !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  code, kbd, samp, pre {
+    font-family: var(--font-mono);
+  }
+
+  /* Khu vực quản trị: Be Vietnam Pro (thiết kế cho dấu tiếng Việt), số liệu dùng chữ số đều cột. */
+  .admin-ui {
+    --font-ui: "Be Vietnam Pro", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-sans: var(--font-ui);
+    font-family: var(--font-ui);
+    letter-spacing: -0.003em;
+  }
+  .admin-ui .admin-num {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
   }
 
   *:focus-visible {
@@ -111,6 +161,14 @@
     0%, 100% { transform: translateY(0px); }
     50%       { transform: translateY(-3px); }
   }
+  @keyframes float-gentle {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-8px); }
+  }
+  @keyframes float-delayed {
+    0%, 100% { transform: translateY(0px); }
+    50%       { transform: translateY(-8px); }
+  }
 
   /* Animation classes */
   .animate-in               { animation: fade-in 0.22s ease-out forwards; }
@@ -123,6 +181,8 @@
   .animate-bounce-in        { animation: bounce-in 0.3s ease-out; }
   .animate-pulse-soft       { animation: pulse-soft 2s ease-in-out infinite; }
   .animate-float            { animation: float 3s ease-in-out infinite; }
+  .animate-float-gentle     { animation: float-gentle 4s ease-in-out infinite; }
+  .animate-float-delayed    { animation: float-delayed 4.5s ease-in-out 1.2s infinite; }
 
   /* ─── Skeleton ─── */
   .skeleton {
@@ -174,6 +234,12 @@
   .shadow-modal { box-shadow: 0 24px 64px rgb(0 0 0 / 0.14), 0 0 0 1px rgb(0 0 0 / 0.04); }
 
   /* ─── Background Utilities ─── */
+  .bg-card {
+    background-color: #ffffff !important;
+  }
+  .bg-popover {
+    background-color: #ffffff !important;
+  }
   .bg-page {
     background-color: hsl(216 33% 97%);
     background-image:
@@ -217,6 +283,41 @@
   .badge-amber { background: hsl(38 100% 91%); color: hsl(38 92% 32%);  border: 1px solid hsl(38 100% 82%); }
   .badge-gray  { background: hsl(214 25% 92%); color: hsl(215 16% 42%); border: 1px solid hsl(214 25% 84%); }
 
+  /* ─── Floating Animations for Mockup Badges ─── */
+  @keyframes spFloat {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  .sp-float {
+    animation: spFloat 4s ease-in-out infinite;
+  }
+
+  .sp-float-delay {
+    animation: spFloat 4s ease-in-out 2s infinite;
+  }
+
+  /* ─── Partner Marquee Animation ─── */
+  @keyframes spMarquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  .sp-marquee {
+    animation: spMarquee 25s linear infinite;
+  }
+  .sp-marquee:hover {
+    animation-play-state: paused;
+  }
+
   /* ─── Divider ─── */
   .divider-fade {
     background: linear-gradient(90deg, transparent, hsl(var(--border) / 0.8), transparent);
@@ -225,18 +326,77 @@
   }
 }
 
+/* ─── Receipt Print Engine ─── */
+#receipt-print-portal {
+  display: none;
+}
+
 @media print {
-  body * { visibility: hidden; }
-  #receipt-print-area, #receipt-print-area * { visibility: visible; }
+  @page {
+    size: auto;
+    margin: 0mm !important;
+  }
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+    color: #000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Ẩn triệt để toàn bộ ứng dụng React khỏi luồng in để KHÔNG phát sinh thêm trang thứ 2 */
+  #root {
+    display: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Chỉ hiển thị duy nhất container in hóa đơn gắn trực tiếp vào body qua Portal */
+  #receipt-print-portal {
+    display: block !important;
+    position: static !important;
+    width: 80mm !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 3mm 4mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    break-before: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #receipt-print-portal * {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Tương thích ngược nếu còn dùng receipt-print-area */
   #receipt-print-area {
-    position: absolute;
-    left: 0; top: 0;
-    width: 100%; max-width: 100%;
-    margin: 0; padding: 12px;
-    background: white !important;
-    color: black !important;
+    display: block !important;
+    width: 80mm !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    padding: 3mm 4mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #fff !important;
+    color: #000 !important;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
+
 
 /* Hide number input spin arrows in POS quantity field */
 .pos-qty-input::-webkit-outer-spin-button,

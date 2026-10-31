@@ -22,3 +22,17 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Project internal docs (DO NOT COMMIT)
+PROJECT_COMPLETE_GUIDE.md
+PROJECT_DOCUMENTATION.md
+MEMORY.md
+RULES.md
+*.tmp
+STOCKPILOT_*.md
+ADMIN_*.md
+
+# Excel & Data files (DO NOT COMMIT)
+*.xlsx
+*.xls
+public/sample_data/

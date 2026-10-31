@@ -5,8 +5,12 @@ import {
   ChevronDown, Minimize2, MessageSquare, Zap
 } from 'lucide-react';
 import { useProductStore } from '../store/productStore';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export function AIChatBox() {
+  const { language } = useTranslation();
+  const isEn = language === 'en';
+
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -18,20 +22,33 @@ export function AIChatBox() {
   const inputRef = useRef(null);
 
   // Initial messages
-  const [messages, setMessages] = useState([
-    {
-      id: 'welcome-1',
-      sender: 'ai',
-      text: 'Xin chào! Tôi là Trợ lý AI Pilot của StockPilot 🤖. Tôi có thể giúp bạn kiểm tra mặt hàng sắp hết kho, phân tích rủi ro đọng vốn, hoặc đề xuất giá bán tối ưu. Bạn muốn tra cứu gì hôm nay?',
-      timestamp: 'Vừa xong',
-      suggestions: [
-        'Hàng nào sắp hết kho?',
-        'Cảnh báo rủi ro đọng vốn',
-        'Tổng quan tồn kho hôm nay',
-        'Đề xuất tối ưu giá bán'
-      ]
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
+
+  useEffect(() => {
+    setMessages([
+      {
+        id: 'welcome-1',
+        sender: 'ai',
+        text: isEn
+          ? "Hello! I am your StockPilot AI Assistant 🤖. I can help check low-stock items, analyze dead inventory risks, or recommend optimal pricing. What would you like to explore today?"
+          : 'Xin chào! Tôi là Trợ lý AI Pilot của StockPilot 🤖. Tôi có thể giúp bạn kiểm tra mặt hàng sắp hết kho, phân tích rủi ro đọng vốn, hoặc đề xuất giá bán tối ưu. Bạn muốn tra cứu gì hôm nay?',
+        timestamp: isEn ? 'Just now' : 'Vừa xong',
+        suggestions: isEn
+          ? [
+              'Which items are low in stock?',
+              'Overstock & capital risk alert',
+              'Inventory summary today',
+              'Price optimization advice'
+            ]
+          : [
+              'Hàng nào sắp hết kho?',
+              'Cảnh báo rủi ro đọng vốn',
+              'Tổng quan tồn kho hôm nay',
+              'Đề xuất tối ưu giá bán'
+            ]
+      }
+    ]);
+  }, [isEn]);
 
   // Auto scroll to bottom
   const scrollToBottom = () => {
@@ -170,13 +187,15 @@ export function AIChatBox() {
 
               <div>
                 <div className="flex items-center gap-1.5">
-                  <h3 className="font-bold text-sm leading-none">Trợ lý AI Pilot</h3>
+                  <h3 className="font-bold text-sm leading-none">
+                    {isEn ? 'AI Pilot Assistant' : 'Trợ lý AI Pilot'}
+                  </h3>
                   <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full bg-white/25 text-white">
                     StockPilot
                   </span>
                 </div>
                 <p className="text-[11px] text-blue-100 font-medium mt-0.5">
-                  Tư vấn kho hàng & Tối ưu giá bán
+                  {isEn ? 'Smart Inventory & Pricing Advisor' : 'Tư vấn kho hàng & Tối ưu giá bán'}
                 </p>
               </div>
             </div>
@@ -284,27 +303,29 @@ export function AIChatBox() {
 
           {/* Quick Shortcuts Bar */}
           <div className="px-3 py-1.5 bg-slate-100/70 border-t border-slate-200 flex items-center gap-1.5 overflow-x-auto text-[11px] scrollbar-none">
-            <span className="text-slate-400 font-bold shrink-0 text-[10px] uppercase">Gợi ý:</span>
+            <span className="text-slate-400 font-bold shrink-0 text-[10px] uppercase">
+              {isEn ? 'Hints:' : 'Gợi ý:'}
+            </span>
             <button
               type="button"
-              onClick={() => handleSendMessage('Hàng nào sắp hết kho?')}
+              onClick={() => handleSendMessage(isEn ? 'Which items are low in stock?' : 'Hàng nào sắp hết kho?')}
               className="text-slate-700 hover:text-blue-600 font-medium bg-white px-2 py-0.5 rounded-md border border-slate-200 shrink-0 cursor-pointer"
             >
-              Hết kho?
+              {isEn ? 'Low Stock?' : 'Hết kho?'}
             </button>
             <button
               type="button"
-              onClick={() => handleSendMessage('Cảnh báo rủi ro đọng vốn')}
+              onClick={() => handleSendMessage(isEn ? 'Overstock & capital risk alert' : 'Cảnh báo rủi ro đọng vốn')}
               className="text-slate-700 hover:text-blue-600 font-medium bg-white px-2 py-0.5 rounded-md border border-slate-200 shrink-0 cursor-pointer"
             >
-              Đọng vốn?
+              {isEn ? 'Dead Stock?' : 'Đọng vốn?'}
             </button>
             <button
               type="button"
-              onClick={() => handleSendMessage('Tổng quan tồn kho hôm nay')}
+              onClick={() => handleSendMessage(isEn ? "Today's inventory summary" : 'Tổng quan tồn kho hôm nay')}
               className="text-slate-700 hover:text-blue-600 font-medium bg-white px-2 py-0.5 rounded-md border border-slate-200 shrink-0 cursor-pointer"
             >
-              Tổng quan
+              {isEn ? 'Summary' : 'Tổng quan'}
             </button>
           </div>
 
@@ -323,7 +344,11 @@ export function AIChatBox() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Hỏi AI về tồn kho, giá bán, nhập hàng..."
+                placeholder={
+                  isEn
+                    ? 'Ask AI about inventory, pricing, stock levels...'
+                    : 'Hỏi AI về tồn kho, giá bán, nhập hàng...'
+                }
                 className="flex-1 bg-slate-100 text-slate-900 placeholder:text-slate-400 text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all font-medium"
               />
 
@@ -331,7 +356,7 @@ export function AIChatBox() {
                 type="submit"
                 disabled={!inputValue.trim()}
                 className="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-40 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/30 transition-all cursor-pointer disabled:cursor-not-allowed"
-                title="Gửi tin nhắn (Enter)"
+                title={isEn ? 'Send message (Enter)' : 'Gửi tin nhắn (Enter)'}
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -353,17 +378,21 @@ export function AIChatBox() {
               ? 'bg-slate-900 text-white shadow-slate-900/30 ring-2 ring-slate-800'
               : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-500/30 hover:scale-105'
           }`}
-          title={isOpen ? 'Đóng Trợ lý AI' : 'Mở Trợ lý AI StockPilot'}
+          title={
+            isOpen
+              ? (isEn ? 'Close AI Assistant' : 'Đóng Trợ lý AI')
+              : (isEn ? 'Open StockPilot AI Assistant' : 'Mở Trợ lý AI StockPilot')
+          }
         >
           {isOpen ? (
             <>
               <X className="w-4 h-4 text-white" />
-              <span className="text-xs font-bold">Đóng Trợ lý AI</span>
+              <span className="text-xs font-bold">{isEn ? 'Close AI Assistant' : 'Đóng Trợ lý AI'}</span>
             </>
           ) : (
             <>
               <Bot className="w-4 h-4 animate-bounce group-hover:animate-none" />
-              <span className="text-xs font-bold">Hỏi Trợ lý AI</span>
+              <span className="text-xs font-bold">{isEn ? 'Ask AI Assistant' : 'Hỏi Trợ lý AI'}</span>
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-blue-600 shadow-xs" />
             </>
           )}
