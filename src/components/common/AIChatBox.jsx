@@ -94,6 +94,7 @@ export function AIChatBox() {
         text: response.answer || (isEn ? 'No answer was returned. Please try again.' : 'Chưa nhận được câu trả lời. Vui lòng thử lại.'),
         timestamp: nowLabel(isEn),
         source: response.source,
+        fallbackReason: response.fallbackReason,
         actionLinks: response.actionLinks || [],
         suggestions: FOLLOW_UPS[isEn ? 'en' : 'vi']
       };
@@ -210,10 +211,11 @@ export function AIChatBox() {
                   >
                     <div className="whitespace-pre-line">
                       {msg.text.split('\n').map((line, i) => {
-                        // Simple bold markdown parser
-                        const parts = line.split(/(\*\*.*?\*\*)/g);
+                        // Minimal markdown: "#" headings become bold lines, **bold** spans stay bold
+                        const heading = /^#{1,6}\s+/.test(line);
+                        const parts = line.replace(/^#{1,6}\s+/, '').split(/(\*\*.*?\*\*)/g);
                         return (
-                          <span key={i} className="block min-h-[1.2em]">
+                          <span key={i} className={`block min-h-[1.2em] ${heading ? 'font-semibold text-slate-900 mt-1' : ''}`}>
                             {parts.map((p, idx) => {
                               if (p.startsWith('**') && p.endsWith('**')) {
                                 return <strong key={idx} className={msg.sender === 'user' ? 'text-white font-bold' : 'text-slate-900 font-bold'}>{p.slice(2, -2)}</strong>;
@@ -248,7 +250,7 @@ export function AIChatBox() {
 
                 <span className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1 px-1">
                   {msg.timestamp}
-                  {msg.sender === 'ai' && <AISourceBadge source={msg.source} isEn={isEn} />}
+                  {msg.sender === 'ai' && <AISourceBadge source={msg.source} fallbackReason={msg.fallbackReason} isEn={isEn} />}
                 </span>
 
                 {/* Suggestions Pills from AI */}

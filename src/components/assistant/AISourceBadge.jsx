@@ -1,21 +1,30 @@
 import { Sparkles, ListChecks } from 'lucide-react';
 
+const FALLBACK_HINT = {
+  QUOTA: { vi: 'Tài khoản OpenAI đã hết credit', en: 'The OpenAI account has no credits left' },
+  TIMEOUT: { vi: 'AI phản hồi quá lâu', en: 'The AI took too long to respond' },
+  HTTP: { vi: 'Không gọi được AI', en: 'The AI service could not be reached' },
+  INVALID_RESPONSE: { vi: 'AI trả về dữ liệu không hợp lệ', en: 'The AI returned an invalid response' },
+  DISABLED: { vi: 'AI chưa được bật', en: 'AI is not configured' },
+};
+
 /**
  * Shows where an assistant answer came from: the language model ("AI") or the
  * rule-based fallback ("Luật"). Numbers always come from the Decision Engine either way.
  */
-export function AISourceBadge({ source, isEn, className = '' }) {
+export function AISourceBadge({ source, fallbackReason, isEn, className = '' }) {
   if (!source) return null;
   const isAi = source === 'AI';
   const Icon = isAi ? Sparkles : ListChecks;
   const label = isAi ? 'AI' : isEn ? 'Rules' : 'Luật';
+  const hint = FALLBACK_HINT[fallbackReason]?.[isEn ? 'en' : 'vi'];
   const title = isAi
     ? isEn
       ? 'Written by the AI model from Decision Engine data'
       : 'Do mô hình AI viết dựa trên số liệu của Decision Engine'
     : isEn
-      ? 'Rule-based answer (AI is off or unavailable)'
-      : 'Câu trả lời theo luật (AI đang tắt hoặc chưa phản hồi)';
+      ? `Rule-based answer${hint ? `: ${hint}` : ' (AI is off or unavailable)'}`
+      : `Câu trả lời theo luật${hint ? `: ${hint}` : ' (AI đang tắt hoặc chưa phản hồi)'}`;
 
   return (
     <span

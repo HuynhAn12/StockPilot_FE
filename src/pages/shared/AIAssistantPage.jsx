@@ -284,6 +284,7 @@ export function AIAssistantPage() {
         text: response.answer || (isEn ? 'No answer was returned. Please try again.' : 'Chưa nhận được câu trả lời. Vui lòng thử lại.'),
         timestamp: new Date().toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' }),
         source: response.source,
+        fallbackReason: response.fallbackReason,
         actionLinks: response.actionLinks || [],
       };
 
@@ -749,7 +750,7 @@ export function AIAssistantPage() {
                     {/* Metadata & Actions */}
                     <div className="flex items-center gap-2 mt-1 px-1 text-[11px] text-slate-400">
                       <span>{msg.timestamp}</span>
-                      {!isUser && <AISourceBadge source={msg.source} isEn={isEn} />}
+                      {!isUser && <AISourceBadge source={msg.source} fallbackReason={msg.fallbackReason} isEn={isEn} />}
 
                       {!isUser && (
                         <button
