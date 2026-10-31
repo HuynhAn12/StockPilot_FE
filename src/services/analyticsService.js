@@ -106,7 +106,8 @@ export async function apiGetAssistantOverview() {
 }
 
 export async function apiChatWithAssistant(question, stockItemId = null) {
-  const { data } = await apiClient.post('/assistant/chat', { question, stockItemId });
+  const body = stockItemId ? { question, stockItemId } : { question };
+  const { data } = await apiClient.post('/assistant/chat', body);
   return data.data;
 }
 
