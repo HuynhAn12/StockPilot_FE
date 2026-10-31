@@ -5,13 +5,15 @@ import {
   Copy, Check, ArrowRight, CornerDownLeft, RefreshCw,
   Search, PanelLeftClose, PanelLeft, Clock, ShieldCheck,
   TrendingUp, AlertTriangle, Package, DollarSign, ChevronRight,
-  ExternalLink, BarChart3, ShoppingCart, ArrowUpRight
+  ExternalLink, BarChart3, ShoppingCart, ArrowUpRight, Lightbulb, CheckCircle2
 } from 'lucide-react';
 import { useProductStore } from '../../components/store/productStore';
 import { useAuthStore } from '../../store/authStore';
 import { isStaff } from '../../config/permissions.config';
 import { apiChatWithAssistant, apiGetAssistantHistory } from '../../services/analyticsService';
 import { useTranslation } from '../../i18n/useTranslation';
+import { AISourceBadge } from '../../components/assistant/AISourceBadge';
+import { AISuggestionsPanel } from '../../components/assistant/AISuggestionsPanel';
 
 const STORAGE_KEY = 'stockpilot_ai_active_session_v2';
 
@@ -156,6 +158,7 @@ export function AIAssistantPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1280);
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -192,7 +195,8 @@ export function AIAssistantPage() {
                 sender: 'ai',
                 text: item.responseText,
                 timestamp: timeStr,
-                actionLinks: item.metadata?.actionLinks || [],
+                source: item.source,
+                actionLinks: [],
               });
             }
           });
@@ -272,20 +276,14 @@ export function AIAssistantPage() {
     setIsTyping(true);
 
     try {
-      const response = await apiChatWithAssistant({
-        prompt: text,
-        context: {
-          role: user?.role,
-          storeName: user?.storeName || user?.store?.name,
-          language: isEn ? 'en' : 'vi',
-        },
-      });
+      const response = await apiChatWithAssistant(text);
 
       const aiMsg = {
-        id: `ai-${Date.now()}`,
+        id: `ai-${response.id || Date.now()}`,
         sender: 'ai',
-        text: response.reply || response.text || (isEn ? 'I have received your request and synced live database.' : 'Tôi đã nhận được thông tin và đồng bộ cơ sở dữ liệu.'),
+        text: response.answer || (isEn ? 'No answer was returned. Please try again.' : 'Chưa nhận được câu trả lời. Vui lòng thử lại.'),
         timestamp: new Date().toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        source: response.source,
         actionLinks: response.actionLinks || [],
       };
 
@@ -303,8 +301,8 @@ export function AIAssistantPage() {
         id: `ai-err-${Date.now()}`,
         sender: 'ai',
         text: isEn
-          ? `### ⚠️ Real-Time Sync Notice\nUnable to connect to AI server: ${err?.message || 'Network error'}. Please try again later.`
-          : `### ⚠️ Thông báo kết nối dữ liệu\nKhông thể kết nối đến máy chủ AI: ${err?.message || 'Lỗi mạng'}. Vui lòng thử lại sau ít phút.`,
+          ? `### ⚠️ Real-Time Sync Notice\nUnable to connect to AI server: ${err?.response?.data?.error?.message || err?.message || 'Network error'}. Please try again later.`
+          : `### ⚠️ Thông báo kết nối dữ liệu\nKhông thể kết nối đến máy chủ AI: ${err?.response?.data?.error?.message || err?.message || 'Lỗi mạng'}. Vui lòng thử lại sau ít phút.`,
         timestamp: new Date().toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -453,7 +451,7 @@ export function AIAssistantPage() {
   ];
 
   return (
-    <div className="ai-assistant-page-scoped flex h-[calc(100vh-84px)] -m-3 sm:-m-5 lg:-m-6 bg-[#fcfcfd] overflow-hidden">
+    <div className="ai-assistant-page-scoped relative flex h-[calc(100vh-84px)] -m-3 sm:-m-5 lg:-m-6 bg-[#fcfcfd] overflow-hidden">
       <style>{`
         .ai-assistant-page-scoped {
           --ifm-color-primary: #2563eb;
@@ -629,6 +627,19 @@ export function AIAssistantPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => setSuggestionsOpen((open) => !open)}
+              aria-pressed={suggestionsOpen}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
+                suggestionsOpen
+                  ? 'border-blue-200 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200'
+              }`}
+            >
+              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+              <span>{isEn ? 'Suggestions' : 'Gợi ý'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleNewChat}
               className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors cursor-pointer"
             >
@@ -738,6 +749,7 @@ export function AIAssistantPage() {
                     {/* Metadata & Actions */}
                     <div className="flex items-center gap-2 mt-1 px-1 text-[11px] text-slate-400">
                       <span>{msg.timestamp}</span>
+                      {!isUser && <AISourceBadge source={msg.source} isEn={isEn} />}
 
                       {!isUser && (
                         <button
@@ -835,6 +847,13 @@ export function AIAssistantPage() {
         </div>
 
       </div>
+
+      {/* 3. SUGGESTED ACTIONS (overlay below xl, side column from xl) */}
+      {suggestionsOpen && (
+        <aside className="absolute xl:static inset-y-0 right-0 z-20 w-[min(20rem,100%)] shrink-0 border-l border-slate-200 shadow-xl xl:shadow-none">
+          <AISuggestionsPanel isEn={isEn} onClose={() => setSuggestionsOpen(false)} />
+        </aside>
+      )}
 
     </div>
   );

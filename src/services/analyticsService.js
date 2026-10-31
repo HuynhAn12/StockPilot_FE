@@ -115,6 +115,12 @@ export async function apiGetAssistantHistory({ limit = 20 } = {}) {
   return data.data;
 }
 
+// GET /assistant/suggestions — gợi ý hành động (chỉ đề xuất; duyệt bằng các endpoint nghiệp vụ có sẵn)
+export async function apiGetAssistantSuggestions() {
+  const { data } = await apiClient.get('/assistant/suggestions');
+  return data.data;
+}
+
 // Decision Engine Config (bảng engine_configs)
 export async function apiGetDecisionConfig() {
   const { data } = await apiClient.get('/decision-engine/config');
