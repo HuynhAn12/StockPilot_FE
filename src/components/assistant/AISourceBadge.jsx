@@ -1,7 +1,7 @@
 import { Sparkles, ListChecks } from 'lucide-react';
 
 const FALLBACK_HINT = {
-  QUOTA: { vi: 'Tài khoản OpenAI đã hết credit', en: 'The OpenAI account has no credits left' },
+  QUOTA: { vi: 'Tài khoản AI đã hết credit/hạn mức', en: 'The AI account has no credits or quota left' },
   TIMEOUT: { vi: 'AI phản hồi quá lâu', en: 'The AI took too long to respond' },
   HTTP: { vi: 'Không gọi được AI', en: 'The AI service could not be reached' },
   INVALID_RESPONSE: { vi: 'AI trả về dữ liệu không hợp lệ', en: 'The AI returned an invalid response' },
