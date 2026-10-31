@@ -36,3 +36,8 @@ ADMIN_*.md
 *.xlsx
 *.xls
 public/sample_data/
+
+# Agent skills (cai local, khong day len git)
+.claude/
+.agents/
+skills-lock.json
