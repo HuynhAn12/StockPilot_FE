@@ -1,89 +1,136 @@
 import React, { useState } from 'react';
-import { CreditCard, Hourglass, Info, Store } from 'lucide-react';
+import { CreditCard, Info } from 'lucide-react';
 import { formatVNDateTime } from '../../../services/adminService';
 import { apiGetPaymentHealth } from '../../../services/adminOpsService';
 import { adminStyles as ui } from '../adminStyles';
-import { Badge, EmptyState, ErrorState, StatCard, TableCard, Td, Th } from '../components/AdminUI';
+import { Badge, EmptyState, ErrorState, PanelCard, SummaryStrip, Td, Th, TableBody } from '../components/AdminUI';
+import { useAdminText } from '../useAdminText';
 import { formatMinutes, formatNumber, segmentedButton, segmentedWrapper, useOpsData } from './opsShared';
 
 const PENDING_PRESETS = [15, 30, 60, 120];
 
 export function OpsPaymentsPanel() {
+  const { t } = useAdminText();
   const [pendingMinutes, setPendingMinutes] = useState(null); // null = dùng ngưỡng trong cài đặt
   const health = useOpsData(() => apiGetPaymentHealth({ pendingMinutes: pendingMinutes ?? undefined }), [pendingMinutes]);
   const data = health.data;
   const threshold = pendingMinutes ?? data?.pendingMinutes;
+  const stuckStores = data?.summary?.storesWithStuckPayments;
+  const stuckTotal = data?.summary?.totalStuckPayments;
+
+  const thresholdPicker = (
+    <div className="flex items-center gap-2">
+      <span className="text-[12px] text-slate-500">{t('Coi là treo sau', 'Stuck after')}</span>
+      <div className={segmentedWrapper} role="group" aria-label={t('Ngưỡng giao dịch treo', 'Stuck payment threshold')}>
+        {PENDING_PRESETS.map((m) => (
+          <button
+            key={m}
+            type="button"
+            aria-pressed={threshold === m}
+            className={segmentedButton(threshold === m)}
+            onClick={() => setPendingMinutes(m)}
+          >
+            {m}′
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-[13px] text-[#64748B] max-w-[70ch]">
-          Theo dõi cổng PayOS của từng cửa hàng. Chỉ hiển thị số lượng và thời điểm — không hiển thị số tiền để không lộ doanh thu cửa hàng.
-        </p>
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] text-[#64748B]">Coi là treo sau</span>
-          <div className={segmentedWrapper} role="group" aria-label="Ngưỡng giao dịch treo">
-            {PENDING_PRESETS.map((m) => (
-              <button key={m} type="button" className={segmentedButton(threshold === m)} onClick={() => setPendingMinutes(m)}>
-                {m}′
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="Cửa hàng đã kết nối PayOS" value={formatNumber(data?.summary?.storesConfigured)} icon={CreditCard} loading={health.loading} />
-        <StatCard
-          title="Cửa hàng có giao dịch treo"
-          value={formatNumber(data?.summary?.storesWithStuckPayments)}
-          alert={Boolean(data?.summary?.storesWithStuckPayments)}
-          subtitle={threshold ? `Chờ quá ${formatMinutes(threshold)}` : ''}
-          icon={Store}
+    <div className="space-y-4">
+      <PanelCard
+        icon={CreditCard}
+        title={t('Sức khỏe thanh toán PayOS', 'PayOS payment health')}
+        description={t(
+          'Chỉ hiển thị số lượng và thời điểm — không hiển thị số tiền để không lộ doanh thu cửa hàng.',
+          'Counts and timestamps only — amounts are hidden so store revenue is never exposed.'
+        )}
+        actions={thresholdPicker}
+        bodyClassName=""
+      >
+        <SummaryStrip
           loading={health.loading}
+          items={[
+            { label: t('Cửa hàng đã kết nối PayOS', 'Stores connected to PayOS'), value: formatNumber(data?.summary?.storesConfigured) },
+            {
+              label: t('Cửa hàng có giao dịch treo', 'Stores with stuck payments'),
+              value: formatNumber(stuckStores),
+              tone: stuckStores ? 'warning' : undefined,
+              hint: threshold ? t(`Chờ quá ${formatMinutes(threshold)}`, `Waiting over ${formatMinutes(threshold)}`) : undefined,
+            },
+            {
+              label: t('Tổng giao dịch đang treo', 'Total stuck payments'),
+              value: formatNumber(stuckTotal),
+              tone: stuckTotal ? 'warning' : undefined,
+            },
+            {
+              label: t('Trạng thái', 'Status'),
+              value: stuckTotal ? t('Cần kiểm tra', 'Needs review') : t('Bình thường', 'Healthy'),
+              tone: stuckTotal ? 'warning' : 'success',
+            },
+          ]}
         />
-        <StatCard title="Tổng giao dịch đang treo" value={formatNumber(data?.summary?.totalStuckPayments)} alert={Boolean(data?.summary?.totalStuckPayments)} icon={Hourglass} loading={health.loading} />
-      </div>
+      </PanelCard>
 
-      <TableCard header={<span className={ui.cardTitle}>Theo cửa hàng</span>}>
+      <PanelCard title={t('Theo cửa hàng', 'By store')} bodyClassName="overflow-x-auto">
         {health.error ? (
           <ErrorState message={health.error} onRetry={health.reload} />
         ) : !health.loading && !data?.items?.length ? (
-          <EmptyState title="Chưa có cửa hàng nào dùng PayOS" description="Khi cửa hàng kết nối PayOS hoặc phát sinh giao dịch, thông tin sẽ hiện ở đây." />
+          <EmptyState
+            title={t('Chưa có cửa hàng nào dùng PayOS', 'No store uses PayOS yet')}
+            description={t(
+              'Khi cửa hàng kết nối PayOS hoặc phát sinh giao dịch, thông tin sẽ hiện ở đây.',
+              'Stores appear here once they connect PayOS or receive a payment.'
+            )}
+          />
         ) : (
           <table className={ui.table}>
             <thead>
               <tr>
-                <Th>Cửa hàng</Th>
+                <Th>{t('Cửa hàng', 'Store')}</Th>
                 <Th>PayOS</Th>
-                <Th align="right">Giao dịch treo</Th>
-                <Th>Treo từ</Th>
-                <Th>Thanh toán thành công gần nhất</Th>
+                <Th align="right">{t('Giao dịch treo', 'Stuck')}</Th>
+                <Th>{t('Treo từ', 'Stuck since')}</Th>
+                <Th>{t('Thanh toán thành công gần nhất', 'Last successful payment')}</Th>
               </tr>
             </thead>
-            <tbody>
+            <TableBody loading={health.loading} columns={5}>
               {(data?.items || []).map((item) => (
                 <tr key={item.storeId} className={ui.tr}>
                   <Td>
-                    <p className="font-semibold text-[#0F172A]">{item.name}</p>
-                    <p className="text-[12px] text-[#94A3B8]">{item.code}{!item.storeActive && ' · đang tạm ngưng'}</p>
+                    <p className="font-medium text-slate-900">{item.name}</p>
+                    <p className="text-[12px] text-slate-500">
+                      {item.code}
+                      {!item.storeActive && t(' · đang tạm ngưng', ' · suspended')}
+                    </p>
                   </Td>
-                  <Td>{item.payosConfigured ? <Badge tone="success">Đã kết nối</Badge> : <Badge tone="neutral">Chưa kết nối</Badge>}</Td>
+                  <Td>
+                    {item.payosConfigured ? (
+                      <Badge tone="success">{t('Đã kết nối', 'Connected')}</Badge>
+                    ) : (
+                      <Badge tone="neutral">{t('Chưa kết nối', 'Not connected')}</Badge>
+                    )}
+                  </Td>
                   <Td align="right">
-                    <span className={`admin-num font-semibold ${item.stuckPendingCount ? 'text-amber-700' : 'text-[#94A3B8]'}`}>{formatNumber(item.stuckPendingCount)}</span>
+                    <span className={`tabular-nums font-medium ${item.stuckPendingCount ? 'text-amber-700' : 'text-slate-400'}`}>
+                      {formatNumber(item.stuckPendingCount)}
+                    </span>
                   </Td>
-                  <Td>{item.oldestStuckAt ? formatVNDateTime(item.oldestStuckAt) : <span className="text-[#94A3B8]">–</span>}</Td>
-                  <Td>{item.lastPaidAt ? formatVNDateTime(item.lastPaidAt) : <span className="text-[#94A3B8]">Chưa có</span>}</Td>
+                  <Td className="tabular-nums">{item.oldestStuckAt ? formatVNDateTime(item.oldestStuckAt) : <span className="text-slate-400">–</span>}</Td>
+                  <Td className="tabular-nums">
+                    {item.lastPaidAt ? formatVNDateTime(item.lastPaidAt) : <span className="text-slate-400">{t('Chưa có', 'None yet')}</span>}
+                  </Td>
                 </tr>
               ))}
-            </tbody>
+            </TableBody>
           </table>
         )}
-      </TableCard>
+      </PanelCard>
 
       {data?.limitations?.length > 0 && (
-        <p className="flex items-start gap-2 text-[12px] text-[#64748B]">
-          <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" /> {data.limitations.join(' ')}
+        <p className="flex items-start gap-2 text-[12px] text-slate-500">
+          <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden="true" /> {data.limitations.join(' ')}
         </p>
       )}
     </div>

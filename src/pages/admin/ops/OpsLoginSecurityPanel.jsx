@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Ban, KeyRound, LockOpen, ShieldAlert } from 'lucide-react';
+import { Globe, LockOpen, ShieldAlert, UserX } from 'lucide-react';
 import { useToast } from '../../../components/common/Toast';
 import { formatVNDateTime } from '../../../services/adminService';
 import { apiClearLoginLock, apiGetLoginFailures } from '../../../services/adminOpsService';
 import { apiErrorMessage, roleLabel } from '../adminLabels';
 import { adminStyles as ui } from '../adminStyles';
-import { Badge, ConfirmDialog, EmptyState, ErrorState, StatCard, TableCard, Td, Th } from '../components/AdminUI';
+import { Badge, ConfirmDialog, EmptyState, ErrorState, PanelCard, SummaryStrip, TableBody, Td, Th } from '../components/AdminUI';
+import { useAdminText } from '../useAdminText';
 import { formatNumber, segmentedButton, segmentedWrapper, useOpsData } from './opsShared';
 
 const WINDOWS = [
-  { hours: 24, label: '24 giờ' },
-  { hours: 168, label: '7 ngày' },
-  { hours: 720, label: '30 ngày' },
+  { hours: 24, vi: '24 giờ', en: '24 hours' },
+  { hours: 168, vi: '7 ngày', en: '7 days' },
+  { hours: 720, vi: '30 ngày', en: '30 days' },
 ];
 
 export function OpsLoginSecurityPanel() {
+  const { t } = useAdminText();
   const { toast } = useToast();
   const [hours, setHours] = useState(24);
   const [clearing, setClearing] = useState(null);
@@ -25,136 +27,202 @@ export function OpsLoginSecurityPanel() {
   const clearLock = async ({ reason }) => {
     try {
       await apiClearLoginLock(clearing.accountKey, reason);
-      toast({ type: 'success', title: 'Đã gỡ khóa đăng nhập', description: `${clearing.emailMasked} có thể đăng nhập lại ngay.` });
+      toast({
+        type: 'success',
+        title: t('Đã gỡ khóa đăng nhập', 'Login lock cleared'),
+        description: t(`${clearing.emailMasked} có thể đăng nhập lại ngay.`, `${clearing.emailMasked} can sign in again now.`),
+      });
       setClearing(null);
       report.reload();
     } catch (err) {
-      toast({ type: 'error', title: 'Không gỡ khóa được', description: apiErrorMessage(err) });
+      toast({ type: 'error', title: t('Không gỡ khóa được', 'Could not clear the lock'), description: apiErrorMessage(err) });
     }
   };
 
-  if (report.error) return <div className={ui.card}><ErrorState message={report.error} onRetry={report.reload} /></div>;
+  if (report.error) {
+    return (
+      <div className={ui.card}>
+        <ErrorState message={report.error} onRetry={report.reload} />
+      </div>
+    );
+  }
 
   const lockout = d?.lockout;
+  const lockedCount = d?.byAccount?.filter((a) => a.locked).length;
+
+  const windowPicker = (
+    <div className={segmentedWrapper} role="group" aria-label={t('Khoảng thời gian', 'Time range')}>
+      {WINDOWS.map((w) => (
+        <button key={w.hours} type="button" aria-pressed={hours === w.hours} className={segmentedButton(hours === w.hours)} onClick={() => setHours(w.hours)}>
+          {t(w.vi, w.en)}
+        </button>
+      ))}
+    </div>
+  );
+
+  const lockoutText = lockout
+    ? lockout.maxAttempts === 0
+      ? t('Tự khóa tạm đang TẮT.', 'Automatic lockout is OFF.')
+      : t(
+          `Một email nhập sai ${lockout.maxAttempts} lần trong ${lockout.windowMinutes} phút sẽ bị khóa đăng nhập tạm thời.`,
+          `An email with ${lockout.maxAttempts} failed attempts within ${lockout.windowMinutes} minutes is temporarily locked.`
+        )
+    : '';
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-[13px] text-[#64748B] max-w-[75ch]">
-          {lockout
-            ? lockout.maxAttempts === 0
-              ? 'Tự khóa tạm đang TẮT. '
-              : `Một email nhập sai ${lockout.maxAttempts} lần trong ${lockout.windowMinutes} phút sẽ bị khóa đăng nhập tạm thời. `
-            : ''}
-          <Link to="/admin/security?tab=settings" className="text-[#2563EB] hover:underline">Đổi ngưỡng</Link>
-        </p>
-        <div className={segmentedWrapper} role="group" aria-label="Khoảng thời gian">
-          {WINDOWS.map((w) => (
-            <button key={w.hours} type="button" className={segmentedButton(hours === w.hours)} onClick={() => setHours(w.hours)}>
-              {w.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard title="Lượt đăng nhập sai" value={formatNumber(d?.totalFailures)} icon={KeyRound} loading={report.loading} />
-        <StatCard
-          title="Lượt bị chặn do đang khóa"
-          value={formatNumber(d?.blockedAttempts)}
-          alert={Boolean(d?.blockedAttempts)}
-          subtitle="Dấu hiệu có người cố dò mật khẩu"
-          icon={Ban}
+    <div className="space-y-4">
+      <PanelCard
+        icon={ShieldAlert}
+        title={t('Đăng nhập bất thường', 'Suspicious sign-ins')}
+        description={
+          <>
+            {lockoutText}{' '}
+            <Link to="/admin/security?tab=settings" className="text-blue-700 hover:underline underline-offset-2">
+              {t('Đổi ngưỡng', 'Change threshold')}
+            </Link>
+          </>
+        }
+        actions={windowPicker}
+        bodyClassName=""
+      >
+        <SummaryStrip
           loading={report.loading}
+          items={[
+            { label: t('Lượt đăng nhập sai', 'Failed sign-ins'), value: formatNumber(d?.totalFailures) },
+            {
+              label: t('Lượt bị chặn do đang khóa', 'Blocked while locked'),
+              value: formatNumber(d?.blockedAttempts),
+              tone: d?.blockedAttempts ? 'warning' : undefined,
+              hint: t('Dấu hiệu có người cố dò mật khẩu', 'A sign of password guessing'),
+            },
+            {
+              label: t('Tài khoản đang bị khóa tạm', 'Accounts locked now'),
+              value: formatNumber(lockedCount),
+              tone: lockedCount ? 'danger' : undefined,
+            },
+            {
+              label: t('IP nhập sai nhiều nhất', 'Top failing IP'),
+              value: d?.byIp?.[0]?.ipAddress || '–',
+              hint: d?.byIp?.[0] ? t(`${formatNumber(d.byIp[0].failures)} lượt sai`, `${formatNumber(d.byIp[0].failures)} failures`) : undefined,
+            },
+          ]}
         />
-        <StatCard
-          title="Tài khoản đang bị khóa tạm"
-          value={formatNumber(d?.byAccount?.filter((a) => a.locked).length)}
-          icon={ShieldAlert}
-          loading={report.loading}
-        />
-      </div>
+      </PanelCard>
 
-      <TableCard header={<span className={ui.cardTitle}>Tài khoản bị nhập sai nhiều nhất</span>}>
+      <PanelCard icon={UserX} title={t('Tài khoản bị nhập sai nhiều nhất', 'Most-failed accounts')} bodyClassName="overflow-x-auto">
         {!report.loading && !d?.byAccount?.length ? (
-          <EmptyState title="Không có lượt đăng nhập sai" description="Trong khoảng thời gian này chưa ai nhập sai mật khẩu." />
+          <EmptyState
+            title={t('Không có lượt đăng nhập sai', 'No failed sign-ins')}
+            description={t('Trong khoảng thời gian này chưa ai nhập sai mật khẩu.', 'Nobody entered a wrong password in this period.')}
+          />
         ) : (
           <table className={ui.table}>
             <thead>
               <tr>
-                <Th>Email (đã che)</Th>
-                <Th>Tài khoản</Th>
-                <Th align="right">Lượt sai</Th>
-                <Th>Lần sai gần nhất</Th>
-                <Th>Trạng thái</Th>
-                <Th align="right">Thao tác</Th>
+                <Th>{t('Email (đã che)', 'Email (masked)')}</Th>
+                <Th>{t('Tài khoản', 'Account')}</Th>
+                <Th align="right">{t('Lượt sai', 'Failures')}</Th>
+                <Th>{t('Lần sai gần nhất', 'Last failure')}</Th>
+                <Th>{t('Trạng thái', 'Status')}</Th>
+                <Th align="right">
+                  <span className="sr-only">{t('Thao tác', 'Actions')}</span>
+                </Th>
               </tr>
             </thead>
-            <tbody>
+            <TableBody loading={report.loading} columns={6}>
               {(d?.byAccount || []).map((a) => (
                 <tr key={a.accountKey} className={ui.tr}>
-                  <Td><span className="font-mono text-[12.5px]">{a.emailMasked}</span></Td>
+                  <Td>
+                    <span className="font-mono text-[12px]">{a.emailMasked}</span>
+                  </Td>
                   <Td>
                     {a.user ? (
                       <>
-                        <p className="font-medium text-[#0F172A]">{a.user.fullName}</p>
-                        <p className="text-[12px] text-[#64748B]">{roleLabel(a.user.role)}{!a.user.isActive && ' · đã khóa'}</p>
+                        <p className="font-medium text-slate-900">{a.user.fullName}</p>
+                        <p className="text-[12px] text-slate-500">
+                          {roleLabel(a.user.role)}
+                          {!a.user.isActive && t(' · đã khóa', ' · disabled')}
+                        </p>
                       </>
                     ) : (
-                      <span className="text-[12.5px] text-[#94A3B8]">Email không tồn tại trong hệ thống</span>
+                      <span className="text-[12px] text-slate-500">{t('Email không tồn tại trong hệ thống', 'Email not registered')}</span>
                     )}
                   </Td>
-                  <Td align="right"><span className="admin-num font-semibold">{formatNumber(a.failures)}</span></Td>
-                  <Td>{formatVNDateTime(a.lastFailedAt)}</Td>
-                  <Td>{a.locked ? <Badge tone="danger">Khóa tạm · còn {a.retryAfterMinutes} phút</Badge> : <Badge tone="neutral">Bình thường</Badge>}</Td>
+                  <Td align="right">
+                    <span className="tabular-nums font-medium">{formatNumber(a.failures)}</span>
+                  </Td>
+                  <Td className="tabular-nums">{formatVNDateTime(a.lastFailedAt)}</Td>
+                  <Td>
+                    {a.locked ? (
+                      <Badge tone="danger">{t(`Khóa tạm · còn ${a.retryAfterMinutes} phút`, `Locked · ${a.retryAfterMinutes} min left`)}</Badge>
+                    ) : (
+                      <Badge tone="neutral">{t('Bình thường', 'Normal')}</Badge>
+                    )}
+                  </Td>
                   <Td align="right">
                     {a.locked && (
-                      <button type="button" className={ui.btnSecondary} onClick={() => setClearing(a)}>
-                        <LockOpen className="w-3.5 h-3.5" /> Gỡ khóa
+                      <button type="button" className={`${ui.btnSecondary} h-8`} onClick={() => setClearing(a)}>
+                        <LockOpen className="w-3.5 h-3.5" aria-hidden="true" /> {t('Gỡ khóa', 'Unlock')}
                       </button>
                     )}
                   </Td>
                 </tr>
               ))}
-            </tbody>
+            </TableBody>
           </table>
         )}
-      </TableCard>
+      </PanelCard>
 
-      <TableCard header={<span className={ui.cardTitle}>Địa chỉ IP nhập sai nhiều nhất</span>}>
+      <PanelCard icon={Globe} title={t('Địa chỉ IP nhập sai nhiều nhất', 'Most-failing IP addresses')} bodyClassName="overflow-x-auto">
         {!report.loading && !d?.byIp?.length ? (
-          <EmptyState title="Chưa có dữ liệu" />
+          <EmptyState title={t('Chưa có dữ liệu', 'No data yet')} />
         ) : (
           <table className={ui.table}>
             <thead>
               <tr>
-                <Th>Địa chỉ IP</Th>
-                <Th align="right">Lượt sai</Th>
-                <Th>Lần sai gần nhất</Th>
+                <Th>{t('Địa chỉ IP', 'IP address')}</Th>
+                <Th align="right">{t('Lượt sai', 'Failures')}</Th>
+                <Th>{t('Lần sai gần nhất', 'Last failure')}</Th>
               </tr>
             </thead>
-            <tbody>
+            <TableBody loading={report.loading} columns={3}>
               {(d?.byIp || []).map((row) => (
                 <tr key={row.ipAddress || 'unknown'} className={ui.tr}>
-                  <Td><span className="font-mono text-[12.5px]">{row.ipAddress || 'Không xác định'}</span></Td>
-                  <Td align="right"><span className="admin-num font-semibold">{formatNumber(row.failures)}</span></Td>
-                  <Td>{formatVNDateTime(row.lastFailedAt)}</Td>
+                  <Td>
+                    <span className="font-mono text-[12px]">{row.ipAddress || t('Không xác định', 'Unknown')}</span>
+                  </Td>
+                  <Td align="right">
+                    <span className="tabular-nums font-medium">{formatNumber(row.failures)}</span>
+                  </Td>
+                  <Td className="tabular-nums">{formatVNDateTime(row.lastFailedAt)}</Td>
                 </tr>
               ))}
-            </tbody>
+            </TableBody>
           </table>
         )}
-      </TableCard>
+      </PanelCard>
 
-      <p className="text-[12px] text-[#64748B]">
-        Cần khóa hẳn một tài khoản? Dùng trang <Link to="/admin/users" className="text-[#2563EB] hover:underline">Người dùng & Quyền</Link>.
+      <p className="text-[12px] text-slate-500">
+        {t('Cần khóa hẳn một tài khoản? Dùng trang', 'Need to disable an account permanently? Use')}{' '}
+        <Link to="/admin/users" className="text-blue-700 hover:underline underline-offset-2">
+          {t('Người dùng & Quyền', 'Users & Roles')}
+        </Link>
+        .
       </p>
 
       {clearing && (
         <ConfirmDialog
-          title={`Gỡ khóa đăng nhập cho ${clearing.emailMasked}?`}
-          description="Chỉ gỡ khi đã xác minh chính chủ (ví dụ chủ cửa hàng gọi điện báo quên mật khẩu). Bộ đếm lượt sai sẽ về 0."
-          confirmLabel="Gỡ khóa"
-          reason={{ required: true, minLength: 3, placeholder: 'Ví dụ: Chủ cửa hàng gọi hotline xác minh lúc 10:15' }}
+          title={t(`Gỡ khóa đăng nhập cho ${clearing.emailMasked}?`, `Clear the login lock for ${clearing.emailMasked}?`)}
+          description={t(
+            'Chỉ gỡ khi đã xác minh chính chủ (ví dụ chủ cửa hàng gọi điện báo quên mật khẩu). Bộ đếm lượt sai sẽ về 0.',
+            'Only clear after verifying the owner (e.g. a store owner called about a forgotten password). The failure counter resets to 0.'
+          )}
+          confirmLabel={t('Gỡ khóa', 'Unlock')}
+          reason={{
+            required: true,
+            minLength: 3,
+            placeholder: t('Ví dụ: Chủ cửa hàng gọi hotline xác minh lúc 10:15', 'e.g. Store owner verified via hotline at 10:15'),
+          }}
           onConfirm={clearLock}
           onClose={() => setClearing(null)}
         />

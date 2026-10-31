@@ -1,111 +1,145 @@
 import React, { useState } from 'react';
-import { Database, ShieldCheck } from 'lucide-react';
+import { Database, HardDrive, ShieldCheck } from 'lucide-react';
 import { formatVNDateTime } from '../../../services/adminService';
 import { apiGetRetentionReport } from '../../../services/adminOpsService';
 import { adminStyles as ui } from '../adminStyles';
-import { ErrorState, TableCard, Td, Th } from '../components/AdminUI';
+import { ErrorState, PanelCard, SkeletonRows, Td, Th } from '../components/AdminUI';
+import { useAdminText } from '../useAdminText';
 import { formatBytes, formatNumber, segmentedButton, segmentedWrapper, useOpsData } from './opsShared';
 
 const PRESETS = [90, 180, 365];
 const TABLE_LABELS = {
-  audit_logs: 'Nhật ký kiểm toán',
-  ai_interactions: 'Lịch sử hỏi Trợ lý AI',
-  notifications: 'Thông báo đã đọc',
-  support_ticket_attachments: 'Ảnh đính kèm ticket',
+  audit_logs: ['Nhật ký kiểm toán', 'Audit logs'],
+  ai_interactions: ['Lịch sử hỏi Trợ lý AI', 'AI assistant history'],
+  notifications: ['Thông báo đã đọc', 'Read notifications'],
+  support_ticket_attachments: ['Ảnh đính kèm ticket', 'Ticket attachments'],
 };
 
 export function OpsDataPanel() {
+  const { t, isEn } = useAdminText();
   const [days, setDays] = useState(180);
   const report = useOpsData(() => apiGetRetentionReport({ olderThanDays: days }), [days]);
   const d = report.data;
 
-  if (report.error) return <div className={ui.card}><ErrorState message={report.error} onRetry={report.reload} /></div>;
+  if (report.error) {
+    return (
+      <div className={ui.card}>
+        <ErrorState message={report.error} onRetry={report.reload} />
+      </div>
+    );
+  }
+
+  const agePicker = (
+    <div className={segmentedWrapper} role="group" aria-label={t('Độ cũ', 'Age')}>
+      {PRESETS.map((p) => (
+        <button key={p} type="button" aria-pressed={days === p} className={segmentedButton(days === p)} onClick={() => setDays(p)}>
+          {p === 365 ? t('1 năm', '1 year') : t(`${p} ngày`, `${p} days`)}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-        <ShieldCheck className="w-4.5 h-4.5 text-[#2563EB] mt-0.5 shrink-0" />
-        <div className="text-[13px] text-[#1E3A8A]">
-          <p className="font-semibold">Chế độ chạy thử — trang này không xóa bất kỳ dữ liệu nào.</p>
-          <p className="mt-0.5">Số liệu giúp nhóm chốt chính sách lưu giữ dữ liệu trước khi bật chức năng dọn dẹp thật.</p>
+    <div className="space-y-4">
+      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+        <ShieldCheck className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" aria-hidden="true" />
+        <div className="text-[13px] text-blue-900">
+          <p className="font-medium">{t('Chế độ chạy thử — trang này không xóa bất kỳ dữ liệu nào.', 'Dry run — this page never deletes any data.')}</p>
+          <p className="mt-0.5 text-blue-800">
+            {t(
+              'Số liệu giúp nhóm chốt chính sách lưu giữ dữ liệu trước khi bật chức năng dọn dẹp thật.',
+              'These numbers help the team settle a retention policy before real cleanup is enabled.'
+            )}
+          </p>
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-[13px] text-[#64748B]">
-          Bản ghi cũ hơn {days} ngày{d?.cutoff ? ` (trước ${formatVNDateTime(d.cutoff)})` : ''}
-        </p>
-        <div className={segmentedWrapper} role="group" aria-label="Độ cũ">
-          {PRESETS.map((p) => (
-            <button key={p} type="button" className={segmentedButton(days === p)} onClick={() => setDays(p)}>
-              {p === 365 ? '1 năm' : `${p} ngày`}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <TableCard header={<span className={ui.cardTitle}>Dữ liệu có thể dọn</span>}>
+      <PanelCard
+        icon={HardDrive}
+        title={t('Dữ liệu có thể dọn', 'Data eligible for cleanup')}
+        description={
+          t(`Bản ghi cũ hơn ${days} ngày`, `Records older than ${days} days`) +
+          (d?.cutoff ? t(` (trước ${formatVNDateTime(d.cutoff)})`, ` (before ${formatVNDateTime(d.cutoff)})`) : '')
+        }
+        actions={agePicker}
+        bodyClassName="overflow-x-auto"
+      >
         <table className={ui.table}>
           <thead>
             <tr>
-              <Th>Loại dữ liệu</Th>
-              <Th align="right">Tổng</Th>
-              <Th align="right">Cũ hơn {days} ngày</Th>
-              <Th>Khuyến nghị</Th>
+              <Th>{t('Loại dữ liệu', 'Data type')}</Th>
+              <Th align="right">{t('Tổng', 'Total')}</Th>
+              <Th align="right">{t(`Cũ hơn ${days} ngày`, `Older than ${days} days`)}</Th>
+              <Th>{t('Khuyến nghị', 'Recommendation')}</Th>
             </tr>
           </thead>
-          <tbody>
-            {report.loading
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i}><td colSpan={4} className="px-4 py-4"><div className="h-4 rounded bg-slate-100 animate-pulse" /></td></tr>
-                ))
-              : (d?.candidates || []).map((c) => (
-                  <tr key={c.table} className={ui.tr}>
-                    <Td>
-                      <p className="font-semibold text-[#0F172A]">{TABLE_LABELS[c.table] || c.table}</p>
-                      <p className="text-[12px] text-[#94A3B8] font-mono">{c.table}</p>
-                    </Td>
-                    <Td align="right">
-                      <span className="admin-num">{formatNumber(c.total)}</span>
-                      {c.totalBytes != null && <p className="text-[12px] text-[#64748B]">{formatBytes(c.totalBytes)}</p>}
-                    </Td>
-                    <Td align="right">
-                      <span className={`admin-num font-semibold ${c.olderThanCutoff ? 'text-amber-700' : 'text-[#94A3B8]'}`}>{formatNumber(c.olderThanCutoff)}</span>
-                      {c.olderThanCutoffBytes != null && <p className="text-[12px] text-[#64748B]">{formatBytes(c.olderThanCutoffBytes)}</p>}
-                    </Td>
-                    <Td className="max-w-[360px] text-[12.5px] text-[#475569]">{c.recommendation}</Td>
-                  </tr>
-                ))}
+          <tbody className="[&>tr]:border-b [&>tr]:border-slate-100 [&>tr:last-child]:border-0">
+            {report.loading ? (
+              <SkeletonRows columns={4} rows={4} />
+            ) : (
+              (d?.candidates || []).map((c) => (
+                <tr key={c.table} className={ui.tr}>
+                  <Td>
+                    <p className="font-medium text-slate-900">{TABLE_LABELS[c.table]?.[isEn ? 1 : 0] || c.table}</p>
+                    <p className="text-[12px] text-slate-500 font-mono">{c.table}</p>
+                  </Td>
+                  <Td align="right">
+                    <span className="tabular-nums">{formatNumber(c.total)}</span>
+                    {c.totalBytes != null && <p className="text-[12px] text-slate-500 tabular-nums">{formatBytes(c.totalBytes)}</p>}
+                  </Td>
+                  <Td align="right">
+                    <span className={`tabular-nums font-medium ${c.olderThanCutoff ? 'text-amber-700' : 'text-slate-400'}`}>
+                      {formatNumber(c.olderThanCutoff)}
+                    </span>
+                    {c.olderThanCutoffBytes != null && <p className="text-[12px] text-slate-500 tabular-nums">{formatBytes(c.olderThanCutoffBytes)}</p>}
+                  </Td>
+                  <Td className="max-w-[360px] text-[12px] text-slate-600">{c.recommendation}</Td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
-      </TableCard>
+      </PanelCard>
 
-      <TableCard header={<span className={`${ui.cardTitle} flex items-center gap-2`}><Database className="w-4 h-4 text-[#64748B]" /> Bảng lớn nhất trong cơ sở dữ liệu</span>}>
+      <PanelCard icon={Database} title={t('Bảng lớn nhất trong cơ sở dữ liệu', 'Largest database tables')} bodyClassName="overflow-x-auto">
         {!report.loading && !d?.largestTables?.length ? (
-          <p className="px-5 py-6 text-[13px] text-[#64748B]">Tài khoản cơ sở dữ liệu không có quyền đọc thông tin dung lượng bảng.</p>
+          <p className="px-5 py-6 text-[13px] text-slate-500">
+            {t(
+              'Tài khoản cơ sở dữ liệu không có quyền đọc thông tin dung lượng bảng.',
+              'The database account cannot read table size information.'
+            )}
+          </p>
         ) : (
           <table className={ui.table}>
             <thead>
               <tr>
-                <Th>Bảng</Th>
-                <Th align="right">Số dòng (ước tính)</Th>
-                <Th align="right">Dữ liệu</Th>
-                <Th align="right">Chỉ mục</Th>
+                <Th>{t('Bảng', 'Table')}</Th>
+                <Th align="right">{t('Số dòng (ước tính)', 'Rows (approx.)')}</Th>
+                <Th align="right">{t('Dữ liệu', 'Data')}</Th>
+                <Th align="right">{t('Chỉ mục', 'Indexes')}</Th>
               </tr>
             </thead>
-            <tbody>
-              {(d?.largestTables || []).map((t) => (
-                <tr key={t.table} className={ui.tr}>
-                  <Td><span className="font-mono text-[12.5px]">{t.table}</span></Td>
-                  <Td align="right"><span className="admin-num">{formatNumber(t.approxRows)}</span></Td>
-                  <Td align="right">{formatBytes(t.dataBytes)}</Td>
-                  <Td align="right">{formatBytes(t.indexBytes)}</Td>
-                </tr>
-              ))}
+            <tbody className="[&>tr]:border-b [&>tr]:border-slate-100 [&>tr:last-child]:border-0">
+              {report.loading ? (
+                <SkeletonRows columns={4} rows={5} />
+              ) : (
+                (d?.largestTables || []).map((row) => (
+                  <tr key={row.table} className={ui.tr}>
+                    <Td>
+                      <span className="font-mono text-[12px]">{row.table}</span>
+                    </Td>
+                    <Td align="right">
+                      <span className="tabular-nums">{formatNumber(row.approxRows)}</span>
+                    </Td>
+                    <Td align="right" className="tabular-nums">{formatBytes(row.dataBytes)}</Td>
+                    <Td align="right" className="tabular-nums">{formatBytes(row.indexBytes)}</Td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         )}
-      </TableCard>
+      </PanelCard>
     </div>
   );
 }

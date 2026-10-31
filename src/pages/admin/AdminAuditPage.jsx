@@ -4,14 +4,10 @@ import {
   Download,
   RefreshCw,
   ChevronDown,
-  ChevronUp,
-  Lock,
   Copy,
   Check,
   ShieldCheck,
-  FileText,
   Calendar,
-  AlertTriangle,
   Monitor,
   Globe,
 } from 'lucide-react';
@@ -25,8 +21,8 @@ import {
   toVnEndOfDayISO,
 } from '../../services/adminService';
 import {
-  ACTION_LABELS,
-  ENTITY_LABELS,
+  ACTION_LABELS_VI,
+  ENTITY_LABELS_VI,
   actionLabel,
   apiErrorMessage,
   entityLabel,
@@ -35,6 +31,7 @@ import {
   roleLabel,
 } from './adminLabels';
 import { adminStyles as ui } from './adminStyles';
+import { segmentedButton, segmentedWrapper } from './ops/opsShared';
 import {
   PageHeader,
   Toolbar,
@@ -51,34 +48,37 @@ import {
   Avatar,
   useDebounced,
 } from './components/AdminUI';
+import { useAdminText } from './useAdminText';
 
-const ENTITY_OPTIONS = [
-  { value: '', label: 'Mọi phân hệ' },
-  ...Object.entries(ENTITY_LABELS).map(([value, label]) => ({ value, label })),
-];
-
-const ACTION_OPTIONS = [
-  { value: '', label: 'Mọi hành động' },
-  ...Object.entries(ACTION_LABELS)
-    .filter(([code]) => code !== 'LOGIN')
-    .map(([value, label]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label, 'vi')),
-];
-
-const ACTOR_OPTIONS = [
-  { value: '', label: 'Mọi người thực hiện' },
-  { value: 'ADMIN', label: 'Quản trị viên' },
-  { value: 'SHOP_OWNER', label: 'Chủ cửa hàng' },
-  { value: 'WAREHOUSE_STAFF', label: 'Nhân viên kho' },
-  { value: 'SYSTEM', label: 'Tác vụ tự động' },
-];
-
-const DATE_PRESETS = [
-  { id: 'today', label: 'Hôm nay', days: 0 },
-  { id: '7d', label: '7 ngày qua', days: 6 },
-  { id: '30d', label: '30 ngày qua', days: 29 },
-  { id: '90d', label: 'Quý này', days: 89 },
-];
+/** Tùy chọn bộ lọc dựng theo ngôn ngữ hiện tại (nhãn hành động/phân hệ lấy từ adminLabels). */
+function buildFilterOptions(t, isEn) {
+  return {
+    entity: [
+      { value: '', label: t('Mọi phân hệ', 'All modules') },
+      ...Object.keys(ENTITY_LABELS_VI).map((value) => ({ value, label: entityLabel(value) })),
+    ],
+    action: [
+      { value: '', label: t('Mọi hành động', 'All actions') },
+      ...Object.keys(ACTION_LABELS_VI)
+        .filter((code) => code !== 'LOGIN')
+        .map((value) => ({ value, label: actionLabel(value) }))
+        .sort((a, b) => a.label.localeCompare(b.label, isEn ? 'en' : 'vi')),
+    ],
+    actor: [
+      { value: '', label: t('Mọi người thực hiện', 'All actors') },
+      { value: 'ADMIN', label: t('Quản trị viên', 'Administrator') },
+      { value: 'SHOP_OWNER', label: t('Chủ cửa hàng', 'Store owner') },
+      { value: 'WAREHOUSE_STAFF', label: t('Nhân viên kho', 'Warehouse staff') },
+      { value: 'SYSTEM', label: t('Tác vụ tự động', 'Automated task') },
+    ],
+    presets: [
+      { id: 'today', label: t('Hôm nay', 'Today'), days: 0 },
+      { id: '7d', label: t('7 ngày qua', 'Last 7 days'), days: 6 },
+      { id: '30d', label: t('30 ngày qua', 'Last 30 days'), days: 29 },
+      { id: '90d', label: t('90 ngày qua', 'Last 90 days'), days: 89 },
+    ],
+  };
+}
 
 function localYMD(date) {
   const pad = (n) => String(n).padStart(2, '0');
@@ -96,13 +96,14 @@ function safeParseJSON(val) {
 }
 
 function formatDiffValue(val) {
-  if (val === undefined || val === null) return '—';
+  if (val === undefined || val === null) return '–';
   if (typeof val === 'boolean') return val ? 'true' : 'false';
   if (typeof val === 'object') return JSON.stringify(val);
   return String(val);
 }
 
 function AuditDiffViewer({ log }) {
+  const { t } = useAdminText();
   const { toast } = useToast();
   const [showRaw, setShowRaw] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -127,38 +128,41 @@ function AuditDiffViewer({ log }) {
     const rawData = JSON.stringify({ before: beforeObj, after: afterObj }, null, 2);
     navigator.clipboard.writeText(rawData);
     setCopied(true);
-    toast({ type: 'success', title: 'Đã sao chép dữ liệu JSON vào Clipboard' });
+    toast({ type: 'success', title: t('Đã sao chép dữ liệu JSON vào Clipboard', 'JSON copied to clipboard') });
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="p-5 bg-slate-50/70 border-t border-[#E2E8F0] text-[13px] space-y-4">
+    <div className="p-5 bg-slate-50 border-t border-slate-200 text-[13px] space-y-4">
       {/* Thông số kỹ thuật của bản ghi */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 bg-white rounded-xl border border-[#E2E8F0] shadow-2xs">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 bg-white rounded-xl border border-slate-200 ">
         <div>
-          <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block">Mã hành động</span>
-          <span className="font-mono text-[12px] font-semibold text-[#0F172A] break-all">{log.action}</span>
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">{t('Mã hành động', 'Action code')}</span>
+          <span className="font-mono text-[12px] font-semibold text-slate-900 break-all">{log.action}</span>
         </div>
         <div>
-          <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block">Đối tượng tác động</span>
-          <span className="text-[13px] font-semibold text-[#0F172A]">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">{t('Đối tượng tác động', 'Target')}</span>
+          <span className="text-[13px] font-semibold text-slate-900">
             {entityLabel(log.entityType)} {log.entityId ? `#${log.entityId}` : ''}
           </span>
         </div>
         <div>
-          <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block">Địa chỉ IP</span>
-          <span className="font-mono text-[12px] text-[#2563EB] font-medium flex items-center gap-1">
-            <Globe className="w-3 h-3" /> {log.ipAddress || '—'}
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">{t('Địa chỉ IP', 'IP address')}</span>
+          <span className="font-mono text-[12px] text-blue-600 font-medium flex items-center gap-1">
+            <Globe className="w-3 h-3" aria-hidden="true" /> {log.ipAddress || '–'}
           </span>
         </div>
         <div>
-          <span className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider block">Thời điểm thực hiện</span>
-          <span className="text-[12px] text-[#0F172A] font-medium">{formatVNDateTime(log.createdAt)}</span>
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">{t('Thời điểm thực hiện', 'Performed at')}</span>
+          <span className="text-[12px] text-slate-900 font-medium">{formatVNDateTime(log.createdAt)}</span>
         </div>
         {log.userAgent && (
-          <div className="sm:col-span-4 pt-2 border-t border-slate-100 flex items-center gap-2 text-[12px] text-[#64748B]">
+          <div className="sm:col-span-4 pt-2 border-t border-slate-100 flex items-center gap-2 text-[12px] text-slate-500">
             <Monitor className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Thiết bị: {log.userAgent}</span>
+            <span className="truncate">
+              {t('Thiết bị: ', 'Device: ')}
+              {log.userAgent}
+            </span>
           </div>
         )}
       </div>
@@ -166,11 +170,14 @@ function AuditDiffViewer({ log }) {
       {/* Tiêu đề vùng so sánh */}
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-2">
-          <span className="font-bold text-[#0F172A]">Dữ liệu thay đổi</span>
+          <span className="font-semibold text-slate-900">{t('Dữ liệu thay đổi', 'Changed data')}</span>
           {diffRows.length > 0 && (
-            <span className="text-[11px] font-semibold px-2 py-0.2 rounded bg-blue-50 text-[#2563EB] border border-blue-200">
-              {diffRows.filter((r) => r.changed).length} trường đã đổi / {diffRows.length} tổng
-            </span>
+            <Badge tone="info" dot={false}>
+              {t(
+                `${diffRows.filter((r) => r.changed).length} trường đã đổi / ${diffRows.length} tổng`,
+                `${diffRows.filter((r) => r.changed).length} changed / ${diffRows.length} fields`
+              )}
+            </Badge>
           )}
         </div>
         <div className="flex items-center gap-3">
@@ -178,59 +185,62 @@ function AuditDiffViewer({ log }) {
             <button
               type="button"
               onClick={copyJSON}
-              className="inline-flex items-center gap-1 text-[12px] text-[#64748B] hover:text-[#0F172A] font-medium cursor-pointer"
+              className="inline-flex items-center gap-1 text-[12px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? 'Đã sao chép' : 'Sao chép JSON'}
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+              {copied ? t('Đã sao chép', 'Copied') : t('Sao chép JSON', 'Copy JSON')}
             </button>
           )}
           <button
             type="button"
             onClick={() => setShowRaw(!showRaw)}
-            className="text-[12px] text-[#2563EB] hover:underline font-semibold cursor-pointer"
+            className="text-[12px] text-blue-600 hover:underline font-semibold cursor-pointer"
           >
-            {showRaw ? 'Xem dạng bảng so sánh' : 'Xem JSON thô'}
+            {showRaw ? t('Xem dạng bảng so sánh', 'Show comparison table') : t('Xem JSON thô', 'Show raw JSON')}
           </button>
         </div>
       </div>
 
       {diffRows.length === 0 ? (
-        <p className="text-[13px] text-[#64748B] p-4 bg-white rounded-lg border border-[#E2E8F0] italic">
-          Bản ghi này không yêu cầu lưu trữ dữ liệu trạng thái trước/sau (thao tác không làm thay đổi model).
+        <p className="text-[13px] text-slate-500 p-4 bg-white rounded-lg border border-slate-200 italic">
+          {t('Bản ghi này không yêu cầu lưu trữ dữ liệu trạng thái trước/sau (thao tác không làm thay đổi model).', 'This entry has no before/after data (the action did not change a record).')}
         </p>
       ) : showRaw ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-[12px]">
-          {[['Dữ liệu trước (Before)', beforeObj], ['Dữ liệu sau (After)', afterObj]].map(([label, obj]) => (
-            <div key={label} className="p-3.5 bg-white border border-[#E2E8F0] rounded-xl overflow-x-auto shadow-2xs">
-              <span className="text-[11px] font-sans font-bold text-[#64748B] uppercase tracking-wider block mb-2">
+          {[
+            [t('Dữ liệu trước', 'Before'), beforeObj],
+            [t('Dữ liệu sau', 'After'), afterObj],
+          ].map(([label, obj]) => (
+            <div key={label} className="p-3.5 bg-white border border-slate-200 rounded-xl overflow-x-auto ">
+              <span className="text-[11px] font-sans font-semibold text-slate-500 uppercase tracking-wider block mb-2">
                 {label}
               </span>
-              <pre className="text-[#334155] leading-relaxed">{JSON.stringify(obj, null, 2) || '—'}</pre>
+              <pre className="text-slate-700 leading-relaxed">{JSON.stringify(obj, null, 2) || '–'}</pre>
             </div>
           ))}
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden shadow-2xs">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden ">
           <table className="w-full text-left text-[13px] border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-[#E2E8F0] text-[#475569]">
-                <th className="px-4 py-2.5 font-semibold text-[12px] w-1/4">Thuộc tính</th>
-                <th className="px-4 py-2.5 font-semibold text-[12px] w-3/8">Trước</th>
-                <th className="px-4 py-2.5 font-semibold text-[12px] w-3/8">Sau</th>
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                <th className="px-4 py-2.5 font-semibold text-[12px] w-1/4">{t('Thuộc tính', 'Field')}</th>
+                <th className="px-4 py-2.5 font-semibold text-[12px] w-3/8">{t('Trước', 'Before')}</th>
+                <th className="px-4 py-2.5 font-semibold text-[12px] w-3/8">{t('Sau', 'After')}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F1F5F9]">
+            <tbody className="divide-y divide-slate-100">
               {diffRows.map((row) => (
-                <tr key={row.key} className={row.changed ? 'bg-amber-50/30' : ''}>
-                  <td className="px-4 py-2.5 font-mono text-[12px] font-semibold text-[#0F172A]">{row.key}</td>
-                  <td className="px-4 py-2.5 font-mono text-[12px] text-[#64748B] break-all">
+                <tr key={row.key} className={row.changed ? 'bg-amber-50/50' : ''}>
+                  <td className="px-4 py-2.5 font-mono text-[12px] font-semibold text-slate-900">{row.key}</td>
+                  <td className="px-4 py-2.5 font-mono text-[12px] text-slate-500 break-all">
                     {formatDiffValue(row.before)}
                   </td>
-                  <td className="px-4 py-2.5 font-mono text-[12px] text-[#0F172A] break-all font-medium">
+                  <td className="px-4 py-2.5 font-mono text-[12px] text-slate-900 break-all font-medium">
                     {formatDiffValue(row.after)}
                     {row.changed && (
-                      <span className="ml-2 font-sans text-[11px] font-bold text-amber-700 bg-amber-100/80 px-1.5 py-0.2 rounded">
-                        đã sửa
+                      <span className="ml-2 font-sans text-[11px] font-semibold text-amber-700 bg-amber-100/80 px-1.5 py-0.2 rounded">
+                        {t('đã sửa', 'changed')}
                       </span>
                     )}
                   </td>
@@ -245,6 +255,11 @@ function AuditDiffViewer({ log }) {
 }
 
 export function AdminAuditPage() {
+  const { t, isEn } = useAdminText();
+  const { entity: ENTITY_OPTIONS, action: ACTION_OPTIONS, actor: ACTOR_OPTIONS, presets: DATE_PRESETS } = useMemo(
+    () => buildFilterOptions(t, isEn),
+    [t, isEn]
+  );
   const { toast } = useToast();
   const [params, setParams] = useSearchParams();
 
@@ -304,7 +319,7 @@ export function AdminAuditPage() {
 
   const load = useCallback(async () => {
     if (rangeInvalid) {
-      setError('Khoảng thời gian không hợp lệ: Ngày bắt đầu phải trước ngày kết thúc.');
+      setError(t('Khoảng thời gian không hợp lệ: Ngày bắt đầu phải trước ngày kết thúc.', 'Invalid range: the start date must be before the end date.'));
       setIsLoading(false);
       return;
     }
@@ -345,11 +360,11 @@ export function AdminAuditPage() {
       await apiExportAdminAuditLogs(filters);
       toast({
         type: 'success',
-        title: 'Đã xuất file kiểm toán CSV',
-        description: 'Tệp CSV gồm tối đa 5.000 sự kiện mới nhất khớp bộ lọc đã được tải xuống.',
+        title: t('Đã xuất file kiểm toán CSV', 'Audit CSV exported'),
+        description: t('Tệp CSV gồm tối đa 5.000 sự kiện mới nhất khớp bộ lọc đã được tải xuống.', 'A CSV with up to the 5,000 latest matching events was downloaded.'),
       });
     } catch (err) {
-      toast({ type: 'error', title: 'Không xuất được file CSV', description: apiErrorMessage(err) });
+      toast({ type: 'error', title: t('Không xuất được file CSV', 'Could not export CSV'), description: apiErrorMessage(err) });
     } finally {
       setIsExporting(false);
     }
@@ -358,7 +373,7 @@ export function AdminAuditPage() {
   const chips = [
     userId && {
       key: 'user',
-      label: `Người thực hiện: ${userName || `#${userId}`}`,
+      label: t('Người thực hiện: ', 'Actor: ') + (userName || `#${userId}`),
       onRemove: () => updateParams({ user: '' }),
     },
     actorRole && {
@@ -370,7 +385,7 @@ export function AdminAuditPage() {
     entityType && { key: 'entity', label: entityLabel(entityType), onRemove: () => updateParams({ entity: '' }) },
     storeId && {
       key: 'store',
-      label: storeOptions.find((s) => String(s.id) === storeId)?.name || 'Cửa hàng',
+      label: storeOptions.find((s) => String(s.id) === storeId)?.name || t('Cửa hàng', 'Store'),
       onRemove: () => updateParams({ store: '' }),
     },
     (fromDate || toDate) && {
@@ -390,14 +405,18 @@ export function AdminAuditPage() {
   return (
     <div className={ui.pageContainer}>
       <PageHeader
-        title="Nhật ký kiểm toán"
-        description="Lưu vết bất biến (Immutable Audit Trail) toàn bộ sự kiện hệ thống: ai làm, lúc nào, địa chỉ IP và dữ liệu trước/sau."
-        badge={<Badge tone="neutral">{pagination?.total ?? 0} sự kiện</Badge>}
+        title={t('Nhật ký kiểm toán', 'Audit log')}
+        description={t('Lưu vết bất biến (Immutable Audit Trail) toàn bộ sự kiện hệ thống: ai làm, lúc nào, địa chỉ IP và dữ liệu trước/sau.', 'An immutable trail of every system event: who, when, from which IP, and the data before/after.')}
+        badge={
+          <Badge tone="neutral" dot={false}>
+            {t(`${pagination?.total ?? 0} sự kiện`, `${pagination?.total ?? 0} events`)}
+          </Badge>
+        }
         actions={
           <>
             <button type="button" onClick={load} disabled={isLoading} className={ui.btnSecondary}>
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-              Làm mới
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
+              {t('Làm mới', 'Refresh')}
             </button>
             <button
               type="button"
@@ -405,19 +424,21 @@ export function AdminAuditPage() {
               disabled={isExporting || rangeInvalid}
               className={ui.btnPrimary}
             >
-              <Download className="w-3.5 h-3.5" />
-              {isExporting ? 'Đang xuất CSV…' : 'Xuất CSV'}
+              <Download className="w-3.5 h-3.5" aria-hidden="true" />
+              {isExporting ? t('Đang xuất CSV…', 'Exporting CSV…') : t('Xuất CSV', 'Export CSV')}
             </button>
           </>
         }
       />
 
       {/* Compliance / Security Info Banner */}
-      <div className="flex items-center gap-3 p-3.5 rounded-xl border border-blue-200/80 bg-blue-50/40 text-[13px] text-blue-900 shadow-2xs">
-        <ShieldCheck className="w-5 h-5 text-[#2563EB] shrink-0" />
+      <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-600">
+        <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
         <span className="leading-relaxed">
-          <strong className="text-[#1D4ED8]">Tiêu chuẩn bảo mật SOC2 / ISO:</strong> Nhật ký kiểm toán là tài nguyên chỉ đọc.
-          Không bất kỳ ai (kể cả Quản trị viên cấp cao nhất) có quyền sửa đổi hoặc xóa bản ghi. Mỗi lượt xuất CSV đều được lưu lại.
+          {t(
+            'Nhật ký chỉ đọc: không ai, kể cả quản trị viên, có thể sửa hoặc xóa bản ghi. Mỗi lượt xuất CSV cũng được ghi lại.',
+            'Read-only log: nobody, administrators included, can edit or delete entries. Every CSV export is also recorded.'
+          )}
         </span>
       </div>
 
@@ -427,39 +448,37 @@ export function AdminAuditPage() {
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder="Tìm theo email, họ tên, mã đối tượng, địa chỉ IP…"
+            placeholder={t('Tìm theo email, họ tên, mã đối tượng, địa chỉ IP…', 'Search by email, name, target ID, IP…')}
             className="w-full lg:w-80"
           />
           <div className="flex flex-wrap items-center gap-2">
-            <FilterSelect label="Người thực hiện" value={actorRole} onChange={(v) => updateParams({ actor: v })} options={ACTOR_OPTIONS} />
-            <FilterSelect label="Hành động" value={action} onChange={(v) => updateParams({ action: v })} options={ACTION_OPTIONS} className="max-w-55" />
-            <FilterSelect label="Phân hệ" value={entityType} onChange={(v) => updateParams({ entity: v })} options={ENTITY_OPTIONS} />
+            <FilterSelect label={t('Người thực hiện', 'Actor')} value={actorRole} onChange={(v) => updateParams({ actor: v })} options={ACTOR_OPTIONS} />
+            <FilterSelect label={t('Hành động', 'Action')} value={action} onChange={(v) => updateParams({ action: v })} options={ACTION_OPTIONS} className="max-w-55" />
+            <FilterSelect label={t('Phân hệ', 'Module')} value={entityType} onChange={(v) => updateParams({ entity: v })} options={ENTITY_OPTIONS} />
             <FilterSelect
-              label="Cửa hàng"
+              label={t('Cửa hàng', 'Store')}
               value={storeId}
               onChange={(v) => updateParams({ store: v })}
-              options={[{ value: '', label: 'Mọi cửa hàng' }, ...storeOptions.map((s) => ({ value: String(s.id), label: s.name }))]}
+              options={[{ value: '', label: t('Mọi cửa hàng', 'All stores') }, ...storeOptions.map((s) => ({ value: String(s.id), label: s.name }))]}
               className="max-w-50"
             />
           </div>
         </Toolbar>
 
         {/* Thanh chọn thời gian */}
-        <div className="flex flex-wrap items-center gap-3 text-[13px] p-3 rounded-xl border border-[#E2E8F0] bg-white shadow-2xs">
-          <span className="font-semibold text-[#334155] flex items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-slate-500" />
-            Khoảng thời gian:
+        <div className="flex flex-wrap items-center gap-3 text-[13px]">
+          <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+            <Calendar className="w-4 h-4 text-slate-500" aria-hidden="true" />
+            {t('Khoảng thời gian:', 'Date range:')}
           </span>
-          <div className="inline-flex rounded-lg border border-[#CBD5E1] bg-white overflow-hidden divide-x divide-slate-200 shadow-2xs">
+          <div className={segmentedWrapper} role="group" aria-label={t('Khoảng thời gian', 'Date range')}>
             {DATE_PRESETS.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => applyPreset(p.days)}
                 aria-pressed={activePreset?.id === p.id}
-                className={`px-3 py-1.5 cursor-pointer font-medium text-[12px] transition-colors ${
-                  activePreset?.id === p.id ? 'bg-[#EFF4FF] text-[#2563EB]' : 'text-[#475569] hover:bg-slate-50'
-                }`}
+                className={segmentedButton(activePreset?.id === p.id)}
               >
                 {p.label}
               </button>
@@ -472,15 +491,17 @@ export function AdminAuditPage() {
               value={fromDate}
               max={toDate || undefined}
               onChange={(e) => updateParams({ from: e.target.value })}
-              className="h-8.5 px-2.5 rounded-lg border border-[#CBD5E1] bg-white text-[#0F172A] text-[12px] cursor-pointer"
+              aria-label={t('Từ ngày', 'From date')}
+              className={`${ui.input} h-8 w-auto tabular-nums cursor-pointer`}
             />
-            <span className="text-[#94A3B8]">đến</span>
+            <span className="text-slate-400">{t('đến', 'to')}</span>
             <input
               type="date"
               value={toDate}
               min={fromDate || undefined}
               onChange={(e) => updateParams({ to: e.target.value })}
-              className="h-8.5 px-2.5 rounded-lg border border-[#CBD5E1] bg-white text-[#0F172A] text-[12px] cursor-pointer"
+              aria-label={t('Đến ngày', 'To date')}
+              className={`${ui.input} h-8 w-auto tabular-nums cursor-pointer`}
             />
           </div>
         </div>
@@ -498,22 +519,22 @@ export function AdminAuditPage() {
               onPage={(p) => updateParams({ page: String(p) }, false)}
               onLimitChange={(l) => updateParams({ limit: String(l) }, true)}
               disabled={isLoading}
-              unit="sự kiện"
+              unit={t('sự kiện', 'events')}
             />
           )
         }
       >
-        <table className="w-full min-w-230">
+        <table className={`${ui.table} min-w-230`}>
           <thead>
             <tr>
-              <Th>Thời gian</Th>
-              <Th>Người thực hiện</Th>
-              <Th>Hành động</Th>
-              <Th>Phân hệ tác động</Th>
-              <Th>Cửa hàng</Th>
-              <Th>Địa chỉ IP</Th>
-              <th className="w-12 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                <span className="sr-only">Chi tiết</span>
+              <Th>{t('Thời gian', 'Time')}</Th>
+              <Th>{t('Người thực hiện', 'Actor')}</Th>
+              <Th>{t('Hành động', 'Action')}</Th>
+              <Th>{t('Phân hệ tác động', 'Module')}</Th>
+              <Th>{t('Cửa hàng', 'Store')}</Th>
+              <Th>{t('Địa chỉ IP', 'IP address')}</Th>
+              <th className="w-12 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                <span className="sr-only">{t('Chi tiết', 'Details')}</span>
               </th>
             </tr>
           </thead>
@@ -525,12 +546,12 @@ export function AdminAuditPage() {
             empty={
               logs.length === 0 && (
                 <EmptyState
-                  title="Không có sự kiện kiểm toán phù hợp"
-                  description="Hãy thử mở rộng khoảng thời gian hoặc bỏ bớt các bộ lọc hiện tại."
+                  title={t('Không có sự kiện kiểm toán phù hợp', 'No matching audit events')}
+                  description={t('Hãy thử mở rộng khoảng thời gian hoặc bỏ bớt các bộ lọc hiện tại.', 'Try a wider date range or remove some filters.')}
                   action={
                     chips.length || search ? (
                       <button type="button" onClick={clearFilters} className={ui.btnSecondary}>
-                        Xóa bộ lọc
+                        {t('Xóa bộ lọc', 'Clear filters')}
                       </button>
                     ) : null
                   }
@@ -546,16 +567,23 @@ export function AdminAuditPage() {
                 <React.Fragment key={log.id}>
                   <tr
                     onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                    className={`cursor-pointer transition-colors ${
-                      isExpanded ? 'bg-blue-50/40 border-b-transparent' : 'hover:bg-slate-50/80'
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setExpandedLogId(isExpanded ? null : log.id);
+                      }
+                    }}
+                    tabIndex={0}
+                    className={`cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-slate-50 ${
+                      isExpanded ? 'bg-slate-50 border-b-transparent' : 'hover:bg-slate-50'
                     }`}
                     aria-expanded={isExpanded}
                   >
                     <Td className="whitespace-nowrap">
-                      <p className="font-semibold text-[#0F172A]" title={formatVNDateTime(log.createdAt)}>
+                      <p className="font-semibold text-slate-900" title={formatVNDateTime(log.createdAt)}>
                         {formatRelativeTime(log.createdAt) || formatVNDateTime(log.createdAt)}
                       </p>
-                      <p className="text-[11px] text-[#94A3B8] font-mono mt-0.5">{formatVNDateTime(log.createdAt)}</p>
+                      <p className="text-[12px] text-slate-500 tabular-nums mt-0.5">{formatVNDateTime(log.createdAt)}</p>
                     </Td>
                     <Td>
                       {log.user ? (
@@ -567,7 +595,7 @@ export function AdminAuditPage() {
                             updateParams({ user: String(log.user.id) });
                           }}
                           className="flex items-center gap-2.5 text-left cursor-pointer group"
-                          title="Lọc chỉ xem người này"
+                          title={t('Lọc chỉ xem người này', 'Show only this person')}
                         >
                           <Avatar
                             name={log.user.fullName}
@@ -575,43 +603,37 @@ export function AdminAuditPage() {
                             tone={log.user.role === 'ADMIN' ? 'brand' : 'neutral'}
                           />
                           <span className="min-w-0">
-                            <span className="block font-semibold text-[#0F172A] group-hover:underline truncate max-w-45">
+                            <span className="block font-semibold text-slate-900 group-hover:underline truncate max-w-45">
                               {log.user.fullName}
                             </span>
-                            <span className="block text-[11px] text-[#64748B]">{roleLabel(log.user.role)}</span>
+                            <span className="block text-[12px] text-slate-500">{roleLabel(log.user.role)}</span>
                           </span>
                         </button>
                       ) : (
-                        <span className="text-[13px] text-[#64748B] font-medium">Tác vụ tự động</span>
+                        <span className="text-[13px] text-slate-500 font-medium">{t('Tác vụ tự động', 'Automated task')}</span>
                       )}
                     </Td>
                     <Td className="whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold border ${
-                          sensitive
-                            ? 'bg-red-50 text-red-700 border-red-200'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}
-                      >
+                      <Badge tone={sensitive ? 'danger' : 'neutral'} dot={sensitive}>
                         {actionLabel(log.action)}
-                      </span>
+                      </Badge>
                     </Td>
                     <Td className="whitespace-nowrap">
-                      <span className="font-semibold text-[#0F172A]">{entityLabel(log.entityType)}</span>
+                      <span className="font-semibold text-slate-900">{entityLabel(log.entityType)}</span>
                       {log.entityId && (
-                        <span className="text-[12px] text-[#64748B] font-mono ml-1.5" title={log.entityId}>
+                        <span className="text-[12px] text-slate-500 font-mono ml-1.5" title={log.entityId}>
                           #{log.entityId.length > 10 ? `${log.entityId.slice(0, 8)}…` : log.entityId}
                         </span>
                       )}
                     </Td>
-                    <Td className="whitespace-nowrap font-medium text-[#334155]">
-                      {log.store?.name || <span className="text-[#94A3B8]">Quản trị Nền tảng</span>}
+                    <Td className="whitespace-nowrap font-medium text-slate-700">
+                      {log.store?.name || <span className="text-slate-400">{t('Quản trị Nền tảng', 'Platform admin')}</span>}
                     </Td>
-                    <Td className="whitespace-nowrap font-mono text-[12px] text-[#475569]">{log.ipAddress || '—'}</Td>
+                    <Td className="whitespace-nowrap font-mono text-[12px] text-slate-600">{log.ipAddress || '–'}</Td>
                     <Td align="right">
                       <span
                         className={`inline-flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 transition-transform ${
-                          isExpanded ? 'rotate-180 text-[#2563EB]' : ''
+                          isExpanded ? 'rotate-180 text-slate-900' : ''
                         }`}
                         aria-hidden="true"
                       >
