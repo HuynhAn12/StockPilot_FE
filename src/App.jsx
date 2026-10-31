@@ -35,6 +35,8 @@ import { AdminAuditPage } from './pages/admin/AdminAuditPage';
 import { AdminLeadsPage } from './pages/admin/AdminLeadsPage';
 import { AdminSystemPage } from './pages/admin/AdminSystemPage';
 import { AdminSupportPage } from './pages/admin/AdminSupportPage';
+import { AdminOpsPage } from './pages/admin/AdminOpsPage';
+import { AdminSecurityPage } from './pages/admin/AdminSecurityPage';
 import { SupportPage } from './pages/shared/SupportPage';
 import { ImportDataPage } from './pages/owner/ImportDataPage';
 import { LegalPage } from './pages/LegalPage';
@@ -309,6 +311,22 @@ export default function App() {
               element={
                 <RequireRole roles={['admin']}>
                   <ErrorBoundary><AdminSystemPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/ops"
+              element={
+                <RequireRole roles={['admin']}>
+                  <ErrorBoundary><AdminOpsPage /></ErrorBoundary>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/security"
+              element={
+                <RequireRole roles={['admin']}>
+                  <ErrorBoundary><AdminSecurityPage /></ErrorBoundary>
                 </RequireRole>
               }
             />

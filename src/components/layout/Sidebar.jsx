@@ -16,6 +16,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useAlertsStore } from '../store/alertsStore';
 import { usePricingStore } from '../store/pricingStore';
 import { StockPilotLogoIcon } from '../common/StockPilotLogo';
+import { Gauge } from 'lucide-react';
 
 const NAV_ITEM_CONFIG = [
   // Hệ thống & Nghiệp vụ Cửa hàng (Chủ shop & Nhân viên)
@@ -41,6 +42,8 @@ const NAV_ITEM_CONFIG = [
   { key: 'navAdminSupport', defaultName: 'Hỗ trợ khách hàng', href: '/admin/support', icon: LifeBuoy, badgeKey: 'support', badgeVariant: 'error', roles: ['admin'] },
   { key: 'navLeads', defaultName: 'Khách hàng tiềm năng', href: '/admin/leads', icon: UserCheck, badgeKey: 'leads', roles: ['admin'] },
   { key: 'navSystem', defaultName: 'Hệ thống & AI', href: '/admin/system', icon: Server, roles: ['admin'] },
+  { key: 'navAdminOps', defaultName: 'Vận hành nền tảng', href: '/admin/ops', icon: Gauge, roles: ['admin'] },
+  { key: 'navAdminSecurity', defaultName: 'Bảo mật & Kiểm soát', href: '/admin/security', icon: ShieldCheck, roles: ['admin'] },
 ];
 
 import { normalizeRole } from '../../config/permissions.config';
