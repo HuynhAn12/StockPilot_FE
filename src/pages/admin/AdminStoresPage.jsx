@@ -16,9 +16,7 @@ import {
   ShoppingBag,
   Clock,
   Warehouse,
-  ShieldCheck,
   CheckCircle2,
-  AlertTriangle,
 } from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
 import {
@@ -56,21 +54,15 @@ import {
   StatCard,
   useDebounced,
 } from './components/AdminUI';
+import { useAdminText } from './useAdminText';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const PAYOS = {
-  ACTIVE: { label: 'VietQR (Đang bật)', tone: 'success' },
-  DISABLED: { label: 'VietQR (Đã tắt)', tone: 'neutral' },
-  NOT_CONFIGURED: { label: 'Chỉ tiền mặt', tone: 'neutral' },
+  ACTIVE: { vi: 'VietQR đang bật', en: 'VietQR on', tone: 'success' },
+  DISABLED: { vi: 'VietQR đã tắt', en: 'VietQR off', tone: 'neutral' },
+  NOT_CONFIGURED: { vi: 'Chỉ tiền mặt', en: 'Cash only', tone: 'neutral' },
 };
-
-const PAYOS_OPTIONS = [
-  { value: '', label: 'Mọi hình thức thanh toán' },
-  { value: 'ACTIVE', label: 'VietQR đang bật' },
-  { value: 'DISABLED', label: 'VietQR đã tắt' },
-  { value: 'NOT_CONFIGURED', label: 'Chỉ tiền mặt' },
-];
 
 function payosFromDetail(detail) {
   const config = detail?.paymentConfigs?.find((c) => c.provider === 'PAYOS');
@@ -79,6 +71,7 @@ function payosFromDetail(detail) {
 }
 
 function EditStoreModal({ store, onClose, onSaved }) {
+  const { t } = useAdminText();
   const { toast } = useToast();
   const [form, setForm] = useState({
     name: store.name || '',
@@ -102,10 +95,10 @@ function EditStoreModal({ store, onClose, onSaved }) {
     setBusy(true);
     try {
       await apiUpdateAdminStore(store.id, payload);
-      toast({ type: 'success', title: 'Đã lưu thông tin cửa hàng' });
+      toast({ type: 'success', title: t('Đã lưu thông tin cửa hàng', 'Store details saved') });
       onSaved();
     } catch (err) {
-      toast({ type: 'error', title: 'Không lưu được', description: apiErrorMessage(err) });
+      toast({ type: 'error', title: t('Không lưu được', 'Could not save'), description: apiErrorMessage(err) });
     } finally {
       setBusy(false);
     }
@@ -113,26 +106,32 @@ function EditStoreModal({ store, onClose, onSaved }) {
 
   return (
     <Modal
-      title="Sửa thông tin Cửa hàng"
-      description={`Mã cửa hàng (${store.code}) là định danh cố định không thể thay đổi. Mọi sửa đổi được lưu vào nhật ký kiểm toán.`}
+      title={t('Sửa thông tin Cửa hàng', 'Edit store details')}
+      description={t(
+        `Mã cửa hàng (${store.code}) là định danh cố định, không thể đổi. Mọi thay đổi được ghi vào nhật ký kiểm toán.`,
+        `The store code (${store.code}) is permanent. Every change is written to the audit log.`
+      )}
       onClose={onClose}
       busy={busy}
       footer={
         <>
           <button type="button" onClick={onClose} disabled={busy} className={ui.btnSecondary}>
-            Hủy
+            {t('Hủy', 'Cancel')}
           </button>
           <button type="submit" form="edit-store-form" disabled={busy || form.name.trim().length < 2} className={ui.btnPrimary}>
-            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Lưu thay đổi
+            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
+            {t('Lưu thay đổi', 'Save changes')}
           </button>
         </>
       }
     >
       <form id="edit-store-form" onSubmit={submit} className="space-y-4">
         <div>
-          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Tên cửa hàng</label>
+          <label htmlFor="store-name" className="block text-[13px] font-medium text-slate-700 mb-1.5">
+            {t('Tên cửa hàng', 'Store name')}
+          </label>
           <input
+            id="store-name"
             required
             minLength={2}
             maxLength={255}
@@ -143,8 +142,11 @@ function EditStoreModal({ store, onClose, onSaved }) {
           />
         </div>
         <div>
-          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Số điện thoại liên hệ</label>
+          <label htmlFor="store-phone" className="block text-[13px] font-medium text-slate-700 mb-1.5">
+            {t('Số điện thoại liên hệ', 'Contact phone')}
+          </label>
           <input
+            id="store-phone"
             inputMode="tel"
             maxLength={20}
             pattern="[0-9+.\s()\-]*"
@@ -155,14 +157,17 @@ function EditStoreModal({ store, onClose, onSaved }) {
           />
         </div>
         <div>
-          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Địa chỉ hoạt động</label>
+          <label htmlFor="store-address" className="block text-[13px] font-medium text-slate-700 mb-1.5">
+            {t('Địa chỉ', 'Address')}
+          </label>
           <textarea
+            id="store-address"
             rows={2}
             maxLength={500}
             value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })}
             className={ui.input}
-            placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố"
+            placeholder={t('Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố', 'Street, ward, district, city')}
           />
         </div>
       </form>
@@ -171,7 +176,13 @@ function EditStoreModal({ store, onClose, onSaved }) {
 }
 
 export function AdminStoresPage() {
+  const { t, isEn } = useAdminText();
   const { toast } = useToast();
+  const locale = isEn ? 'en-US' : 'vi-VN';
+  const PAYOS_OPTIONS = [
+    { value: '', label: t('Mọi hình thức thanh toán', 'All payment methods') },
+    ...Object.entries(PAYOS).map(([value, p]) => ({ value, label: t(p.vi, p.en) })),
+  ];
   const [params, setParams] = useSearchParams();
 
   const status = params.get('status') || '';
@@ -200,7 +211,7 @@ export function AdminStoresPage() {
   const [drawerTab, setDrawerTab] = useState('overview');
 
   // Dialogs
-  const [dialog, setDialog] = useState(null); // { type: 'edit' | 'lock' | 'unlock', store }
+  const [dialog, setDialog] = useState(null); // { type: 'edit' | 'lock' | 'unlock', store } | { type: 'bulkLock' }
 
   const setParam = (key, value, resetPage = true) => {
     const next = new URLSearchParams(params);
@@ -244,7 +255,7 @@ export function AdminStoresPage() {
       try {
         setDetail(await apiGetAdminStore(id));
       } catch (err) {
-        toast({ type: 'error', title: 'Không mở được thông tin cửa hàng', description: apiErrorMessage(err) });
+        toast({ type: 'error', title: t('Không mở được thông tin cửa hàng', 'Could not open the store'), description: apiErrorMessage(err) });
         setDetailId(null);
       }
     },
@@ -280,7 +291,7 @@ export function AdminStoresPage() {
       if (sortKey === 'name') {
         const nA = a.name || '';
         const nB = b.name || '';
-        return sortDirection === 'asc' ? nA.localeCompare(nB, 'vi') : nB.localeCompare(nA, 'vi');
+        return sortDirection === 'asc' ? nA.localeCompare(nB, locale) : nB.localeCompare(nA, locale);
       }
       if (sortKey === 'skus') {
         const vA = a.stats?.skus || 0;
@@ -303,7 +314,7 @@ export function AdminStoresPage() {
       return 0;
     });
     return sorted;
-  }, [stores, sortKey, sortDirection]);
+  }, [stores, sortKey, sortDirection, locale]);
 
   // Bulk Actions
   const isAllSelected = sortedStores.length > 0 && selectedIds.length === sortedStores.length;
@@ -326,29 +337,54 @@ export function AdminStoresPage() {
   };
 
   const idleDays = summary?.idleDays ?? 14;
+  const selectedActive = sortedStores.filter((s) => selectedIds.includes(s.id) && s.isActive);
+
+  /** Khóa lần lượt từng cửa hàng đang chọn (mỗi lần đều ghi nhật ký kiểm toán ở backend). */
+  const bulkLock = async ({ reason, password }) => {
+    let ok = 0;
+    const failed = [];
+    for (const st of selectedActive) {
+      try {
+        await apiUpdateAdminStoreStatus(st.id, { isActive: false, reason, actorPassword: password });
+        ok += 1;
+      } catch (err) {
+        failed.push(`${st.name}: ${apiErrorMessage(err)}`);
+        // Sai mật khẩu thì các lượt sau cũng sai — dừng sớm.
+        if (err?.response?.status === 401 || err?.response?.status === 403) break;
+      }
+    }
+    toast({
+      type: failed.length ? (ok ? 'warning' : 'error') : 'success',
+      title: t(`Đã tạm khóa ${ok}/${selectedActive.length} cửa hàng`, `Suspended ${ok}/${selectedActive.length} stores`),
+      description: failed.length ? failed.slice(0, 2).join(' · ') : undefined,
+    });
+    setSelectedIds([]);
+    setDialog(null);
+    load();
+  };
 
   const actionsFor = (st) => [
-    { label: 'Xem chi tiết', icon: ExternalLink, onClick: () => setDetailId(st.id) },
-    { label: 'Sửa thông tin', icon: Edit2, onClick: () => setDialog({ type: 'edit', store: st }) },
+    { label: t('Xem chi tiết', 'View details'), icon: ExternalLink, onClick: () => setDetailId(st.id) },
+    { label: t('Sửa thông tin', 'Edit details'), icon: Edit2, onClick: () => setDialog({ type: 'edit', store: st }) },
     st.owner?.email && {
-      label: 'Gửi email cho chủ cửa hàng',
+      label: t('Gửi email cho chủ cửa hàng', 'Email the owner'),
       icon: Mail,
       onClick: () => window.open(`mailto:${st.owner.email}`),
     },
     st.phone && {
-      label: 'Gọi điện cho cửa hàng',
+      label: t('Gọi điện cho cửa hàng', 'Call the store'),
       icon: Phone,
       onClick: () => window.open(`tel:${st.phone.replace(/[^\d+]/g, '')}`),
     },
     st.isActive
-      ? { label: 'Tạm khóa cửa hàng', icon: Lock, onClick: () => setDialog({ type: 'lock', store: st }), danger: true }
-      : { label: 'Mở lại cửa hàng', icon: Unlock, onClick: () => setDialog({ type: 'unlock', store: st }) },
+      ? { label: t('Tạm khóa cửa hàng', 'Suspend store'), icon: Lock, onClick: () => setDialog({ type: 'lock', store: st }), danger: true }
+      : { label: t('Mở lại cửa hàng', 'Reactivate store'), icon: Unlock, onClick: () => setDialog({ type: 'unlock', store: st }) },
   ].filter(Boolean);
 
   const chips = [
     status && {
       key: 'status',
-      label: status === 'true' ? 'Đang hoạt động' : 'Tạm khóa',
+      label: status === 'true' ? t('Đang hoạt động', 'Active') : t('Tạm khóa', 'Suspended'),
       onRemove: () => setParam('status', ''),
     },
     payos && {
@@ -369,13 +405,17 @@ export function AdminStoresPage() {
   return (
     <div className={ui.pageContainer}>
       <PageHeader
-        title="Quản lý Cửa hàng"
-        description="Theo dõi tình trạng hoạt động, quy mô và tích hợp của từng khách hàng thuê nền tảng."
-        badge={<Badge tone="neutral">{summary?.total ?? 0} cửa hàng</Badge>}
+        title={t('Quản lý Cửa hàng', 'Stores')}
+        description={t('Theo dõi tình trạng hoạt động, quy mô và tích hợp của từng khách hàng thuê nền tảng.', 'Activity, size and integrations of every store on the platform.')}
+        badge={
+          <Badge tone="neutral" dot={false}>
+            {t(`${summary?.total ?? 0} cửa hàng`, `${summary?.total ?? 0} stores`)}
+          </Badge>
+        }
         actions={
           <button type="button" onClick={load} disabled={isLoading} className={ui.btnSecondary}>
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            Làm mới
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
+            {t('Làm mới', 'Refresh')}
           </button>
         }
       >
@@ -386,9 +426,9 @@ export function AdminStoresPage() {
             setParam('status', v);
           }}
           tabs={[
-            { value: '', label: 'Tất cả cửa hàng', count: summary?.total },
-            { value: 'true', label: 'Đang hoạt động', count: summary?.active },
-            { value: 'false', label: 'Đang tạm khóa', count: summary?.locked },
+            { value: '', label: t('Tất cả', 'All'), count: summary?.total },
+            { value: 'true', label: t('Đang hoạt động', 'Active'), count: summary?.active },
+            { value: 'false', label: t('Đang tạm khóa', 'Suspended'), count: summary?.locked },
           ]}
         />
       </PageHeader>
@@ -396,35 +436,35 @@ export function AdminStoresPage() {
       {/* 4 Thẻ KPI Tóm tắt Cửa hàng */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Tổng số Cửa hàng"
+          title={t('Tổng số cửa hàng', 'Total stores')}
           value={summary?.total ?? 0}
-          subtitle="Tất cả tenant đăng ký"
+          subtitle={t('Tất cả cửa hàng đã đăng ký', 'Every registered store')}
           icon={Store}
-          iconBg="bg-blue-50 text-[#2563EB] border-blue-100"
+          iconBg="bg-slate-100 text-slate-600"
           loading={isLoading}
         />
         <StatCard
-          title="Đang hoạt động"
+          title={t('Đang hoạt động', 'Active')}
           value={summary?.active ?? 0}
-          subtitle={`Tỷ lệ ${summary?.total ? Math.round((summary.active / summary.total) * 100) : 0}% tổng thể`}
+          subtitle={summary?.total ? t(`${Math.round((summary.active / summary.total) * 100)}% tổng số`, `${Math.round((summary.active / summary.total) * 100)}% of all`) : '–'}
           icon={CheckCircle2}
-          iconBg="bg-emerald-50 text-emerald-600 border-emerald-100"
+          iconBg="bg-slate-100 text-slate-600"
           loading={isLoading}
         />
         <StatCard
-          title="Tích hợp VietQR (PayOS)"
+          title={t('Đã bật VietQR (PayOS)', 'VietQR (PayOS) on')}
           value={`${summary?.payosActive ?? 0} / ${summary?.active ?? 0}`}
-          subtitle="Cửa hàng nhận thanh toán QR"
+          subtitle={t('Cửa hàng nhận thanh toán QR', 'Stores accepting QR payments')}
           icon={CreditCard}
-          iconBg="bg-purple-50 text-purple-600 border-purple-100"
+          iconBg="bg-slate-100 text-slate-600"
           loading={isLoading}
         />
         <StatCard
-          title="Ít hoạt động (> 14 ngày)"
+          title={t(`Ít hoạt động (≥ ${idleDays} ngày)`, `Low activity (≥ ${idleDays} days)`)}
           value={summary?.idle ?? 0}
-          subtitle="Nguy cơ rời bỏ nền tảng"
+          subtitle={t('Nên liên hệ chăm sóc', 'Worth a check-in')}
           icon={Clock}
-          iconBg="bg-amber-50 text-amber-700 border-amber-100"
+          iconBg="bg-slate-100 text-slate-600"
           alert={summary?.idle > 0}
           loading={isLoading}
         />
@@ -435,11 +475,11 @@ export function AdminStoresPage() {
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder="Tìm theo tên cửa hàng, mã định danh, số điện thoại…"
+            placeholder={t('Tìm theo tên cửa hàng, mã định danh, số điện thoại…', 'Search by store name, code or phone…')}
             className="w-full lg:w-80"
           />
           <FilterSelect
-            label="Thanh toán"
+            label={t('Thanh toán', 'Payments')}
             value={payos}
             onChange={(v) => setParam('payos', v)}
             options={PAYOS_OPTIONS}
@@ -457,41 +497,41 @@ export function AdminStoresPage() {
               onPage={(p) => setParam('page', String(p), false)}
               onLimitChange={(l) => setParam('limit', String(l), true)}
               disabled={isLoading}
-              unit="cửa hàng"
+              unit={t('cửa hàng', 'stores')}
             />
           )
         }
       >
-        <table className="w-full min-w-237.5">
+        <table className={`${ui.table} min-w-237.5`}>
           <thead>
             <tr>
-              <th className="w-10 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] text-center">
+              <th className="w-10 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-center">
                 <Checkbox
                   checked={isAllSelected}
                   indeterminate={isSomeSelected}
                   onChange={handleSelectAll}
-                  aria-label="Chọn tất cả cửa hàng"
+                  aria-label={t('Chọn tất cả cửa hàng', 'Select all stores')}
                 />
               </th>
               <Th sortKey="name" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
-                Cửa hàng
+                {t('Cửa hàng', 'Store')}
               </Th>
-              <Th>Chủ cửa hàng</Th>
+              <Th>{t('Chủ cửa hàng', 'Owner')}</Th>
               <Th sortKey="skus" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort} align="right">
-                Quy mô
+                {t('Quy mô', 'Size')}
               </Th>
               <Th sortKey="orders" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort} align="right">
-                Đơn 30 ngày
+                {t('Đơn 30 ngày', 'Orders (30d)')}
               </Th>
               <Th sortKey="lastActiveAt" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
-                Đăng nhập gần nhất
+                {t('Đăng nhập gần nhất', 'Last sign-in')}
               </Th>
-              <Th>Thanh toán</Th>
+              <Th>{t('Thanh toán', 'Payments')}</Th>
               <Th sortKey="isActive" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
-                Trạng thái
+                {t('Trạng thái', 'Status')}
               </Th>
-              <th className="w-12 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                <span className="sr-only">Thao tác</span>
+              <th className="w-12 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                <span className="sr-only">{t('Thao tác', 'Actions')}</span>
               </th>
             </tr>
           </thead>
@@ -503,12 +543,12 @@ export function AdminStoresPage() {
             empty={
               sortedStores.length === 0 && (
                 <EmptyState
-                  title="Không tìm thấy cửa hàng phù hợp"
-                  description="Hãy thử từ khóa tìm kiếm khác hoặc bỏ bớt các bộ lọc đang kích hoạt."
+                  title={t('Không tìm thấy cửa hàng phù hợp', 'No matching stores')}
+                  description={t('Hãy thử từ khóa tìm kiếm khác hoặc bỏ bớt các bộ lọc đang kích hoạt.', 'Try another search term or remove some filters.')}
                   action={
                     chips.length || search ? (
                       <button type="button" onClick={clearFilters} className={ui.btnSecondary}>
-                        Xóa bộ lọc
+                        {t('Xóa bộ lọc', 'Clear filters')}
                       </button>
                     ) : null
                   }
@@ -518,6 +558,7 @@ export function AdminStoresPage() {
           >
             {sortedStores.map((st) => {
               const p = PAYOS[st.payos] || PAYOS.NOT_CONFIGURED;
+              const openDetail = () => setDetailId(st.id);
               const isSelected = selectedIds.includes(st.id);
               const isIdle =
                 st.lastActiveAt && Math.floor((Date.now() - new Date(st.lastActiveAt).getTime()) / DAY_MS) >= idleDays;
@@ -525,23 +566,25 @@ export function AdminStoresPage() {
               return (
                 <tr
                   key={st.id}
-                  onClick={() => setDetailId(st.id)}
-                  className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/30' : ''}`}
+                  onClick={openDetail}
+                  onKeyDown={(e) => e.key === 'Enter' && openDetail()}
+                  tabIndex={0}
+                  className={`hover:bg-slate-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-slate-50 ${isSelected ? 'bg-blue-50/60' : ''}`}
                 >
-                  <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={isSelected}
                       onChange={(checked) => handleSelectRow(st.id, checked)}
-                      aria-label={`Chọn ${st.name}`}
+                      aria-label={t(`Chọn ${st.name}`, `Select ${st.name}`)}
                     />
                   </td>
                   <Td>
                     <div className="flex items-center gap-3">
-                      <Avatar name={st.name} tone="brand" size={38} />
+                      <Avatar name={st.name} tone="brand" size={32} />
                       <div className="min-w-0">
-                        <p className="font-bold text-[#0F172A] truncate max-w-55">{st.name}</p>
-                        <p className="text-[12px] text-[#64748B] flex items-center gap-1.5 mt-0.5">
-                          <span className="font-mono bg-slate-100 px-1.5 py-0.2 rounded text-[11px] text-[#475569]">
+                        <p className="font-semibold text-slate-900 truncate max-w-55">{st.name}</p>
+                        <p className="text-[12px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                          <span className="font-mono text-[12px] text-slate-600">
                             {st.code}
                           </span>
                           {st.phone && <span>· {st.phone}</span>}
@@ -552,62 +595,62 @@ export function AdminStoresPage() {
                   <Td>
                     {st.owner ? (
                       <div>
-                        <p className="font-semibold text-[#1E293B] flex items-center gap-1.5">
+                        <p className="font-semibold text-slate-800 flex items-center gap-1.5">
                           {st.owner.fullName}
                           {!st.owner.isActive && (
-                            <span className="text-[11px] font-semibold text-red-600 bg-red-50 px-1.5 py-0.2 rounded border border-red-200">
-                              Khóa
-                            </span>
+                            <Badge tone="danger" dot={false}>
+                              {t('Khóa', 'Disabled')}
+                            </Badge>
                           )}
                         </p>
-                        <p className="text-[12px] text-[#64748B] truncate mt-0.5">{st.owner.email}</p>
+                        <p className="text-[12px] text-slate-500 truncate mt-0.5">{st.owner.email}</p>
                       </div>
                     ) : (
-                      <span className="text-[#94A3B8] italic">Chưa liên kết</span>
+                      <span className="text-slate-400">{t('Chưa liên kết', 'Not linked')}</span>
                     )}
                   </Td>
-                  <Td align="right" className="whitespace-nowrap admin-num">
-                    <p className="font-bold text-[#0F172A]">{st.stats.skus.toLocaleString('vi-VN')} SKU</p>
-                    <p className="text-[12px] text-[#64748B]">{st.stats.users} tài khoản</p>
+                  <Td align="right" className="whitespace-nowrap tabular-nums">
+                    <p className="font-medium text-slate-900">{st.stats.skus.toLocaleString(locale)} SKU</p>
+                    <p className="text-[12px] text-slate-500">{t(`${st.stats.users} tài khoản`, `${st.stats.users} accounts`)}</p>
                   </Td>
-                  <Td align="right" className="whitespace-nowrap admin-num">
-                    <p className="font-bold text-[#0F172A]">{st.stats.ordersLast30Days.toLocaleString('vi-VN')} đơn</p>
-                    <p className="text-[12px] text-[#64748B]">
+                  <Td align="right" className="whitespace-nowrap tabular-nums">
+                    <p className="font-medium text-slate-900">{t(`${st.stats.ordersLast30Days.toLocaleString(locale)} đơn`, `${st.stats.ordersLast30Days.toLocaleString(locale)} orders`)}</p>
+                    <p className="text-[12px] text-slate-500">
                       {st.stats.lastOrderAt
-                        ? `Gần nhất ${formatRelativeTime(st.stats.lastOrderAt) || formatVNDateTime(st.stats.lastOrderAt)}`
-                        : 'Chưa có đơn'}
+                        ? t('Gần nhất ', 'Last ') + (formatRelativeTime(st.stats.lastOrderAt) || formatVNDateTime(st.stats.lastOrderAt))
+                        : t('Chưa có đơn', 'No orders yet')}
                     </p>
                   </Td>
                   <Td className="whitespace-nowrap">
                     {st.lastActiveAt ? (
                       <div>
-                        <p className={`font-semibold ${isIdle ? 'text-amber-800' : 'text-[#0F172A]'}`} title={formatVNDateTime(st.lastActiveAt)}>
+                        <p className={`font-medium ${isIdle ? 'text-amber-800' : 'text-slate-900'}`} title={formatVNDateTime(st.lastActiveAt)}>
                           {formatRelativeTime(st.lastActiveAt) || formatVNDateTime(st.lastActiveAt)}
                         </p>
                         {isIdle && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded font-medium mt-0.5">
-                            <Clock className="w-2.5 h-2.5" /> Lâu không dùng
-                          </span>
+                          <Badge tone="warning" dot={false} className="mt-0.5">
+                            {t('Lâu không dùng', 'Inactive')}
+                          </Badge>
                         )}
                       </div>
                     ) : (
-                      <span className="text-[#94A3B8] italic">Chưa đăng nhập</span>
+                      <span className="text-slate-400">{t('Chưa đăng nhập', 'Never signed in')}</span>
                     )}
                   </Td>
                   <Td>
                     <Badge tone={p.tone} dot={st.payos === 'ACTIVE'}>
-                      {p.label}
+                      {t(p.vi, p.en)}
                     </Badge>
                   </Td>
                   <Td>
                     {st.isActive ? (
-                      <Badge tone="success">Đang hoạt động</Badge>
+                      <Badge tone="success">{t('Đang hoạt động', 'Active')}</Badge>
                     ) : (
-                      <Badge tone="danger">Tạm khóa</Badge>
+                      <Badge tone="danger">{t('Tạm khóa', 'Suspended')}</Badge>
                     )}
                   </Td>
                   <Td align="right">
-                    <RowMenu items={actionsFor(st)} label={`Thao tác với ${st.name}`} />
+                    <RowMenu items={actionsFor(st)} label={t(`Thao tác với ${st.name}`, `Actions for ${st.name}`)} />
                   </Td>
                 </tr>
               );
@@ -622,16 +665,11 @@ export function AdminStoresPage() {
         onClear={() => setSelectedIds([])}
         actions={[
           {
-            label: 'Tạm khóa hàng loạt',
+            label: t(`Tạm khóa ${selectedActive.length} cửa hàng`, `Suspend ${selectedActive.length} stores`),
             icon: Lock,
             danger: true,
-            onClick: () => {
-              toast({
-                type: 'info',
-                title: 'Thao tác hàng loạt',
-                description: `Đang chuẩn bị xác nhận tạm khóa cho ${selectedIds.length} cửa hàng đã chọn.`,
-              });
-            },
+            disabled: selectedActive.length === 0,
+            onClick: () => setDialog({ type: 'bulkLock' }),
           },
         ]}
       />
@@ -639,19 +677,19 @@ export function AdminStoresPage() {
       {/* Drawer Chi Tiết Cửa Hàng */}
       {detailId && (
         <Drawer
-          title={detail?.name || 'Hồ sơ Cửa hàng'}
-          subtitle={`Mã tenant: ${detail?.code}`}
+          title={detail?.name || t('Hồ sơ cửa hàng', 'Store profile')}
+          subtitle={detail ? t(`Mã cửa hàng: ${detail.code}`, `Store code: ${detail.code}`) : ''}
           badge={
             detail && (
               <Badge tone={detail.isActive ? 'success' : 'danger'}>
-                {detail.isActive ? 'Hoạt động' : 'Tạm khóa'}
+                {detail.isActive ? t('Hoạt động', 'Active') : t('Tạm khóa', 'Suspended')}
               </Badge>
             )
           }
           tabs={[
-            { key: 'overview', label: 'Tổng quan & Quy mô' },
-            { key: 'owners', label: 'Nhân sự', count: detail?.owners?.length },
-            { key: 'integrations', label: 'Cổng thanh toán' },
+            { key: 'overview', label: t('Tổng quan', 'Overview') },
+            { key: 'owners', label: t('Chủ cửa hàng', 'Owners'), count: detail?.owners?.length },
+            { key: 'integrations', label: t('Thanh toán', 'Payments') },
           ]}
           activeTab={drawerTab}
           onTabChange={setDrawerTab}
@@ -664,8 +702,8 @@ export function AdminStoresPage() {
                   onClick={() => setDialog({ type: 'edit', store: detail })}
                   className={ui.btnSecondary}
                 >
-                  <Edit2 className="w-3.5 h-3.5" />
-                  Sửa thông tin
+                  <Edit2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  {t('Sửa thông tin', 'Edit details')}
                 </button>
                 {detail.isActive ? (
                   <button
@@ -673,8 +711,8 @@ export function AdminStoresPage() {
                     onClick={() => setDialog({ type: 'lock', store: detail })}
                     className={ui.btnDanger}
                   >
-                    <Lock className="w-3.5 h-3.5" />
-                    Tạm khóa cửa hàng
+                    <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+                    {t('Tạm khóa cửa hàng', 'Suspend store')}
                   </button>
                 ) : (
                   <button
@@ -682,8 +720,8 @@ export function AdminStoresPage() {
                     onClick={() => setDialog({ type: 'unlock', store: detail })}
                     className={ui.btnPrimary}
                   >
-                    <Unlock className="w-3.5 h-3.5" />
-                    Mở lại cửa hàng
+                    <Unlock className="w-3.5 h-3.5" aria-hidden="true" />
+                    {t('Mở lại cửa hàng', 'Reactivate store')}
                   </button>
                 )}
               </>
@@ -700,34 +738,34 @@ export function AdminStoresPage() {
             <div className="space-y-6">
               <DetailList
                 rows={[
-                  ['Tên cửa hàng', detail.name],
-                  ['Mã subdomain', <span className="font-mono">{detail.code}</span>],
-                  ['Điện thoại liên hệ', detail.phone || 'Chưa cập nhật'],
-                  ['Địa chỉ', detail.address || 'Chưa cập nhật'],
-                  ['Ngày khởi tạo', formatVNDateTime(detail.createdAt)],
+                  [t('Tên cửa hàng', 'Store name'), detail.name],
+                  [t('Mã cửa hàng', 'Store code'), <span key="code" className="font-mono">{detail.code}</span>],
+                  [t('Điện thoại', 'Phone'), detail.phone || t('Chưa cập nhật', 'Not set')],
+                  [t('Địa chỉ', 'Address'), detail.address || t('Chưa cập nhật', 'Not set')],
+                  [t('Ngày tạo', 'Created'), formatVNDateTime(detail.createdAt)],
                   [
-                    'Đơn hàng gần nhất',
-                    detail.stats?.lastOrderAt ? formatVNDateTime(detail.stats.lastOrderAt) : 'Chưa có đơn hàng nào',
+                    t('Đơn hàng gần nhất', 'Last order'),
+                    detail.stats?.lastOrderAt ? formatVNDateTime(detail.stats.lastOrderAt) : t('Chưa có đơn hàng nào', 'No orders yet'),
                   ],
                 ]}
               />
 
-              <Section title="Quy mô & Tài nguyên vận hành">
+              <Section title={t('Quy mô & Tài nguyên vận hành', 'Size & resources')}>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    ['Tài khoản', (detail.stats?.owners || 0) + (detail.stats?.staff || 0), Users],
-                    ['Sản phẩm', detail.stats?.products ?? 0, Package],
-                    ['Mã SKU', detail.stats?.skus ?? 0, ShoppingBag],
-                    ['Tổng số đơn', detail.stats?.orders ?? 0, ShoppingBag],
-                    ['Đơn 30 ngày', detail.stats?.ordersLast30Days ?? 0, ShoppingBag],
-                    ['Kho hàng', detail.stats?.warehouses ?? 0, Warehouse],
+                    [t('Tài khoản', 'Accounts'), (detail.stats?.owners || 0) + (detail.stats?.staff || 0), Users],
+                    [t('Sản phẩm', 'Products'), detail.stats?.products ?? 0, Package],
+                    [t('Mã SKU', 'SKUs'), detail.stats?.skus ?? 0, ShoppingBag],
+                    [t('Tổng số đơn', 'Orders'), detail.stats?.orders ?? 0, ShoppingBag],
+                    [t('Đơn 30 ngày', 'Orders (30d)'), detail.stats?.ordersLast30Days ?? 0, ShoppingBag],
+                    [t('Kho hàng', 'Warehouses'), detail.stats?.warehouses ?? 0, Warehouse],
                   ].map(([label, value, Icon]) => (
-                    <div key={label} className="p-3.5 rounded-xl border border-[#E2E8F0] bg-white shadow-2xs">
-                      <div className="flex items-center justify-between text-[#64748B] mb-1">
-                        <span className="text-[12px] font-medium">{label}</span>
-                        <Icon className="w-3.5 h-3.5" />
+                    <div key={label} className="px-3 py-2.5 rounded-lg border border-slate-200 bg-white">
+                      <div className="flex items-center justify-between text-slate-500 mb-0.5">
+                        <span className="text-[12px]">{label}</span>
+                        <Icon className="w-3.5 h-3.5" aria-hidden="true" />
                       </div>
-                      <p className="text-[20px] font-bold text-[#0F172A] admin-num">{value.toLocaleString('vi-VN')}</p>
+                      <p className="text-[18px] font-semibold text-slate-900 tabular-nums">{value.toLocaleString(locale)}</p>
                     </div>
                   ))}
                 </div>
@@ -735,58 +773,71 @@ export function AdminStoresPage() {
             </div>
           ) : drawerTab === 'owners' ? (
             <div className="space-y-4">
-              <h4 className="text-[13px] font-bold text-[#0F172A]">Chủ cửa hàng & Quản lý</h4>
+              <h4 className="text-[13px] font-semibold text-slate-900">{t('Chủ cửa hàng & Quản lý', 'Owners')}</h4>
               {detail.owners?.length > 0 ? (
-                <ul className="rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] bg-white overflow-hidden shadow-2xs">
+                <ul className="rounded-xl border border-slate-200 divide-y divide-slate-100 bg-white overflow-hidden ">
                   {detail.owners.map((ow) => (
-                    <li key={ow.id} className="p-4 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors">
+                    <li key={ow.id} className="px-4 py-3 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         <Avatar name={ow.fullName} size={36} />
                         <div className="min-w-0">
-                          <p className="font-semibold text-[#0F172A] truncate flex items-center gap-1.5">
+                          <p className="font-semibold text-slate-900 truncate flex items-center gap-1.5">
                             {ow.fullName}
-                            {!ow.isActive && <Badge tone="danger">Khóa</Badge>}
+                            {!ow.isActive && <Badge tone="danger">{t('Khóa', 'Disabled')}</Badge>}
                           </p>
-                          <a href={`mailto:${ow.email}`} className="text-[12px] text-[#2563EB] hover:underline truncate block mt-0.5">
+                          <a href={`mailto:${ow.email}`} className="text-[12px] text-blue-600 hover:underline truncate block mt-0.5">
                             {ow.email}
                           </a>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <a href={`mailto:${ow.email}`} className={`${ui.btnGhost} p-2`} title="Gửi email">
-                          <Mail className="w-4 h-4 text-[#2563EB]" />
+                        <a
+                          href={`mailto:${ow.email}`}
+                          className={`${ui.btnGhost} p-2`}
+                          title={t('Gửi email', 'Send email')}
+                          aria-label={t(`Gửi email cho ${ow.fullName}`, `Email ${ow.fullName}`)}
+                        >
+                          <Mail className="w-4 h-4 text-slate-500" aria-hidden="true" />
                         </a>
                       </div>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p className="text-[13px] text-[#64748B] p-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  Cửa hàng chưa có tài khoản chủ shop liên kết.
+                <p className="text-[13px] text-slate-500 p-6 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                  {t('Cửa hàng chưa có tài khoản chủ shop liên kết.', 'This store has no linked owner account.')}
                 </p>
               )}
             </div>
           ) : (
             <div className="space-y-4">
-              <h4 className="text-[13px] font-bold text-[#0F172A]">Cổng thanh toán điện tử</h4>
-              <div className="p-4 rounded-xl border border-[#E2E8F0] bg-white shadow-2xs space-y-3">
+              <h4 className="text-[13px] font-semibold text-slate-900">{t('Cổng thanh toán điện tử', 'Payment gateway')}</h4>
+              <div className="p-4 rounded-lg border border-slate-200 bg-white space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
-                      <CreditCard className="w-5 h-5" />
+                    <div className="w-8 h-8 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center">
+                      <CreditCard className="w-4 h-4" aria-hidden="true" />
                     </div>
                     <div>
-                      <p className="text-[14px] font-bold text-[#0F172A]">VietQR qua PayOS</p>
-                      <p className="text-[12px] text-[#64748B]">Tự động đối soát và khớp đơn hàng tại quầy</p>
+                      <p className="text-[14px] font-semibold text-slate-900">{t('VietQR qua PayOS', 'VietQR via PayOS')}</p>
+                      <p className="text-[12px] text-slate-500">{t('Tự động đối soát và khớp đơn hàng tại quầy', 'Automatic reconciliation for counter orders')}</p>
                     </div>
                   </div>
                   <Badge tone={PAYOS[detailPayos].tone} dot={detailPayos === 'ACTIVE'}>
-                    {{ ACTIVE: 'Đang bật', DISABLED: 'Đã tắt', NOT_CONFIGURED: 'Chưa kết nối' }[detailPayos]}
+                    {
+                      {
+                        ACTIVE: t('Đang bật', 'On'),
+                        DISABLED: t('Đã tắt', 'Off'),
+                        NOT_CONFIGURED: t('Chưa kết nối', 'Not connected'),
+                      }[detailPayos]
+                    }
                   </Badge>
                 </div>
                 {payosConfig && (
-                  <p className="text-[12px] text-[#475569] pt-2 border-t border-slate-100">
-                    Được cấu hình ngày <span className="font-semibold">{formatVNDateTime(payosConfig.configuredAt)}</span>. Khóa API được mã hóa bằng AES-256 an toàn.
+                  <p className="text-[12px] text-slate-600 pt-2 border-t border-slate-100">
+                    {t('Cấu hình ngày ', 'Configured on ')}
+                    <span className="font-medium tabular-nums">{formatVNDateTime(payosConfig.configuredAt)}</span>.{' '}
+                    {t('Khóa API được lưu mã hóa AES-256-GCM.', 'API keys are stored encrypted with AES-256-GCM.')}
                   </p>
                 )}
               </div>
@@ -808,26 +859,32 @@ export function AdminStoresPage() {
         <ConfirmDialog
           title={
             dialog.type === 'lock'
-              ? `Tạm khóa cửa hàng ${dialog.store.name}?`
-              : `Mở lại cửa hàng ${dialog.store.name}?`
+              ? t(`Tạm khóa cửa hàng ${dialog.store.name}?`, `Suspend ${dialog.store.name}?`)
+              : t(`Mở lại cửa hàng ${dialog.store.name}?`, `Reactivate ${dialog.store.name}?`)
           }
           description={
             dialog.type === 'lock'
-              ? 'Tất cả tài khoản thuộc cửa hàng này sẽ bị đăng xuất ngay lập tức và không thể truy cập hệ thống. Toàn bộ dữ liệu sản phẩm và đơn hàng vẫn được lưu giữ an toàn.'
-              : 'Các tài khoản thuộc cửa hàng sẽ có thể đăng nhập và bán hàng bình thường ngay sau khi mở khóa.'
+              ? t(
+                  'Mọi tài khoản của cửa hàng bị đăng xuất ngay và không truy cập được hệ thống. Dữ liệu sản phẩm và đơn hàng vẫn được giữ nguyên.',
+                  'Every account of this store is signed out immediately and loses access. Product and order data are kept.'
+                )
+              : t(
+                  'Các tài khoản của cửa hàng đăng nhập và bán hàng bình thường ngay sau khi mở lại.',
+                  'Store accounts can sign in and sell again right away.'
+                )
           }
-          confirmLabel={dialog.type === 'lock' ? 'Tạm khóa cửa hàng' : 'Mở lại cửa hàng'}
+          confirmLabel={dialog.type === 'lock' ? t('Tạm khóa cửa hàng', 'Suspend store') : t('Mở lại cửa hàng', 'Reactivate store')}
           danger={dialog.type === 'lock'}
           reason={{
             required: dialog.type === 'lock',
             placeholder:
               dialog.type === 'lock'
-                ? 'Ví dụ: Hết hạn gói dịch vụ tháng này hoặc vi phạm điều khoản'
-                : 'Ví dụ: Đã thanh toán gia hạn dịch vụ thành công',
+                ? t('Ví dụ: Vi phạm điều khoản sử dụng', 'e.g. Terms of service violation')
+                : t('Ví dụ: Đã xử lý xong vấn đề với chủ cửa hàng', 'e.g. Issue resolved with the owner'),
           }}
           password={
             dialog.type === 'lock'
-              ? { hint: 'Khóa cửa hàng ảnh hưởng đến toàn bộ nhân viên shop nên cần xác nhận lại mật khẩu.' }
+              ? { hint: t('Khóa cửa hàng ảnh hưởng toàn bộ nhân viên nên cần nhập lại mật khẩu.', 'Suspending affects every staff member, so your password is required.') }
               : null
           }
           onClose={() => setDialog(null)}
@@ -840,17 +897,36 @@ export function AdminStoresPage() {
               });
               toast({
                 type: 'success',
-                title: dialog.type === 'lock' ? 'Đã tạm khóa cửa hàng' : 'Đã mở lại cửa hàng',
+                title: dialog.type === 'lock' ? t('Đã tạm khóa cửa hàng', 'Store suspended') : t('Đã mở lại cửa hàng', 'Store reactivated'),
                 description:
                   dialog.type === 'lock'
-                    ? `${dialog.store.name}: Đã thu hồi ${res?.data?.revokedSessions ?? 0} phiên đăng nhập.`
-                    : `${dialog.store.name} đã được mở lại thành công.`,
+                    ? t(
+                        `${dialog.store.name}: đã thu hồi ${res?.data?.revokedSessions ?? 0} phiên đăng nhập.`,
+                        `${dialog.store.name}: ${res?.data?.revokedSessions ?? 0} sessions revoked.`
+                      )
+                    : t(`${dialog.store.name} đã được mở lại.`, `${dialog.store.name} is active again.`),
               });
               refreshAfterChange(dialog.store.id);
             } catch (err) {
-              toast({ type: 'error', title: 'Không cập nhật được trạng thái', description: apiErrorMessage(err) });
+              toast({ type: 'error', title: t('Không cập nhật được trạng thái', 'Could not update the status'), description: apiErrorMessage(err) });
             }
           }}
+        />
+      )}
+
+      {dialog?.type === 'bulkLock' && (
+        <ConfirmDialog
+          title={t(`Tạm khóa ${selectedActive.length} cửa hàng?`, `Suspend ${selectedActive.length} stores?`)}
+          description={t(
+            `${selectedActive.map((s) => s.name).join(', ')}. Mọi tài khoản của các cửa hàng này bị đăng xuất ngay. Dữ liệu vẫn được giữ nguyên.`,
+            `${selectedActive.map((s) => s.name).join(', ')}. Every account of these stores is signed out immediately. Data is kept.`
+          )}
+          confirmLabel={t('Tạm khóa tất cả', 'Suspend all')}
+          danger
+          reason={{ required: true, placeholder: t('Ví dụ: Vi phạm điều khoản sử dụng', 'e.g. Terms of service violation') }}
+          password={{ hint: t('Cần nhập lại mật khẩu cho thao tác hàng loạt.', 'Bulk actions require your password.') }}
+          onClose={() => setDialog(null)}
+          onConfirm={bulkLock}
         />
       )}
     </div>
