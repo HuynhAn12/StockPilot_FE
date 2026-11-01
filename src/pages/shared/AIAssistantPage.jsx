@@ -791,7 +791,7 @@ export function AIAssistantPage() {
                   <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '150ms' }} />
                   <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '300ms' }} />
                   <span className="text-xs text-slate-500 font-semibold ml-2">
-                    {isEn ? 'AI Pilot is querying real-time database...' : 'AI Pilot đang truy vấn dữ liệu thực tế từ cơ sở dữ liệu...'}
+                    {isEn ? 'AI Pilot loading...' : 'AI Pilot loading...'}
                   </span>
                 </div>
               </div>
