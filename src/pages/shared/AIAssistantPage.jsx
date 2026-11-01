@@ -565,7 +565,7 @@ export function AIAssistantPage() {
   ];
 
   return (
-    <div className="ai-assistant-page-scoped relative flex flex-1 h-[calc(100vh-64px)] h-[calc(100dvh-64px)] w-full bg-[#fcfcfd] overflow-hidden">
+    <div className="ai-assistant-page-scoped relative flex flex-1 h-full min-h-0 w-full bg-[#fcfcfd] overflow-hidden">
       <style>{`
         .ai-assistant-page-scoped {
           --ifm-color-primary: #2563eb;
@@ -614,9 +614,7 @@ export function AIAssistantPage() {
 
       {/* 1. LEFT SIDEBAR */}
       <div
-        className={`${
-          sidebarOpen ? 'w-72 sm:w-80' : 'w-0'
-        } transition-all duration-300 ease-in-out bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-hidden z-20 shadow-sm`}
+        className={`${sidebarOpen ? 'w-72 sm:w-80' : 'w-0'} transition-all duration-300 ease-in-out bg-white border-r border-slate-200 flex flex-col shrink-0 h-full min-h-0 overflow-hidden z-20 shadow-sm`}
       >
         {/* Sidebar Header */}
         <div className="p-3 border-b border-slate-100 flex items-center gap-2">
@@ -709,7 +707,7 @@ export function AIAssistantPage() {
       </div>
 
       {/* 2. MAIN CHAT WORKSPACE */}
-      <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
+      <div className="flex-1 flex flex-col bg-white overflow-hidden relative min-h-0 h-full">
 
         {/* Top Header Bar */}
         <div className="h-14 px-4 border-b border-slate-200/80 flex items-center justify-between bg-white shrink-0 shadow-2xs">
@@ -773,7 +771,7 @@ export function AIAssistantPage() {
           onScroll={onFeedScroll}
           role="log"
           aria-label={isEn ? 'Conversation' : 'Nội dung hội thoại'}
-          className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-6 py-6 space-y-6"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-6 py-4 space-y-4"
         >
           <div className="max-w-3xl mx-auto w-full">
 
@@ -1011,7 +1009,7 @@ export function AIAssistantPage() {
         </div>
 
         {/* Input Bar */}
-        <div className="p-4 bg-gradient-to-t from-white via-white to-white/80 border-t border-slate-100">
+        <div className="shrink-0 p-3 sm:p-4 bg-white border-t border-slate-200/80 z-10 shadow-xs">
           <div className="max-w-3xl mx-auto w-full">
             {/* Voice Status Indicators */}
             {isListening && (
@@ -1161,7 +1159,7 @@ export function AIAssistantPage() {
 
       {/* 3. SUGGESTED ACTIONS (overlay below xl, side column from xl) */}
       {suggestionsOpen && (
-        <aside className="absolute xl:static inset-y-0 right-0 z-20 w-[min(20rem,100%)] shrink-0 border-l border-slate-200 shadow-xl xl:shadow-none">
+        <aside className="absolute xl:static inset-y-0 right-0 z-20 w-[min(20rem,100%)] shrink-0 h-full min-h-0 border-l border-slate-200 shadow-xl xl:shadow-none bg-white flex flex-col overflow-hidden">
           <AISuggestionsPanel isEn={isEn} onClose={() => setSuggestionsOpen(false)} />
         </aside>
       )}

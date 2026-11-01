@@ -626,14 +626,14 @@ export function AIChatBox() {
       {/* ========================================================================= */}
       {/* FLOATING PILL BUTTON (Matching user screenshot: [ 🤖 Hỏi Trợ lý AI 🟢 ]) */}
       {/* ========================================================================= */}
-      <div className="fixed bottom-6 right-6 z-40">
+      <div className="fixed bottom-4 right-4 sm:bottom-5 sm:right-5 z-40">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className={`group flex items-center gap-2 px-4 py-2.5 rounded-full shadow-lg transition-all duration-200 cursor-pointer select-none active:scale-95 ${
+          className={`group flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-full shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer select-none active:scale-95 ${
             isOpen
               ? 'bg-slate-900 text-white shadow-slate-900/30 ring-2 ring-slate-800'
-              : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-500/30 hover:scale-105'
+              : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-blue-500/25 hover:scale-102'
           }`}
           title={
             isOpen
@@ -644,13 +644,13 @@ export function AIChatBox() {
           {isOpen ? (
             <>
               <X className="w-4 h-4 text-white" />
-              <span className="text-xs font-bold">{isEn ? 'Close AI Assistant' : 'Đóng Trợ lý AI'}</span>
+              <span className="text-xs font-bold">{isEn ? 'Close' : 'Đóng'}</span>
             </>
           ) : (
             <>
-              <Bot className="w-4 h-4 animate-bounce group-hover:animate-none" />
+              <Bot className="w-4 h-4" />
               <span className="text-xs font-bold">{isEn ? 'Ask AI Assistant' : 'Hỏi Trợ lý AI'}</span>
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-blue-600 shadow-xs" />
+              <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-blue-600 shadow-xs" />
             </>
           )}
         </button>
