@@ -8,27 +8,28 @@ import {
   CheckCircle2,
   Copy,
   Check,
-  Server,
   Clock,
-  Layers,
 } from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
 import { apiGetAdminSystemHealth, formatVNDateTime } from '../../services/adminService';
 import { apiErrorMessage, formatRelativeTime } from './adminLabels';
 import { adminStyles as ui } from './adminStyles';
-import { StatCard, TableCard, Th, Td, Badge } from './components/AdminUI';
+import { StatCard, TableCard, Th, Td } from './components/AdminUI';
+import { currentAdminLang, useAdminText } from './useAdminText';
 
 function formatUptime(seconds) {
-  if (!seconds && seconds !== 0) return '—';
+  if (!seconds && seconds !== 0) return '–';
+  const en = currentAdminLang() === 'en';
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  if (days > 0) return `${days} ngày ${hours} giờ`;
-  if (hours > 0) return `${hours} giờ ${minutes} phút`;
-  return `${minutes} phút`;
+  if (days > 0) return en ? `${days} d ${hours} h` : `${days} ngày ${hours} giờ`;
+  if (hours > 0) return en ? `${hours} h ${minutes} min` : `${hours} giờ ${minutes} phút`;
+  return en ? `${minutes} min` : `${minutes} phút`;
 }
 
 export function AdminHealthPanel() {
+  const { t, isEn } = useAdminText();
   const { toast } = useToast();
   const [health, setHealth] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,7 +40,7 @@ export function AdminHealthPanel() {
     try {
       setHealth(await apiGetAdminSystemHealth());
     } catch (err) {
-      toast({ type: 'error', title: 'Không kiểm tra được sức khỏe hệ thống', description: apiErrorMessage(err) });
+      toast({ type: 'error', title: t('Không kiểm tra được sức khỏe hệ thống', 'Could not check system health'), description: apiErrorMessage(err) });
     } finally {
       setIsLoading(false);
     }
@@ -53,7 +54,7 @@ export function AdminHealthPanel() {
     if (!reqId) return;
     navigator.clipboard.writeText(reqId);
     setCopiedId(reqId);
-    toast({ type: 'success', title: 'Đã sao chép Request ID' });
+    toast({ type: 'success', title: t('Đã sao chép Request ID', 'Request ID copied') });
     setTimeout(() => setCopiedId(null), 2000);
   };
 
@@ -77,62 +78,63 @@ export function AdminHealthPanel() {
   return (
     <div className="space-y-6">
       {/* Thanh trạng thái kiểm tra */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-white rounded-xl border border-[#E2E8F0] text-[13px] text-[#64748B] shadow-2xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-white rounded-xl border border-slate-200 text-[13px] text-slate-500 ">
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-slate-500 shrink-0" />
           <span>
-            Kiểm tra lúc <strong className="text-[#0F172A]">{formatVNDateTime(health.checkedAt)}</strong>. Dữ liệu request tính từ{' '}
-            <strong className="text-[#0F172A]">{formatVNDateTime(http.since)}</strong>.
+            {t('Kiểm tra lúc', 'Checked at')} <strong className="font-medium text-slate-900 tabular-nums">{formatVNDateTime(health.checkedAt)}</strong>.{' '}
+            {t('Dữ liệu request tính từ', 'Request data since')}{' '}
+            <strong className="font-medium text-slate-900 tabular-nums">{formatVNDateTime(http.since)}</strong>.
           </span>
         </div>
         <button
           type="button"
           onClick={fetchHealth}
           disabled={isLoading}
-          className={`${ui.btnSecondary} px-3 py-1.5 text-[12px] self-start sm:self-auto`}
+          className={`${ui.btnSecondary} h-8 self-start sm:self-auto`}
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          Kiểm tra lại
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
+          {t('Kiểm tra lại', 'Check again')}
         </button>
       </div>
 
       {/* 4 Thẻ Sức Khỏe */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Cơ sở dữ liệu MySQL"
-          value={isDbUp ? 'Kết nối tốt' : 'Mất kết nối'}
+          title={t('Cơ sở dữ liệu MySQL', 'MySQL database')}
+          value={isDbUp ? t('Kết nối tốt', 'Connected') : t('Mất kết nối', 'Disconnected')}
           subtitle={
             isDbUp
               ? database.latencyMs < 1
-                ? 'Độ trễ phản hồi < 1 ms'
-                : `Độ trễ phản hồi ${database.latencyMs} ms`
-              : 'Kiểm tra máy chủ MySQL ngay'
+                ? t('Độ trễ phản hồi < 1 ms', 'Response latency < 1 ms')
+                : t(`Độ trễ phản hồi ${database.latencyMs} ms`, `Response latency ${database.latencyMs} ms`)
+              : t('Kiểm tra máy chủ MySQL ngay', 'Check the MySQL server now')
           }
           icon={Database}
-          iconBg={isDbUp ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}
+          iconBg={isDbUp ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}
           alert={!isDbUp}
         />
         <StatCard
-          title="Lưu lượng HTTP 24h"
-          value={(http.requests ?? 0).toLocaleString('vi-VN')}
-          subtitle={`Thời gian xử lý TB ${http.avgLatencyMs ?? 0} ms`}
+          title={t('Lưu lượng HTTP 24h', 'HTTP traffic (24h)')}
+          value={(http.requests ?? 0).toLocaleString(isEn ? 'en-US' : 'vi-VN')}
+          subtitle={t(`Thời gian xử lý TB ${http.avgLatencyMs ?? 0} ms`, `Avg handling time ${http.avgLatencyMs ?? 0} ms`)}
           icon={Activity}
-          iconBg="bg-blue-50 text-[#2563EB] border-blue-100"
+          iconBg="bg-slate-100 text-slate-600"
         />
         <StatCard
-          title="Lỗi máy chủ (5xx)"
-          value={(http.serverErrors ?? 0).toLocaleString('vi-VN')}
-          subtitle={http.requests > 0 ? `${errorPercent}% trên tổng request` : 'Chưa có lỗi nào'}
+          title={t('Lỗi máy chủ (5xx)', 'Server errors (5xx)')}
+          value={(http.serverErrors ?? 0).toLocaleString(isEn ? 'en-US' : 'vi-VN')}
+          subtitle={http.requests > 0 ? t(`${errorPercent}% trên tổng request`, `${errorPercent}% of all requests`) : t('Chưa có lỗi nào', 'No errors yet')}
           icon={AlertTriangle}
-          iconBg={isHighError ? 'bg-red-50 text-red-600 border-red-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}
+          iconBg={isHighError ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}
           alert={isHighError}
         />
         <StatCard
-          title="Thời gian máy chủ chạy"
+          title={t('Thời gian máy chủ chạy', 'Server uptime')}
           value={formatUptime(proc.uptimeSeconds)}
           subtitle={`RAM: ${proc.memoryRssMb} MB · Node ${proc.nodeVersion}`}
           icon={Cpu}
-          iconBg="bg-purple-50 text-purple-600 border-purple-100"
+          iconBg="bg-slate-100 text-slate-600"
         />
       </div>
 
@@ -140,41 +142,41 @@ export function AdminHealthPanel() {
       <TableCard
         header={
           <div>
-            <h3 className="text-[14px] font-bold text-[#0F172A]">Lỗi máy chủ gần đây (Mã lỗi 5xx)</h3>
-            <p className="text-[12px] text-[#64748B]">Tối đa 20 sự kiện lỗi được lưu trữ tạm thời trong bộ nhớ máy chủ</p>
+            <h3 className="text-[14px] font-semibold text-slate-900">{t('Lỗi máy chủ gần đây (Mã lỗi 5xx)', 'Recent server errors (5xx)')}</h3>
+            <p className="text-[12px] text-slate-500">{t('Tối đa 20 sự kiện lỗi được lưu trữ tạm thời trong bộ nhớ máy chủ', 'Up to 20 error events kept in server memory')}</p>
           </div>
         }
       >
         {http.recentServerErrors.length === 0 ? (
-          <div className="p-8 text-center text-[13px] text-[#64748B]">
-            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-            <p className="font-semibold text-[#0F172A]">Không ghi nhận lỗi máy chủ nào</p>
-            <p className="text-[12px] text-[#64748B] mt-0.5">Tất cả request trong 24 giờ qua đều được xử lý thành công.</p>
+          <div className="p-8 text-center text-[13px] text-slate-500">
+            <CheckCircle2 className="w-6 h-6 text-emerald-500 mx-auto mb-2" aria-hidden="true" />
+            <p className="font-semibold text-slate-900">{t('Không ghi nhận lỗi máy chủ nào', 'No server errors recorded')}</p>
+            <p className="text-[12px] text-slate-500 mt-0.5">{t('Tất cả request trong 24 giờ qua đều được xử lý thành công.', 'Every request in the last 24 hours succeeded.')}</p>
           </div>
         ) : (
-          <table className="w-full min-w-175">
+          <table className={`${ui.table} min-w-175`}>
             <thead>
               <tr>
-                <Th>Thời điểm</Th>
-                <Th>Giao thức & Đường dẫn (API)</Th>
-                <Th>Mã lỗi HTTP</Th>
-                <Th>Mã tra cứu Request ID</Th>
+                <Th>{t('Thời điểm', 'Time')}</Th>
+                <Th>{t('Giao thức & Đường dẫn (API)', 'Method & path (API)')}</Th>
+                <Th>{t('Mã lỗi HTTP', 'HTTP status')}</Th>
+                <Th>{t('Mã tra cứu Request ID', 'Request ID')}</Th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F1F5F9]">
+            <tbody className="divide-y divide-slate-100">
               {http.recentServerErrors.map((e, idx) => (
                 <tr key={`${e.at}-${idx}`} className="hover:bg-slate-50/70 transition-colors">
-                  <Td className="whitespace-nowrap font-medium text-[#0F172A]" title={formatVNDateTime(e.at)}>
+                  <Td className="whitespace-nowrap font-medium text-slate-900" title={formatVNDateTime(e.at)}>
                     {formatRelativeTime(e.at) || formatVNDateTime(e.at)}
                   </Td>
                   <Td>
-                    <span className="font-mono text-[12px] bg-slate-100 px-2 py-0.5 rounded text-[#334155] font-semibold mr-1.5">
+                    <span className="font-mono text-[12px] bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-semibold mr-1.5">
                       {e.method}
                     </span>
-                    <span className="font-mono text-[12px] text-[#475569]">{e.path}</span>
+                    <span className="font-mono text-[12px] text-slate-600">{e.path}</span>
                   </Td>
                   <Td>
-                    <span className="inline-flex items-center gap-1 font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                    <span className="inline-flex items-center gap-1 font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-200">
                       {e.statusCode}
                     </span>
                   </Td>
@@ -183,18 +185,18 @@ export function AdminHealthPanel() {
                       <button
                         type="button"
                         onClick={() => copyRequestId(e.requestId)}
-                        className="inline-flex items-center gap-1.5 font-mono text-[12px] text-[#2563EB] hover:underline cursor-pointer group"
-                        title="Sao chép requestId"
+                        className="inline-flex items-center gap-1.5 font-mono text-[12px] text-blue-600 hover:underline cursor-pointer group"
+                        title={t('Sao chép requestId', 'Copy request ID')}
                       >
                         {copiedId === e.requestId ? (
                           <Check className="w-3.5 h-3.5 text-emerald-600" />
                         ) : (
-                          <Copy className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#2563EB]" />
+                          <Copy className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600" />
                         )}
                         <span>{e.requestId}</span>
                       </button>
                     ) : (
-                      <span className="text-[#94A3B8]">—</span>
+                      <span className="text-slate-400">–</span>
                     )}
                   </Td>
                 </tr>

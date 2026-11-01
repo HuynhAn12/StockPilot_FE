@@ -1,19 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Bot, Send, Plus, Trash2, MessageSquare, Sparkles,
-  Copy, Check, ArrowRight, CornerDownLeft, RefreshCw,
-  Search, PanelLeftClose, PanelLeft, Clock, ShieldCheck,
-  TrendingUp, AlertTriangle, Package, DollarSign, ChevronRight,
-  ExternalLink, BarChart3, ShoppingCart, ArrowUpRight
+  Bot, Plus, Trash2, MessageSquare, Sparkles,
+  Copy, Check, ArrowRight, RefreshCw,
+  Search, PanelLeftClose, PanelLeft, TrendingUp, AlertTriangle, Package, DollarSign, ShoppingCart, ArrowUpRight, Lightbulb, CheckCircle2,
+  ArrowDown, RotateCcw
 } from 'lucide-react';
 import { useProductStore } from '../../components/store/productStore';
 import { useAuthStore } from '../../store/authStore';
 import { isStaff } from '../../config/permissions.config';
-import { apiChatWithAssistant, apiGetAssistantHistory } from '../../services/analyticsService';
+import { useAssistantChat, CURRENT_SESSION_ID } from '../../features/assistant/useAssistantChat';
+import { useStickToBottom } from '../../features/assistant/useStickToBottom';
 import { useTranslation } from '../../i18n/useTranslation';
-
-const STORAGE_KEY = 'stockpilot_ai_active_session_v2';
+import { AISourceBadge } from '../../components/assistant/AISourceBadge';
+import { AISuggestionsPanel } from '../../components/assistant/AISuggestionsPanel';
 
 function parseInlineMarkdown(text) {
   if (!text) return null;
@@ -148,217 +148,91 @@ export function AIAssistantPage() {
   const { language } = useTranslation();
   const isEn = language === 'en';
 
-  const [chats, setChats] = useState([]);
-  const [activeChatId, setActiveChatId] = useState('current');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [inputMessage, setInputMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1280);
 
-  const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const copyTimerRef = useRef(null);
+
+  const {
+    sessions, activeSession, setActiveId, send, newChat, deleteChat,
+    isSending, sendingSessionId, isHistoryLoading, isHistoryFetching, historyError, refetchHistory,
+  } = useAssistantChat({ isEn });
+  const activeChatId = activeSession.id;
+  const isTyping = isSending && sendingSessionId === activeChatId;
+
+  // Giờ hiển thị tính lúc render → đổi VI/EN chỉ định dạng lại, không gọi lại API.
+  const messages = useMemo(() => {
+    const fmt = new Intl.DateTimeFormat(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
+    const timeOf = (iso) => {
+      const d = iso ? new Date(iso) : null;
+      return d && !Number.isNaN(d.getTime()) ? fmt.format(d) : '';
+    };
+    return activeSession.turns.flatMap((turn) => {
+      const timestamp = timeOf(turn.createdAt);
+      const out = [{ id: `${turn.id}-q`, turnId: turn.id, sender: 'user', text: turn.question, timestamp, status: turn.status, error: turn.error }];
+      if (turn.answer != null) {
+        out.push({
+          id: `${turn.id}-a`, sender: 'ai', text: turn.answer, timestamp,
+          source: turn.source, fallbackReason: turn.fallbackReason, actionLinks: turn.actionLinks,
+        });
+      }
+      return out;
+    });
+  }, [activeSession.turns, isEn]);
+
+  const lastTurn = activeSession.turns[activeSession.turns.length - 1];
+  const { containerRef: feedRef, onScroll: onFeedScroll, scrollToBottom, stick, hasUnseen } = useStickToBottom({
+    sessionKey: activeChatId,
+    itemCount: messages.length,
+    contentKey: `${messages.length}:${lastTurn?.id ?? ''}:${lastTurn?.status ?? ''}:${isTyping}`,
+  });
+
+  useEffect(() => () => clearTimeout(copyTimerRef.current), []);
 
   // Fetch product list for entity matching
   useEffect(() => {
     if (!products.length) fetchProducts();
   }, []);
 
-  // Load chat history from backend database on mount
-  useEffect(() => {
-    async function loadHistory() {
-      setIsLoadingHistory(true);
-      try {
-        const historyData = await apiGetAssistantHistory({ limit: 40 });
-        if (Array.isArray(historyData) && historyData.length > 0) {
-          const serverMessages = [];
-          const reversed = [...historyData].reverse();
-          reversed.forEach((item, idx) => {
-            const timeStr = item.createdAt
-              ? new Date(item.createdAt).toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' })
-              : '';
-            if (item.questionText) {
-              serverMessages.push({
-                id: `hist-q-${item.id || idx}`,
-                sender: 'user',
-                text: item.questionText,
-                timestamp: timeStr,
-              });
-            }
-            if (item.responseText) {
-              serverMessages.push({
-                id: `hist-a-${item.id || idx}`,
-                sender: 'ai',
-                text: item.responseText,
-                timestamp: timeStr,
-                actionLinks: item.metadata?.actionLinks || [],
-              });
-            }
-          });
-
-          const initialSession = {
-            id: 'current',
-            title: isEn ? 'Latest Conversation' : 'Hội thoại gần nhất',
-            createdAt: reversed[0]?.createdAt || new Date().toISOString(),
-            messages: serverMessages,
-          };
-          setChats([initialSession]);
-          setActiveChatId('current');
-        } else {
-          setChats([
-            {
-              id: 'current',
-              title: isEn ? 'New Chat Session' : 'Phiên trò chuyện mới',
-              createdAt: new Date().toISOString(),
-              messages: [],
-            },
-          ]);
-          setActiveChatId('current');
-        }
-      } catch (err) {
-        console.error('Failed to load assistant history:', err);
-        setChats([
-          {
-            id: 'current',
-            title: isEn ? 'New Chat Session' : 'Phiên trò chuyện mới',
-            createdAt: new Date().toISOString(),
-            messages: [],
-          },
-        ]);
-        setActiveChatId('current');
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    }
-
-    loadHistory();
-  }, [isEn]);
-
-  const activeChat = chats.find((c) => c.id === activeChatId) || chats[0];
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeChat?.messages, isTyping]);
-
-  const handleSendMessage = async (textToSend) => {
-    const text = (textToSend || inputMessage).trim();
-    if (!text || isTyping) return;
-
-    setInputMessage('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-    }
-
-    const timestamp = new Date().toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' });
-    const userMsg = {
-      id: `usr-${Date.now()}`,
-      sender: 'user',
-      text,
-      timestamp,
-    };
-
-    setChats((prev) =>
-      prev.map((c) => {
-        if (c.id === activeChatId) {
-          const newMessages = [...(c.messages || []), userMsg];
-          const newTitle = c.messages?.length === 0 ? text.slice(0, 30) + '...' : c.title;
-          return { ...c, title: newTitle, messages: newMessages };
-        }
-        return c;
-      })
-    );
-
-    setIsTyping(true);
-
-    try {
-      const response = await apiChatWithAssistant({
-        prompt: text,
-        context: {
-          role: user?.role,
-          storeName: user?.storeName || user?.store?.name,
-          language: isEn ? 'en' : 'vi',
-        },
-      });
-
-      const aiMsg = {
-        id: `ai-${Date.now()}`,
-        sender: 'ai',
-        text: response.reply || response.text || (isEn ? 'I have received your request and synced live database.' : 'Tôi đã nhận được thông tin và đồng bộ cơ sở dữ liệu.'),
-        timestamp: new Date().toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        actionLinks: response.actionLinks || [],
-      };
-
-      setChats((prev) =>
-        prev.map((c) => {
-          if (c.id === activeChatId) {
-            return { ...c, messages: [...(c.messages || []), aiMsg] };
-          }
-          return c;
-        })
-      );
-    } catch (err) {
-      console.error('Failed to chat with AI Pilot:', err);
-      const fallbackAiMsg = {
-        id: `ai-err-${Date.now()}`,
-        sender: 'ai',
-        text: isEn
-          ? `### ⚠️ Real-Time Sync Notice\nUnable to connect to AI server: ${err?.message || 'Network error'}. Please try again later.`
-          : `### ⚠️ Thông báo kết nối dữ liệu\nKhông thể kết nối đến máy chủ AI: ${err?.message || 'Lỗi mạng'}. Vui lòng thử lại sau ít phút.`,
-        timestamp: new Date().toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      setChats((prev) =>
-        prev.map((c) => {
-          if (c.id === activeChatId) {
-            return { ...c, messages: [...(c.messages || []), fallbackAiMsg] };
-          }
-          return c;
-        })
-      );
-    } finally {
-      setIsTyping(false);
+  const handleSendMessage = (textToSend) => {
+    const text = (textToSend ?? inputMessage).trim();
+    if (!text) return;
+    stick();
+    if (!send(text)) return;
+    if (textToSend === undefined) {
+      setInputMessage('');
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
     }
   };
 
+  const handleRetry = (turnId, text) => {
+    stick();
+    send(text, turnId);
+  };
+
   const handleNewChat = () => {
-    const newId = `chat-${Date.now()}`;
-    const newChat = {
-      id: newId,
-      title: isEn ? 'New Chat Session' : 'Phiên trò chuyện mới',
-      createdAt: new Date().toISOString(),
-      messages: [],
-    };
-    setChats((prev) => [newChat, ...prev]);
-    setActiveChatId(newId);
+    newChat();
     setInputMessage('');
   };
 
   const handleDeleteChat = (e, chatId) => {
     e.stopPropagation();
-    setChats((prev) => {
-      const remaining = prev.filter((c) => c.id !== chatId);
-      if (remaining.length === 0) {
-        return [
-          {
-            id: 'current',
-            title: isEn ? 'New Chat Session' : 'Phiên trò chuyện mới',
-            createdAt: new Date().toISOString(),
-            messages: [],
-          },
-        ];
-      }
-      return remaining;
-    });
-    if (activeChatId === chatId) {
-      setActiveChatId('current');
-    }
+    deleteChat(chatId);
   };
 
-  const handleCopy = (msgId, text) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(msgId);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleCopy = async (msgId, text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(msgId);
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      setCopiedId(null);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -374,7 +248,7 @@ export function AIAssistantPage() {
     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
   };
 
-  const filteredChats = chats.filter((c) =>
+  const filteredChats = sessions.filter((c) =>
     c.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -453,7 +327,7 @@ export function AIAssistantPage() {
   ];
 
   return (
-    <div className="ai-assistant-page-scoped flex h-[calc(100vh-84px)] -m-3 sm:-m-5 lg:-m-6 bg-[#fcfcfd] overflow-hidden">
+    <div className="ai-assistant-page-scoped relative flex h-[calc(100vh-84px)] -m-3 sm:-m-5 lg:-m-6 bg-[#fcfcfd] overflow-hidden">
       <style>{`
         .ai-assistant-page-scoped {
           --ifm-color-primary: #2563eb;
@@ -545,7 +419,7 @@ export function AIAssistantPage() {
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
             <span>{isEn ? `Chat History (${filteredChats.length})` : `Lịch sử hội thoại (${filteredChats.length})`}</span>
-            {isLoadingHistory && <RefreshCw className="w-3 h-3 animate-spin text-blue-600" />}
+            {isHistoryFetching && <RefreshCw className="w-3 h-3 animate-spin text-blue-600" aria-label={isEn ? 'Syncing' : 'Đang đồng bộ'} />}
           </div>
 
           {filteredChats.map((chat) => {
@@ -553,7 +427,11 @@ export function AIAssistantPage() {
             return (
               <div
                 key={chat.id}
-                onClick={() => setActiveChatId(chat.id)}
+                role="button"
+                tabIndex={0}
+                aria-current={isActive ? 'true' : undefined}
+                onClick={() => setActiveId(chat.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActiveId(chat.id); } }}
                 className={`group relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-all ${
                   isActive
                     ? 'bg-blue-50 text-blue-700 font-bold border border-blue-200/90 shadow-2xs'
@@ -563,19 +441,22 @@ export function AIAssistantPage() {
                 <MessageSquare className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
                 <span className="flex-1 truncate text-left">{chat.title}</span>
 
-                <button
-                  type="button"
-                  onClick={(e) => handleDeleteChat(e, chat.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
-                  title={isEn ? "Delete this chat" : "Xóa đoạn chat này"}
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {!chat.persisted && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleDeleteChat(e, chat.id)}
+                    className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
+                    title={isEn ? "Delete this chat" : "Xóa đoạn chat này"}
+                    aria-label={isEn ? `Delete chat ${chat.title}` : `Xóa đoạn chat ${chat.title}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             );
           })}
 
-          {filteredChats.length === 0 && !isLoadingHistory && (
+          {filteredChats.length === 0 && !isHistoryLoading && (
             <div className="text-center py-8 text-xs text-slate-400">
               {isEn ? 'No chat history found' : 'Chưa có phiên trò chuyện nào'}
             </div>
@@ -615,7 +496,7 @@ export function AIAssistantPage() {
               </div>
               <div>
                 <h2 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight truncate max-w-xs sm:max-w-md">
-                  {activeChat?.title || (isEn ? 'AI Pilot Assistant' : 'Trợ lý AI Pilot')}
+                  {activeSession.title || (isEn ? 'AI Pilot Assistant' : 'Trợ lý AI Pilot')}
                 </h2>
                 <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                   <span className="text-blue-600 font-bold">{isEn ? 'Real-time database' : 'Dữ liệu thời gian thực'}</span>
@@ -629,6 +510,19 @@ export function AIAssistantPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => setSuggestionsOpen((open) => !open)}
+              aria-pressed={suggestionsOpen}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
+                suggestionsOpen
+                  ? 'border-blue-200 bg-blue-50 text-blue-700'
+                  : 'border-slate-200 text-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200'
+              }`}
+            >
+              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+              <span>{isEn ? 'Suggestions' : 'Gợi ý'}</span>
+            </button>
+            <button
+              type="button"
               onClick={handleNewChat}
               className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors cursor-pointer"
             >
@@ -639,11 +533,38 @@ export function AIAssistantPage() {
         </div>
 
         {/* Messages Feed Area */}
-        <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-6 space-y-6">
+        <div
+          ref={feedRef}
+          onScroll={onFeedScroll}
+          role="log"
+          aria-label={isEn ? 'Conversation' : 'Nội dung hội thoại'}
+          className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-6 py-6 space-y-6"
+        >
           <div className="max-w-3xl mx-auto w-full">
 
+            {/* History loading skeleton (chỉ lần đầu; quay lại trang dùng cache nên không hiện) */}
+            {isHistoryLoading && (
+              <div className="space-y-5 py-2" aria-busy="true" aria-label={isEn ? 'Loading chat history' : 'Đang tải lịch sử chat'}>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="space-y-3">
+                    <div className="ml-auto h-10 w-2/5 animate-pulse rounded-2xl bg-slate-100" />
+                    <div className="h-24 w-4/5 animate-pulse rounded-2xl bg-slate-100" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {historyError && activeChatId === CURRENT_SESSION_ID && (
+              <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+                <span>{historyError}</span>
+                <button type="button" onClick={() => refetchHistory()} className="font-semibold underline cursor-pointer">
+                  {isEn ? 'Try again' : 'Thử lại'}
+                </button>
+              </div>
+            )}
+
             {/* Empty Chat State: Quick Prompts Grid */}
-            {(!activeChat?.messages || activeChat.messages.length === 0) && (
+            {messages.length === 0 && !isHistoryLoading && (
               <div className="py-6 sm:py-10 flex flex-col items-center text-center animate-in fade-in duration-300">
                 <div className="relative mb-4">
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/25">
@@ -692,7 +613,7 @@ export function AIAssistantPage() {
             )}
 
             {/* Conversation Messages */}
-            {activeChat?.messages?.map((msg) => {
+            {messages.map((msg) => {
               const isUser = msg.sender === 'user';
               return (
                 <div
@@ -738,6 +659,24 @@ export function AIAssistantPage() {
                     {/* Metadata & Actions */}
                     <div className="flex items-center gap-2 mt-1 px-1 text-[11px] text-slate-400">
                       <span>{msg.timestamp}</span>
+                      {isUser && msg.status === 'pending' && (
+                        <span className="text-slate-400">{isEn ? 'Sending…' : 'Đang gửi…'}</span>
+                      )}
+                      {isUser && msg.status === 'failed' && (
+                        <span role="alert" className="flex flex-wrap items-center gap-1.5 text-rose-600">
+                          <AlertTriangle className="w-3 h-3" aria-hidden />
+                          <span title={msg.error}>{isEn ? 'Not sent' : 'Không gửi được'}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRetry(msg.turnId, msg.text)}
+                            disabled={isSending}
+                            className="inline-flex items-center gap-1 font-semibold underline hover:text-rose-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+                          >
+                            <RotateCcw className="w-3 h-3" aria-hidden /> {isEn ? 'Retry' : 'Gửi lại'}
+                          </button>
+                        </span>
+                      )}
+                      {!isUser && <AISourceBadge source={msg.source} fallbackReason={msg.fallbackReason} isEn={isEn} />}
 
                       {!isUser && (
                         <button
@@ -789,8 +728,20 @@ export function AIAssistantPage() {
               </div>
             )}
 
-            <div ref={messagesEndRef} />
           </div>
+
+          {hasUnseen && (
+            <div className="sticky bottom-0 flex justify-center pointer-events-none">
+              <button
+                type="button"
+                onClick={() => scrollToBottom(true)}
+                className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-lg hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 cursor-pointer"
+              >
+                <ArrowDown className="w-3.5 h-3.5" aria-hidden />
+                {isEn ? 'New messages' : 'Tin mới'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Input Bar */}
@@ -818,7 +769,8 @@ export function AIAssistantPage() {
               <button
                 type="button"
                 onClick={() => handleSendMessage()}
-                disabled={!inputMessage.trim() || isTyping}
+                disabled={!inputMessage.trim() || isSending || isHistoryLoading}
+                aria-label={isEn ? "Send message" : "Gửi câu hỏi"}
                 className="w-9 h-9 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-30 disabled:hover:bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs transition-all cursor-pointer disabled:cursor-not-allowed mb-0.5"
                 title={isEn ? "Send message" : "Gửi câu hỏi"}
               >
@@ -835,6 +787,13 @@ export function AIAssistantPage() {
         </div>
 
       </div>
+
+      {/* 3. SUGGESTED ACTIONS (overlay below xl, side column from xl) */}
+      {suggestionsOpen && (
+        <aside className="absolute xl:static inset-y-0 right-0 z-20 w-[min(20rem,100%)] shrink-0 border-l border-slate-200 shadow-xl xl:shadow-none">
+          <AISuggestionsPanel isEn={isEn} onClose={() => setSuggestionsOpen(false)} />
+        </aside>
+      )}
 
     </div>
   );

@@ -23,7 +23,7 @@ const NAV_ITEM_CONFIG = [
   { key: 'navDashboard', sectionKey: 'systemSection', defaultName: 'Tổng quan', defaultSection: 'Hệ thống', href: '/dashboard', icon: LayoutDashboard, roles: ['store_owner','warehouse_staff','admin'] },
   { key: 'navProducts', defaultName: 'Sản phẩm', href: '/products', icon: Package, roles: ['store_owner','warehouse_staff'] },
   { key: 'navPos', defaultName: 'Thanh toán', href: '/pos', icon: ShoppingBag, roles: ['store_owner','warehouse_staff'] },
-  { key: 'navOrders', defaultName: 'Đơn hàng', href: '/orders', icon: ShoppingCart, roles: ['store_owner'] },
+  { key: 'navOrders', defaultName: 'Đơn hàng', href: '/orders', icon: ShoppingCart, roles: ['store_owner','warehouse_staff'] },
   { key: 'navStaff', defaultName: 'Nhân viên', href: '/staff', icon: Users, roles: ['store_owner'] },
   { key: 'navInventory', defaultName: 'Quản lý kho', href: '/inventory', icon: Boxes, roles: ['store_owner','warehouse_staff'] },
   // Hỗ trợ quyết định (Chủ shop & Nhân viên)

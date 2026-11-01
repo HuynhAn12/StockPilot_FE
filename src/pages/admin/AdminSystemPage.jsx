@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   RefreshCw,
-  CheckCircle2,
-  CircleAlert,
   ShieldAlert,
   Server,
   ShieldCheck,
@@ -16,8 +14,6 @@ import {
   Calendar,
   Copy,
   Check,
-  ExternalLink,
-  Layers,
   Info,
 } from 'lucide-react';
 import { AdminHealthPanel } from './AdminHealthPanel';
@@ -25,6 +21,8 @@ import { AdminSettingsPanel } from './AdminSettingsPanel';
 import { useToast } from '../../components/common/Toast';
 import { apiGetAdminSystemConfig, apiGetAdminAiUsage, toVnStartOfDayISO, toVnEndOfDayISO } from '../../services/adminService';
 import { apiErrorMessage } from './adminLabels';
+import { currentAdminLang, useAdminText } from './useAdminText';
+import { segmentedButton, segmentedWrapper } from './ops/opsShared';
 import { adminStyles as ui } from './adminStyles';
 import {
   PageHeader,
@@ -39,10 +37,10 @@ import {
 } from './components/AdminUI';
 
 const SYSTEM_TABS = [
-  { value: 'health', label: 'Sức khỏe' },
-  { value: 'settings', label: 'Cài đặt nền tảng' },
-  { value: 'config', label: 'Cấu hình máy chủ' },
-  { value: 'ai', label: 'Trợ lý AI' },
+  { value: 'health', vi: 'Sức khỏe', en: 'Health' },
+  { value: 'settings', vi: 'Cài đặt nền tảng', en: 'Platform settings' },
+  { value: 'config', vi: 'Cấu hình máy chủ', en: 'Server configuration' },
+  { value: 'ai', vi: 'Trợ lý AI', en: 'AI assistant' },
 ];
 
 /** yyyy-mm-dd in local time (toISOString would shift to UTC). */
@@ -51,61 +49,80 @@ function localYMD(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-const formatWindow = (limit) => (limit ? `${limit.max} lượt / ${limit.windowMs / 60000} phút` : '—');
+const formatWindow = (limit) => {
+  if (!limit) return '–';
+  const en = currentAdminLang() === 'en';
+  return en ? `${limit.max} req / ${limit.windowMs / 60000} min` : `${limit.max} lượt / ${limit.windowMs / 60000} phút`;
+};
+
+/** Tiêu đề thẻ cấu hình: icon trung tính · tên · badge trạng thái. */
+function ConfigCardHeader({ icon: Icon, title, badge }) {
+  return (
+    <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2.5">
+        <span className="w-7 h-7 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center">
+          <Icon className="w-4 h-4" aria-hidden="true" />
+        </span>
+        <h2 className="text-[14px] font-semibold text-slate-900">{title}</h2>
+      </div>
+      {badge}
+    </div>
+  );
+}
 
 function ConfigRow({ label, value, status, isDanger, mono = false, copyable = false, copyValue }) {
+  const { t } = useAdminText();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
     const text = copyValue || value;
-    if (!text || text === '—') return;
+    if (!text || text === '–') return;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 px-3.5 hover:bg-slate-50/70 rounded-lg transition-colors border-b border-[#F1F5F9] last:border-b-0 text-[13px] gap-2">
-      <span className="text-[#64748B] font-medium">{label}</span>
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between py-2.5 px-1 border-b border-slate-100 last:border-b-0 text-[13px] gap-2">
+      <span className="text-slate-500 font-medium">{label}</span>
       <div className="flex items-center gap-2 self-start sm:self-auto font-medium">
         {status === 'ok' && (
           <Badge tone="success" dot={true}>
-            Hoạt động
+            {t('Hoạt động', 'Active')}
           </Badge>
         )}
         {status === 'warning' && (
           <Badge tone="warning" dot={true}>
-            Cần lưu ý
+            {t('Cần lưu ý', 'Attention')}
           </Badge>
         )}
         {status === 'danger' && (
           <Badge tone="danger" dot={true}>
-            Cảnh báo
+            {t('Cảnh báo', 'Warning')}
           </Badge>
         )}
 
         <span
-          className={`${mono ? 'font-mono text-[12px] bg-slate-50 px-2 py-0.5 rounded border border-slate-200/80 text-[#334155]' : ''} ${
+          className={`${mono ? 'font-mono text-[12px] bg-slate-50 px-1.5 py-0.5 rounded ring-1 ring-inset ring-slate-200' : ''} ${
             isDanger || status === 'danger'
-              ? 'text-[#DC2626] font-semibold'
+              ? 'text-red-700 font-medium'
               : status === 'warning'
-              ? 'text-[#D97706] font-semibold'
-              : status === 'ok'
-              ? 'text-emerald-700'
-              : 'text-[#1E293B]'
+              ? 'text-amber-800 font-medium'
+              : 'text-slate-800'
           }`}
         >
           {value}
         </span>
 
-        {copyable && value && value !== '—' && (
+        {copyable && value && value !== '–' && (
           <button
             type="button"
             onClick={handleCopy}
-            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
-            title="Sao chép"
+            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            title={t('Sao chép', 'Copy')}
+            aria-label={t('Sao chép', 'Copy')}
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
           </button>
         )}
       </div>
@@ -114,10 +131,12 @@ function ConfigRow({ label, value, status, isDanger, mono = false, copyable = fa
 }
 
 export function AdminSystemPage() {
+  const { t, isEn } = useAdminText();
   const { toast } = useToast();
+  const locale = isEn ? 'en-US' : 'vi-VN';
 
   const [params, setParams] = useSearchParams();
-  const activeTab = SYSTEM_TABS.some((t) => t.value === params.get('tab')) ? params.get('tab') : 'health';
+  const activeTab = SYSTEM_TABS.some((tab) => tab.value === params.get('tab')) ? params.get('tab') : 'health';
   const setActiveTab = (tab) => setParams(tab === 'health' ? {} : { tab }, { replace: true });
 
   // System Config State (Read-only)
@@ -128,8 +147,9 @@ export function AdminSystemPage() {
   // AI Usage Monitoring State
   const [aiUsageData, setAiUsageData] = useState(null);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
-  const [aiFromDate, setAiFromDate] = useState('');
-  const [aiToDate, setAiToDate] = useState('');
+  // Mặc định 30 ngày qua: nút preset đang chọn khớp với ô ngày hiển thị.
+  const [aiFromDate, setAiFromDate] = useState(() => localYMD(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)));
+  const [aiToDate, setAiToDate] = useState(() => localYMD(new Date()));
   const [aiPreset, setAiPreset] = useState(30);
 
   // Sorting state for AI byStore table
@@ -155,8 +175,8 @@ export function AdminSystemPage() {
     if (aiFromDate && aiToDate && aiFromDate > aiToDate) {
       toast({
         type: 'warning',
-        title: 'Khoảng thời gian không hợp lệ',
-        description: 'Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.',
+        title: t('Khoảng thời gian không hợp lệ', 'Invalid date range'),
+        description: t('Ngày bắt đầu phải nhỏ hơn hoặc bằng ngày kết thúc.', 'The start date must be on or before the end date.'),
       });
       return;
     }
@@ -171,7 +191,7 @@ export function AdminSystemPage() {
     } catch (err) {
       toast({
         type: 'error',
-        title: 'Lỗi tải số liệu AI',
+        title: t('Lỗi tải số liệu AI', 'Could not load AI usage'),
         description: apiErrorMessage(err),
       });
     } finally {
@@ -212,9 +232,9 @@ export function AdminSystemPage() {
   const avgLatencyText =
     aiTotals.avgLatencyMs !== null && aiTotals.avgLatencyMs !== undefined
       ? `${aiTotals.avgLatencyMs} ms`
-      : '—';
-  const inputTokensText = (aiTotals.inputTokens ?? 0).toLocaleString('vi-VN');
-  const outputTokensText = (aiTotals.outputTokens ?? 0).toLocaleString('vi-VN');
+      : '–';
+  const inputTokensText = (aiTotals.inputTokens ?? 0).toLocaleString(locale);
+  const outputTokensText = (aiTotals.outputTokens ?? 0).toLocaleString(locale);
 
   // Max interactions in byStore for ratio bar
   const maxStoreInteractions = useMemo(() => {
@@ -264,8 +284,8 @@ export function AdminSystemPage() {
   return (
     <div className={ui.pageContainer}>
       <PageHeader
-        title="Hệ thống & AI"
-        description="Giám sát sức khỏe máy chủ, cấu hình hạ tầng đang chạy, cài đặt nền tảng và hạn mức sử dụng Trợ lý AI. Khóa bí mật không bao giờ hiển thị ở đây."
+        title={t('Hệ thống & AI', 'System & AI')}
+        description={t('Giám sát sức khỏe máy chủ, cấu hình hạ tầng đang chạy, cài đặt nền tảng và hạn mức sử dụng Trợ lý AI. Khóa bí mật không bao giờ hiển thị ở đây.', 'Server health, running configuration, platform settings and AI assistant usage. Secrets are never shown here.')}
         actions={
           (activeTab === 'config' || activeTab === 'ai') && (
             <button
@@ -274,13 +294,13 @@ export function AdminSystemPage() {
               disabled={isLoadingConfig || isLoadingAi}
               className={ui.btnSecondary}
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingConfig || isLoadingAi ? 'animate-spin' : ''}`} />
-              Làm mới
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingConfig || isLoadingAi ? 'animate-spin' : ''}`} aria-hidden="true" />
+              {t('Làm mới', 'Refresh')}
             </button>
           )
         }
       >
-        <Tabs value={activeTab} onChange={setActiveTab} tabs={SYSTEM_TABS} />
+        <Tabs value={activeTab} onChange={setActiveTab} tabs={SYSTEM_TABS.map((tab) => ({ value: tab.value, label: t(tab.vi, tab.en) }))} />
       </PageHeader>
 
       {activeTab === 'health' && <AdminHealthPanel />}
@@ -296,24 +316,30 @@ export function AdminSystemPage() {
       {activeTab === 'config' && !configError && (
         <div className={`space-y-5 ${isLoadingConfig && !configData ? 'opacity-60' : ''}`}>
           {/* Ghi chú đầu trang */}
-          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl text-[13px] text-[#475569] flex items-start gap-3 shadow-2xs">
-            <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+          <div className="px-4 py-3 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-600 flex items-start gap-3">
+            <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" aria-hidden="true" />
             <div className="leading-relaxed">
-              <span className="font-semibold text-[#0F172A]">Chế độ cấu hình chỉ đọc:</span> Bảng thông số được đọc trực tiếp từ tiến trình Node.js đang chạy. Để thay đổi các tham số này, hãy cập nhật file <code className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[#1E293B] font-mono text-[12px]">.env</code> trên máy chủ và khởi động lại dịch vụ backend.
+              <span className="font-medium text-slate-900">{t('Chỉ đọc:', 'Read-only:')}</span>{' '}
+              {t(
+                'Thông số được đọc trực tiếp từ máy chủ đang chạy. Muốn thay đổi, cập nhật file',
+                'Values are read from the running server. To change them, update the'
+              )}{' '}
+              <code className="px-1 py-0.5 bg-slate-100 rounded text-slate-800 font-mono text-[12px]">.env</code>{' '}
+              {t('trên máy chủ rồi khởi động lại backend.', 'file on the server and restart the backend.')}
             </div>
           </div>
 
           {/* Cảnh báo nếu JWT dùng mặc định */}
           {auth.usingDefaultJwtSecrets && (
-            <div className="p-4 bg-red-50/80 border border-red-200 rounded-xl text-[13px] text-[#DC2626] flex items-start gap-3 shadow-xs">
-              <ShieldAlert className="w-5 h-5 shrink-0 text-red-600 mt-0.5" />
+            <div className="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-[13px] text-red-800 flex items-start gap-3" role="alert">
+              <ShieldAlert className="w-4 h-4 shrink-0 text-red-600 mt-0.5" aria-hidden="true" />
               <div className="space-y-1">
-                <p className="font-bold text-[14px]">Cảnh báo an ninh cấp thiết: Máy chủ đang dùng khóa JWT mặc định!</p>
+                <p className="font-semibold">{t('Máy chủ đang dùng khóa JWT mặc định', 'The server is using the default JWT secrets')}</p>
                 <p className="text-red-700 leading-relaxed">
-                  Hệ thống đang sử dụng khóa ký token mẫu của mã nguồn mở. Cần khai báo ngay lập tức biến môi trường{' '}
-                  <code className="px-1.5 py-0.5 bg-red-100/80 font-mono text-[12px] font-semibold">JWT_SECRET</code> và{' '}
-                  <code className="px-1.5 py-0.5 bg-red-100/80 font-mono text-[12px] font-semibold">JWT_REFRESH_SECRET</code>{' '}
-                  trong file <code className="px-1.5 py-0.5 bg-red-100/80 font-mono text-[12px]">.env</code> để ngăn chặn nguy cơ giả mạo phiên đăng nhập quản trị viên.
+                  {t('Khai báo ngay', 'Set')}{' '}
+                  <code className="px-1 py-0.5 bg-red-100 rounded font-mono text-[12px]">JWT_SECRET</code> {t('và', 'and')}{' '}
+                  <code className="px-1 py-0.5 bg-red-100 rounded font-mono text-[12px]">JWT_REFRESH_SECRET</code>{' '}
+                  {t('trong file .env để không ai giả mạo được phiên đăng nhập quản trị.', 'in .env right away so nobody can forge admin sessions.')}
                 </p>
               </div>
             </div>
@@ -323,34 +349,30 @@ export function AdminSystemPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             {/* Nhóm 1: Môi trường */}
             <div className={ui.card}>
-              <div className="px-5 py-3.5 border-b border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#2563EB] border border-blue-100 flex items-center justify-center">
-                    <Server className="w-4 h-4" />
-                  </div>
-                  <h2 className="text-[14px] font-semibold text-[#0F172A]">Môi trường máy chủ</h2>
-                </div>
-                {configData?.environment && (
-                  <Badge tone={configData.environment === 'production' ? 'success' : 'neutral'}>
-                    {configData.environment}
-                  </Badge>
-                )}
-              </div>
-              <div className="p-4 space-y-1">
+              <ConfigCardHeader
+                icon={Server}
+                title={t('Môi trường máy chủ', 'Server environment')}
+                badge={
+                  configData?.environment && (
+                    <Badge tone={configData.environment === 'production' ? 'success' : 'neutral'}>{configData.environment}</Badge>
+                  )
+                }
+              />
+              <div className="px-5 py-2">
                 <ConfigRow
-                  label="Môi trường hoạt động (NODE_ENV)"
-                  value={configData?.environment || '—'}
+                  label={t('Môi trường hoạt động (NODE_ENV)', 'Environment (NODE_ENV)')}
+                  value={configData?.environment || '–'}
                   mono={true}
                   status={configData?.environment === 'production' ? 'ok' : 'neutral'}
                 />
                 <ConfigRow
-                  label="Múi giờ máy chủ (Timezone)"
-                  value={configData?.timezone || '—'}
+                  label={t('Múi giờ máy chủ (Timezone)', 'Server time zone')}
+                  value={configData?.timezone || '–'}
                   mono={true}
                 />
                 <ConfigRow
-                  label="Tên miền gốc (Root Tenant Domain)"
-                  value={configData?.tenantRootDomain || '—'}
+                  label={t('Tên miền gốc (Root Tenant Domain)', 'Root tenant domain')}
+                  value={configData?.tenantRootDomain || '–'}
                   mono={true}
                   copyable={true}
                 />
@@ -359,35 +381,35 @@ export function AdminSystemPage() {
 
             {/* Nhóm 2: Đăng nhập & Xác thực */}
             <div className={ui.card}>
-              <div className="px-5 py-3.5 border-b border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <h2 className="text-[14px] font-semibold text-[#0F172A]">Đăng nhập & Phiên xác thực</h2>
-                </div>
-                <Badge tone={auth.usingDefaultJwtSecrets ? 'danger' : 'success'}>
-                  {auth.usingDefaultJwtSecrets ? 'Bảo mật kém' : 'Bảo mật cao'}
-                </Badge>
-              </div>
-              <div className="p-4 space-y-1">
+              <ConfigCardHeader
+                icon={ShieldCheck}
+                title={t('Đăng nhập & phiên', 'Sign-in & sessions')}
+                badge={
+                  configData && (
+                    <Badge tone={auth.usingDefaultJwtSecrets ? 'danger' : 'success'}>
+                      {auth.usingDefaultJwtSecrets ? t('Khóa mặc định', 'Default secrets') : t('Đã cấu hình', 'Configured')}
+                    </Badge>
+                  )
+                }
+              />
+              <div className="px-5 py-2">
                 <ConfigRow
-                  label="Thời hạn Access Token"
-                  value={auth.accessTokenTtl || '—'}
+                  label={t('Thời hạn Access Token', 'Access token lifetime')}
+                  value={auth.accessTokenTtl || '–'}
                   mono={true}
                 />
                 <ConfigRow
-                  label="Thời hạn Refresh Token"
-                  value={auth.refreshTokenTtl || '—'}
+                  label={t('Thời hạn Refresh Token', 'Refresh token lifetime')}
+                  value={auth.refreshTokenTtl || '–'}
                   mono={true}
                 />
                 <ConfigRow
-                  label="Số phiên đăng nhập hoạt động"
-                  value={configData ? `${auth.activeSessions ?? 0} phiên` : '—'}
+                  label={t('Số phiên đăng nhập hoạt động', 'Active sessions')}
+                  value={configData ? t(`${auth.activeSessions ?? 0} phiên`, `${auth.activeSessions ?? 0} sessions`) : '–'}
                 />
                 <ConfigRow
-                  label="Khóa bảo mật JWT (Secret)"
-                  value={!configData ? '—' : auth.usingDefaultJwtSecrets ? 'Đang dùng mặc định!' : 'Đã cấu hình an toàn'}
+                  label={t('Khóa bảo mật JWT (Secret)', 'JWT signing secret')}
+                  value={!configData ? '–' : auth.usingDefaultJwtSecrets ? t('Đang dùng mặc định', 'Using defaults') : t('Đã cấu hình', 'Configured')}
                   status={!configData ? 'neutral' : auth.usingDefaultJwtSecrets ? 'danger' : 'ok'}
                   isDanger={auth.usingDefaultJwtSecrets}
                 />
@@ -396,30 +418,30 @@ export function AdminSystemPage() {
 
             {/* Nhóm 3: Giới hạn truy cập (Rate Limit) */}
             <div className={ui.card}>
-              <div className="px-5 py-3.5 border-b border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center">
-                    <Gauge className="w-4 h-4" />
-                  </div>
-                  <h2 className="text-[14px] font-semibold text-[#0F172A]">Giới hạn tần suất truy cập (Rate Limit)</h2>
-                </div>
-                <Badge tone={rateLimit.enabled ? 'success' : 'neutral'}>
-                  {rateLimit.enabled ? 'Đang bật' : 'Đang tắt'}
-                </Badge>
-              </div>
-              <div className="p-4 space-y-1">
+              <ConfigCardHeader
+                icon={Gauge}
+                title={t('Giới hạn tần suất (rate limit)', 'Rate limiting')}
+                badge={
+                  configData && (
+                    <Badge tone={rateLimit.enabled ? 'success' : 'neutral'}>
+                      {rateLimit.enabled ? t('Đang bật', 'On') : t('Đang tắt', 'Off')}
+                    </Badge>
+                  )
+                }
+              />
+              <div className="px-5 py-2">
                 <ConfigRow
-                  label="Trạng thái phân tầng Rate Limit"
-                  value={!configData ? '—' : rateLimit.enabled ? 'Đang kích hoạt' : 'Đang tắt'}
+                  label={t('Trạng thái phân tầng Rate Limit', 'Rate limiting')}
+                  value={!configData ? '–' : rateLimit.enabled ? t('Đang bật', 'On') : t('Đang tắt', 'Off')}
                   status={rateLimit.enabled ? 'ok' : 'neutral'}
                 />
                 <ConfigRow
-                  label="API chung (General Endpoints)"
+                  label={t('API chung (General Endpoints)', 'General endpoints')}
                   value={formatWindow(rateLimit.general)}
                   mono={true}
                 />
                 <ConfigRow
-                  label="API bảo mật & OTP (Auth Endpoints)"
+                  label={t('API bảo mật & OTP (Auth Endpoints)', 'Auth & OTP endpoints')}
                   value={formatWindow(rateLimit.auth)}
                   mono={true}
                 />
@@ -428,46 +450,42 @@ export function AdminSystemPage() {
 
             {/* Nhóm 4: Tích hợp dịch vụ ngoại vi */}
             <div className={ui.card}>
-              <div className="px-5 py-3.5 border-b border-[#F1F5F9] bg-[#FAFBFC] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 border border-amber-100 flex items-center justify-center">
-                    <Plug className="w-4 h-4" />
-                  </div>
-                  <h2 className="text-[14px] font-semibold text-[#0F172A]">Tích hợp dịch vụ bên thứ ba</h2>
-                </div>
-              </div>
-              <div className="p-4 space-y-1">
+              <ConfigCardHeader icon={Plug} title={t('Tích hợp bên thứ ba', 'Third-party integrations')} />
+              <div className="px-5 py-2">
                 <ConfigRow
-                  label="Máy chủ gửi Email OTP (SMTP)"
+                  label={t('Máy chủ gửi Email OTP (SMTP)', 'OTP email server (SMTP)')}
                   value={
                     !configData
-                      ? '—'
+                      ? '–'
                       : integrations.smtp?.configured
                       ? `${integrations.smtp.host}:${integrations.smtp.port}`
-                      : 'Chưa cấu hình'
+                      : t('Chưa cấu hình', 'Not configured')
                   }
                   mono={integrations.smtp?.configured}
                   copyable={Boolean(integrations.smtp?.configured)}
                   status={integrations.smtp?.configured ? 'ok' : 'warning'}
                 />
                 <ConfigRow
-                  label="Lưu trữ tài nguyên (Cloudinary)"
-                  value={!configData ? '—' : integrations.cloudinary?.configured ? 'Đã cấu hình kết nối' : 'Chưa cấu hình'}
+                  label={t('Lưu trữ tài nguyên (Cloudinary)', 'Media storage (Cloudinary)')}
+                  value={!configData ? '–' : integrations.cloudinary?.configured ? t('Đã cấu hình', 'Configured') : t('Chưa cấu hình', 'Not configured')}
                   status={integrations.cloudinary?.configured ? 'ok' : 'warning'}
                 />
                 <ConfigRow
-                  label="Cổng tin nhắn SMS Brandname"
-                  value={!configData ? '—' : integrations.sms?.configured ? integrations.sms.provider : 'Chế độ mô phỏng Dev (Sandbox)'}
+                  label={t('Cổng tin nhắn SMS Brandname', 'SMS gateway')}
+                  value={!configData ? '–' : integrations.sms?.configured ? integrations.sms.provider : t('Chế độ thử (sandbox)', 'Sandbox mode')}
                   status={integrations.sms?.configured ? 'ok' : 'neutral'}
                 />
                 <ConfigRow
-                  label="Cổng thanh toán PayOS"
+                  label={t('Cổng thanh toán PayOS', 'PayOS payment gateway')}
                   value={
                     !configData
-                      ? '—'
+                      ? '–'
                       : integrations.payos?.encryptionKeyConfigured
-                      ? `Đã kích hoạt (${integrations.payos?.storesConfigured ?? 0} cửa hàng đã nạp key)`
-                      : 'Thiếu khóa mã hóa PAYOS_ENCRYPTION_KEY'
+                      ? t(
+                          `Đã kích hoạt (${integrations.payos?.storesConfigured ?? 0} cửa hàng đã nạp key)`,
+                          `Enabled (${integrations.payos?.storesConfigured ?? 0} stores connected)`
+                        )
+                      : t('Thiếu khóa mã hóa PAYOS_ENCRYPTION_KEY', 'Missing PAYOS_ENCRYPTION_KEY')
                   }
                   status={integrations.payos?.encryptionKeyConfigured ? 'ok' : 'warning'}
                 />
@@ -481,11 +499,11 @@ export function AdminSystemPage() {
       {activeTab === 'ai' && (
         <div className="space-y-5">
           {/* Thanh chọn khoảng thời gian */}
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-1.5 text-[13px] font-medium text-[#475569]">
-                <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                <span>Khoảng thời gian:</span>
+              <div className="flex items-center gap-1.5 text-[13px] font-medium text-slate-600">
+                <Calendar className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
+                <span>{t('Khoảng thời gian:', 'Date range:')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -495,9 +513,11 @@ export function AdminSystemPage() {
                     setAiFromDate(e.target.value);
                     setAiPreset(null);
                   }}
-                  className={`${ui.input} w-auto h-8.5 text-[12px] py-1 cursor-pointer`}
+                  aria-label={t('Từ ngày', 'From date')}
+                  max={aiToDate || undefined}
+                  className={`${ui.input} w-auto h-8 tabular-nums cursor-pointer`}
                 />
-                <span className="text-[#94A3B8] text-[13px]">→</span>
+                <span className="text-slate-400 text-[13px]" aria-hidden="true">→</span>
                 <input
                   type="date"
                   value={aiToDate}
@@ -505,28 +525,23 @@ export function AdminSystemPage() {
                     setAiToDate(e.target.value);
                     setAiPreset(null);
                   }}
-                  className={`${ui.input} w-auto h-8.5 text-[12px] py-1 cursor-pointer`}
+                  aria-label={t('Đến ngày', 'To date')}
+                  min={aiFromDate || undefined}
+                  className={`${ui.input} w-auto h-8 tabular-nums cursor-pointer`}
                 />
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 self-start md:self-auto">
-              {[
-                { days: 7, label: '7 ngày' },
-                { days: 30, label: '30 ngày' },
-                { days: 90, label: '90 ngày' },
-              ].map(({ days, label }) => (
+            <div className={`${segmentedWrapper} self-start md:self-auto`} role="group" aria-label={t('Khoảng thời gian', 'Date range')}>
+              {[7, 30, 90].map((days) => (
                 <button
                   key={days}
                   type="button"
+                  aria-pressed={aiPreset === days}
                   onClick={() => applyAiDatePreset(days)}
-                  className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors cursor-pointer ${
-                    aiPreset === days
-                      ? 'bg-[#EFF4FF] text-[#2563EB] border border-blue-200'
-                      : 'text-[#64748B] hover:text-[#0F172A] hover:bg-slate-100 border border-transparent'
-                  }`}
+                  className={segmentedButton(aiPreset === days)}
                 >
-                  {label}
+                  {t(`${days} ngày`, `${days} days`)}
                 </button>
               ))}
             </div>
@@ -535,40 +550,42 @@ export function AdminSystemPage() {
           {/* 4 Thẻ số liệu chính (StatCard) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              title="Tổng lượt hỏi AI"
-              value={isLoadingAi ? '—' : totalInteractions.toLocaleString('vi-VN')}
-              subtitle={`${aiTotals.SUCCESS ?? 0} phản hồi thành công`}
+              title={t('Tổng lượt hỏi AI', 'AI requests')}
+              value={isLoadingAi ? '–' : totalInteractions.toLocaleString(locale)}
+              subtitle={t(`${aiTotals.SUCCESS ?? 0} phản hồi thành công`, `${aiTotals.SUCCESS ?? 0} successful replies`)}
               icon={Bot}
-              iconBg="bg-blue-50 text-[#2563EB] border-blue-100"
+              iconBg="bg-slate-100 text-slate-600"
               loading={isLoadingAi}
             />
 
             <StatCard
-              title="Tỉ lệ lỗi & Timeout"
-              value={isLoadingAi ? '—' : `${errorRatePercent}%`}
-              subtitle={`${(aiTotals.FAILED ?? 0) + (aiTotals.TIMEOUT ?? 0)} lượt thất bại / timeout`}
+              title={t('Tỉ lệ lỗi & Timeout', 'Error & timeout rate')}
+              value={isLoadingAi ? '–' : totalInteractions ? `${errorRatePercent}%` : '–'}
+              subtitle={t(
+                `${(aiTotals.FAILED ?? 0) + (aiTotals.TIMEOUT ?? 0)} lượt thất bại / timeout`,
+                `${(aiTotals.FAILED ?? 0) + (aiTotals.TIMEOUT ?? 0)} failed / timed out`
+              )}
               alert={isHighError}
-              trend={isHighError ? 'up' : 'down'}
               icon={AlertTriangle}
-              iconBg={isHighError ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}
+              iconBg={isHighError ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}
               loading={isLoadingAi}
             />
 
             <StatCard
-              title="Độ trễ trung bình"
-              value={isLoadingAi ? '—' : avgLatencyText}
-              subtitle="Thời gian suy luận của AI"
+              title={t('Độ trễ trung bình', 'Average latency')}
+              value={isLoadingAi ? '–' : avgLatencyText}
+              subtitle={t('Thời gian suy luận của AI', 'AI response time')}
               icon={Clock}
-              iconBg="bg-indigo-50 text-indigo-600 border-indigo-100"
+              iconBg="bg-slate-100 text-slate-600"
               loading={isLoadingAi}
             />
 
             <StatCard
-              title="Tổng Token tiêu thụ"
-              value={isLoadingAi ? '—' : ((aiTotals.inputTokens ?? 0) + (aiTotals.outputTokens ?? 0)).toLocaleString('vi-VN')}
-              subtitle={`Vào: ${inputTokensText} · Ra: ${outputTokensText}`}
+              title={t('Tổng Token tiêu thụ', 'Tokens used')}
+              value={isLoadingAi ? '–' : ((aiTotals.inputTokens ?? 0) + (aiTotals.outputTokens ?? 0)).toLocaleString(locale)}
+              subtitle={t(`Vào: ${inputTokensText} · Ra: ${outputTokensText}`, `In: ${inputTokensText} · Out: ${outputTokensText}`)}
               icon={Zap}
-              iconBg="bg-amber-50 text-amber-600 border-amber-100"
+              iconBg="bg-slate-100 text-slate-600"
               loading={isLoadingAi}
             />
           </div>
@@ -578,13 +595,13 @@ export function AdminSystemPage() {
             header={
               <>
                 <div>
-                  <h2 className="text-[14px] font-semibold text-[#0F172A]">Thống kê theo cửa hàng</h2>
-                  <p className="text-[12px] text-[#64748B] mt-0.5">
-                    Hiển thị danh sách cửa hàng phát sinh truy vấn AI trong khoảng thời gian đã chọn
+                  <h2 className="text-[14px] font-semibold text-slate-900">{t('Thống kê theo cửa hàng', 'By store')}</h2>
+                  <p className="text-[12px] text-slate-500 mt-0.5">
+                    {t('Hiển thị danh sách cửa hàng phát sinh truy vấn AI trong khoảng thời gian đã chọn', 'Stores that used the AI assistant in the selected range')}
                   </p>
                 </div>
-                <div className="text-[12px] text-[#64748B] font-medium">
-                  {sortedAiByStore.length} cửa hàng
+                <div className="text-[12px] text-slate-500 tabular-nums shrink-0">
+                  {t(`${sortedAiByStore.length} cửa hàng`, `${sortedAiByStore.length} stores`)}
                 </div>
               </>
             }
@@ -598,7 +615,7 @@ export function AdminSystemPage() {
                     sortDirection={aiSortDirection}
                     onSort={handleAiSort}
                   >
-                    Cửa hàng
+                    {t('Cửa hàng', 'Store')}
                   </Th>
                   <Th
                     sortKey="interactions"
@@ -606,7 +623,7 @@ export function AdminSystemPage() {
                     sortDirection={aiSortDirection}
                     onSort={handleAiSort}
                   >
-                    Lượt tương tác
+                    {t('Lượt tương tác', 'Requests')}
                   </Th>
                   <Th
                     sortKey="failed"
@@ -614,7 +631,7 @@ export function AdminSystemPage() {
                     sortDirection={aiSortDirection}
                     onSort={handleAiSort}
                   >
-                    Số lượt lỗi
+                    {t('Số lượt lỗi', 'Errors')}
                   </Th>
                   <Th
                     sortKey="avgLatency"
@@ -622,7 +639,7 @@ export function AdminSystemPage() {
                     sortDirection={aiSortDirection}
                     onSort={handleAiSort}
                   >
-                    Độ trễ TB
+                    {t('Độ trễ TB', 'Avg latency')}
                   </Th>
                   <Th
                     sortKey="tokens"
@@ -631,16 +648,16 @@ export function AdminSystemPage() {
                     onSort={handleAiSort}
                     align="right"
                   >
-                    Tổng Token
+                    {t('Tổng Token', 'Tokens')}
                   </Th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E2E8F0]">
+              <tbody className="divide-y divide-slate-100">
                 {isLoadingAi ? (
                   Array.from({ length: 4 }).map((_, i) => (
                     <tr key={i}>
                       {Array.from({ length: 5 }).map((__, j) => (
-                        <td key={j} className="px-4 py-4">
+                        <td key={j} className="px-4 py-3.5">
                           <div
                             className="h-4 rounded bg-slate-100 animate-pulse"
                             style={{ width: `${50 + ((i + j) % 3) * 15}%` }}
@@ -651,10 +668,10 @@ export function AdminSystemPage() {
                   ))
                 ) : sortedAiByStore.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-12">
+                    <td colSpan={5}>
                       <EmptyState
-                        title="Chưa có dữ liệu hội thoại AI"
-                        description="Không ghi nhận lượt gọi API Trợ lý AI nào trong khoảng thời gian đã chọn."
+                        title={t('Chưa có dữ liệu hội thoại AI', 'No AI conversations yet')}
+                        description={t('Không ghi nhận lượt gọi API Trợ lý AI nào trong khoảng thời gian đã chọn.', 'No AI assistant requests in the selected range.')}
                       />
                     </td>
                   </tr>
@@ -667,11 +684,11 @@ export function AdminSystemPage() {
                       <tr key={idx} className={ui.tr}>
                         {/* Cửa hàng */}
                         <Td>
-                          <div className="font-semibold text-[#0F172A]">
-                            {row.store?.name || `Cửa hàng #${row.store?.id || idx + 1}`}
+                          <div className="font-semibold text-slate-900">
+                            {row.store?.name || t(`Cửa hàng #${row.store?.id || idx + 1}`, `Store #${row.store?.id || idx + 1}`)}
                           </div>
                           {row.store?.code && (
-                            <div className="text-[11px] text-[#64748B] font-mono mt-0.5">
+                            <div className="text-[12px] text-slate-500 font-mono mt-0.5">
                               {row.store.code}
                             </div>
                           )}
@@ -680,16 +697,16 @@ export function AdminSystemPage() {
                         {/* Lượt hỏi kèm thanh tỉ lệ chuẩn SaaS */}
                         <Td className="min-w-45">
                           <div className="flex items-center gap-3">
-                            <span className="font-semibold text-[#0F172A] tabular-nums min-w-9">
-                              {count.toLocaleString('vi-VN')}
+                            <span className="font-semibold text-slate-900 tabular-nums min-w-9">
+                              {count.toLocaleString(locale)}
                             </span>
-                            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden max-w-30">
+                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden max-w-30" aria-hidden="true">
                               <div
                                 className="h-full bg-blue-600 rounded-full transition-all duration-500"
                                 style={{ width: `${percent}%` }}
                               />
                             </div>
-                            <span className="text-[11px] text-[#94A3B8] tabular-nums">
+                            <span className="text-[12px] text-slate-500 tabular-nums">
                               {percent}%
                             </span>
                           </div>
@@ -699,10 +716,10 @@ export function AdminSystemPage() {
                         <Td>
                           {row.failed > 0 ? (
                             <Badge tone="danger" dot={true}>
-                              {row.failed} lỗi
+                              {t(`${row.failed} lỗi`, `${row.failed} errors`)}
                             </Badge>
                           ) : (
-                            <span className="text-[#94A3B8] text-[12px] font-medium">—</span>
+                            <span className="text-slate-400">–</span>
                           )}
                         </Td>
 
@@ -722,17 +739,17 @@ export function AdminSystemPage() {
                               {row.avgLatencyMs} ms
                             </Badge>
                           ) : (
-                            <span className="text-[#94A3B8]">—</span>
+                            <span className="text-slate-400">–</span>
                           )}
                         </Td>
 
                         {/* Token */}
                         <Td align="right">
-                          <div className="font-mono text-[13px] font-semibold text-[#0F172A] tabular-nums">
-                            {((row.inputTokens || 0) + (row.outputTokens || 0)).toLocaleString('vi-VN')}
+                          <div className="font-mono text-[13px] font-semibold text-slate-900 tabular-nums">
+                            {((row.inputTokens || 0) + (row.outputTokens || 0)).toLocaleString(locale)}
                           </div>
-                          <div className="text-[11px] text-[#94A3B8] mt-0.5">
-                            {(row.inputTokens || 0).toLocaleString('vi-VN')} in · {(row.outputTokens || 0).toLocaleString('vi-VN')} out
+                          <div className="text-[12px] text-slate-500 tabular-nums mt-0.5">
+                            {(row.inputTokens || 0).toLocaleString(locale)} in · {(row.outputTokens || 0).toLocaleString(locale)} out
                           </div>
                         </Td>
                       </tr>

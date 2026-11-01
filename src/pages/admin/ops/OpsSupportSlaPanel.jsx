@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
-import { AlarmClock, CheckCircle2, Inbox, Timer } from 'lucide-react';
+import { AlarmClock, Layers, LifeBuoy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatVNDateTime } from '../../../services/adminService';
 import { apiGetSupportSla } from '../../../services/adminOpsService';
 import { adminStyles as ui } from '../adminStyles';
-import { Badge, EmptyState, ErrorState, StatCard, TableCard, Td, Th } from '../components/AdminUI';
+import { Badge, EmptyState, ErrorState, PanelCard, SummaryStrip, TableBody, Td, Th } from '../components/AdminUI';
+import { useAdminText } from '../useAdminText';
 import {
-  PRIORITY_LABELS,
   PRIORITY_TONES,
   formatMinutes,
   formatNumber,
+  priorityLabel,
   rangeFromPreset,
   segmentedButton,
   segmentedWrapper,
@@ -19,124 +20,172 @@ import {
 const PRESETS = [7, 30, 90];
 
 export function OpsSupportSlaPanel() {
+  const { t } = useAdminText();
   const [days, setDays] = useState(30);
   const sla = useOpsData(() => apiGetSupportSla(rangeFromPreset(days)), [days]);
   const d = sla.data;
   const overall = d?.overall;
 
-  if (sla.error) return <div className={ui.card}><ErrorState message={sla.error} onRetry={sla.reload} /></div>;
+  if (sla.error) {
+    return (
+      <div className={ui.card}>
+        <ErrorState message={sla.error} onRetry={sla.reload} />
+      </div>
+    );
+  }
+
+  const rangePicker = (
+    <div className={segmentedWrapper} role="group" aria-label={t('Khoảng thời gian', 'Time range')}>
+      {PRESETS.map((p) => (
+        <button key={p} type="button" aria-pressed={days === p} className={segmentedButton(days === p)} onClick={() => setDays(p)}>
+          {t(`${p} ngày`, `${p} days`)}
+        </button>
+      ))}
+    </div>
+  );
+
+  const slaText = d?.slaHours
+    ? t(
+        `Thời hạn phản hồi đầu tiên: Cao ${d.slaHours.HIGH} giờ · Bình thường ${d.slaHours.NORMAL} giờ · Thấp ${d.slaHours.LOW} giờ.`,
+        `First-response targets: High ${d.slaHours.HIGH}h · Normal ${d.slaHours.NORMAL}h · Low ${d.slaHours.LOW}h.`
+      )
+    : t('Đang tải thời hạn…', 'Loading targets…');
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-[13px] text-[#64748B]">
-          Thời hạn phản hồi đầu tiên:{' '}
-          {d?.slaHours ? `Cao ${d.slaHours.HIGH} giờ · Bình thường ${d.slaHours.NORMAL} giờ · Thấp ${d.slaHours.LOW} giờ` : '…'}{' '}
-          <Link to="/admin/security?tab=settings" className="text-[#2563EB] hover:underline">Đổi thời hạn</Link>
-        </p>
-        <div className={segmentedWrapper} role="group" aria-label="Khoảng thời gian">
-          {PRESETS.map((p) => (
-            <button key={p} type="button" className={segmentedButton(days === p)} onClick={() => setDays(p)}>
-              {p} ngày
-            </button>
-          ))}
-        </div>
-      </div>
+    <div className="space-y-4">
+      <PanelCard
+        icon={LifeBuoy}
+        title={t('Chất lượng hỗ trợ', 'Support quality')}
+        description={
+          <>
+            {slaText}{' '}
+            <Link to="/admin/security?tab=settings" className="text-blue-700 hover:underline underline-offset-2">
+              {t('Đổi thời hạn', 'Change targets')}
+            </Link>
+          </>
+        }
+        actions={rangePicker}
+        bodyClassName=""
+      >
+        <SummaryStrip
+          loading={sla.loading}
+          items={[
+            {
+              label: t('Ticket trong kỳ', 'Tickets in period'),
+              value: formatNumber(overall?.total),
+              hint: overall ? t(`${formatNumber(overall.resolved)} đã xử lý xong`, `${formatNumber(overall.resolved)} resolved`) : undefined,
+            },
+            {
+              label: t('Phản hồi đầu tiên (TB)', 'First response (avg)'),
+              value: formatMinutes(overall?.firstResponseMinutes?.avg),
+              hint:
+                overall?.firstResponseMinutes?.p95 != null
+                  ? t(`95% ticket dưới ${formatMinutes(overall.firstResponseMinutes.p95)}`, `95% under ${formatMinutes(overall.firstResponseMinutes.p95)}`)
+                  : t('Chưa có ticket được phản hồi', 'No responses yet'),
+            },
+            {
+              label: t('Vi phạm SLA phản hồi', 'Response SLA breaches'),
+              value: formatNumber(overall?.breachedFirstResponse),
+              tone: overall?.breachedFirstResponse ? 'danger' : undefined,
+            },
+            {
+              label: t('Thời gian xử lý xong (TB)', 'Resolution time (avg)'),
+              value: formatMinutes(overall?.resolutionMinutes?.avg),
+              hint: overall?.resolutionMinutes?.p95 != null ? `P95: ${formatMinutes(overall.resolutionMinutes.p95)}` : undefined,
+            },
+          ]}
+        />
+      </PanelCard>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard title="Ticket trong kỳ" value={formatNumber(overall?.total)} subtitle={overall ? `${formatNumber(overall.resolved)} đã xử lý xong` : ''} icon={Inbox} loading={sla.loading} />
-        <StatCard
-          title="Phản hồi đầu tiên (TB)"
-          value={formatMinutes(overall?.firstResponseMinutes?.avg)}
-          subtitle={overall?.firstResponseMinutes?.p95 != null ? `95% ticket dưới ${formatMinutes(overall.firstResponseMinutes.p95)}` : 'Chưa có ticket được phản hồi'}
-          icon={Timer}
-          loading={sla.loading}
-        />
-        <StatCard
-          title="Vi phạm SLA phản hồi"
-          value={formatNumber(overall?.breachedFirstResponse)}
-          alert={Boolean(overall?.breachedFirstResponse)}
-          icon={AlarmClock}
-          loading={sla.loading}
-        />
-        <StatCard
-          title="Thời gian xử lý xong (TB)"
-          value={formatMinutes(overall?.resolutionMinutes?.avg)}
-          subtitle={overall?.resolutionMinutes?.p95 != null ? `P95: ${formatMinutes(overall.resolutionMinutes.p95)}` : ''}
-          icon={CheckCircle2}
-          loading={sla.loading}
-        />
-      </div>
-
-      <TableCard header={<span className={ui.cardTitle}>Theo mức ưu tiên</span>}>
+      <PanelCard icon={Layers} title={t('Theo mức ưu tiên', 'By priority')} bodyClassName="overflow-x-auto">
         <table className={ui.table}>
           <thead>
             <tr>
-              <Th>Mức ưu tiên</Th>
-              <Th align="right">Thời hạn</Th>
+              <Th>{t('Mức ưu tiên', 'Priority')}</Th>
+              <Th align="right">{t('Thời hạn', 'Target')}</Th>
               <Th align="right">Ticket</Th>
-              <Th align="right">Phản hồi TB</Th>
+              <Th align="right">{t('Phản hồi TB', 'Avg response')}</Th>
               <Th align="right">P95</Th>
-              <Th align="right">Vi phạm</Th>
+              <Th align="right">{t('Vi phạm', 'Breaches')}</Th>
             </tr>
           </thead>
-          <tbody>
+          <TableBody loading={sla.loading} columns={6}>
             {(d?.byPriority || []).map((row) => (
               <tr key={row.priority} className={ui.tr}>
-                <Td><Badge tone={PRIORITY_TONES[row.priority]}>{PRIORITY_LABELS[row.priority]}</Badge></Td>
-                <Td align="right">{d.slaHours[row.priority]} giờ</Td>
-                <Td align="right"><span className="admin-num">{formatNumber(row.total)}</span></Td>
-                <Td align="right">{formatMinutes(row.firstResponseMinutes.avg)}</Td>
-                <Td align="right">{formatMinutes(row.firstResponseMinutes.p95)}</Td>
+                <Td>
+                  <Badge tone={PRIORITY_TONES[row.priority]}>{priorityLabel(row.priority)}</Badge>
+                </Td>
+                <Td align="right" className="tabular-nums">
+                  {d.slaHours[row.priority]} {t('giờ', 'h')}
+                </Td>
+                <Td align="right" className="tabular-nums">{formatNumber(row.total)}</Td>
+                <Td align="right" className="tabular-nums">{formatMinutes(row.firstResponseMinutes.avg)}</Td>
+                <Td align="right" className="tabular-nums">{formatMinutes(row.firstResponseMinutes.p95)}</Td>
                 <Td align="right">
-                  <span className={`admin-num font-semibold ${row.breachedFirstResponse ? 'text-red-700' : 'text-[#94A3B8]'}`}>{formatNumber(row.breachedFirstResponse)}</span>
+                  <span className={`tabular-nums font-medium ${row.breachedFirstResponse ? 'text-red-700' : 'text-slate-400'}`}>
+                    {formatNumber(row.breachedFirstResponse)}
+                  </span>
                 </Td>
               </tr>
             ))}
-          </tbody>
+          </TableBody>
         </table>
-      </TableCard>
+      </PanelCard>
 
-      <TableCard
-        header={
-          <>
-            <span className={ui.cardTitle}>Ticket chưa phản hồi đã quá hạn</span>
-            {d?.overdue?.count > 0 && <Badge tone="danger">{formatNumber(d.overdue.count)} ticket</Badge>}
-          </>
-        }
+      <PanelCard
+        icon={AlarmClock}
+        title={t('Ticket chưa phản hồi đã quá hạn', 'Overdue tickets awaiting a reply')}
+        actions={d?.overdue?.count > 0 && <Badge tone="danger">{formatNumber(d.overdue.count)} ticket</Badge>}
+        bodyClassName="overflow-x-auto"
       >
         {!sla.loading && !d?.overdue?.items?.length ? (
-          <EmptyState title="Không có ticket nào quá hạn" description="Mọi ticket đang mở đều đã được phản hồi trong thời hạn." />
+          <EmptyState
+            title={t('Không có ticket nào quá hạn', 'No overdue tickets')}
+            description={t('Mọi ticket đang mở đều đã được phản hồi trong thời hạn.', 'Every open ticket was answered within its target.')}
+          />
         ) : (
           <table className={ui.table}>
             <thead>
               <tr>
                 <Th>Ticket</Th>
-                <Th>Cửa hàng</Th>
-                <Th>Ưu tiên</Th>
-                <Th>Tạo lúc</Th>
-                <Th align="right">Đã chờ</Th>
-                <Th>Phụ trách</Th>
+                <Th>{t('Cửa hàng', 'Store')}</Th>
+                <Th>{t('Ưu tiên', 'Priority')}</Th>
+                <Th>{t('Tạo lúc', 'Created')}</Th>
+                <Th align="right">{t('Đã chờ', 'Waiting')}</Th>
+                <Th>{t('Phụ trách', 'Assignee')}</Th>
               </tr>
             </thead>
-            <tbody>
-              {(d?.overdue?.items || []).map((t) => (
-                <tr key={t.id} className={ui.tr}>
+            <TableBody loading={sla.loading} columns={6}>
+              {(d?.overdue?.items || []).map((ticket) => (
+                <tr key={ticket.id} className={ui.tr}>
                   <Td>
-                    <Link to={`/admin/support?ticket=${t.id}`} className="font-semibold text-[#0F172A] hover:text-[#2563EB]">#{t.id} · {t.subject}</Link>
+                    <Link to={`/admin/support?ticket=${ticket.id}`} className="font-medium text-slate-900 hover:text-blue-700 hover:underline underline-offset-2">
+                      #{ticket.id} · {ticket.subject}
+                    </Link>
                   </Td>
-                  <Td>{t.store?.name || '–'}</Td>
-                  <Td><Badge tone={PRIORITY_TONES[t.priority]}>{PRIORITY_LABELS[t.priority]}</Badge></Td>
-                  <Td>{formatVNDateTime(t.createdAt)}</Td>
-                  <Td align="right"><span className="font-semibold text-red-700">{formatMinutes(t.waitingMinutes)}</span></Td>
-                  <Td>{t.assignee?.fullName || <span className="text-[#94A3B8]">Chưa phân công</span>}</Td>
+                  <Td>{ticket.store?.name || '–'}</Td>
+                  <Td>
+                    <Badge tone={PRIORITY_TONES[ticket.priority]}>{priorityLabel(ticket.priority)}</Badge>
+                  </Td>
+                  <Td className="tabular-nums">{formatVNDateTime(ticket.createdAt)}</Td>
+                  <Td align="right">
+                    <span className="font-medium text-red-700 tabular-nums">{formatMinutes(ticket.waitingMinutes)}</span>
+                  </Td>
+                  <Td>{ticket.assignee?.fullName || <span className="text-slate-400">{t('Chưa phân công', 'Unassigned')}</span>}</Td>
                 </tr>
               ))}
-            </tbody>
+            </TableBody>
           </table>
         )}
-      </TableCard>
-      {d?.truncated && <p className="text-[12px] text-[#64748B]">Kỳ này có hơn 5.000 ticket; số liệu tính trên 5.000 ticket mới nhất.</p>}
+      </PanelCard>
+      {d?.truncated && (
+        <p className="text-[12px] text-slate-500">
+          {t(
+            'Kỳ này có hơn 5.000 ticket; số liệu tính trên 5.000 ticket mới nhất.',
+            'This period has over 5,000 tickets; figures use the latest 5,000.'
+          )}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,9 +1,9 @@
 // Bộ component dùng chung chuẩn Production B2B SaaS cho Quản trị viên hệ thống (Admin).
-// Executive Command-Center Edition: Tích hợp Motion Animations, Glassmorphism, Song ngữ Vi/En toàn diện.
+// Phong cách tối giản (Swiss / Linear): phẳng, viền mảnh, một màu nhấn, song ngữ Vi/En.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion } from 'motion/react';
 import {
   Search,
   X,
@@ -15,10 +15,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Activity,
   TrendingUp,
   TrendingDown,
-  Check,
 } from 'lucide-react';
 import { adminStyles as ui } from '../adminStyles';
 import { useTranslation } from '../../../i18n/useTranslation';
@@ -54,7 +52,7 @@ export function Checkbox({ checked = false, indeterminate = false, onChange, dis
         disabled={disabled}
         onChange={(e) => onChange && onChange(e.target.checked, e)}
         aria-label={ariaLabel}
-        className="w-4 h-4 rounded-md border-slate-300 text-blue-600 focus:ring-blue-500/20 focus:ring-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        className="w-4 h-4 rounded border-slate-300 accent-blue-600 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
       />
     </label>
   );
@@ -67,7 +65,7 @@ export function PageHeader({ title, description, badge, actions, children }) {
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-[24px] sm:text-[30px] font-black tracking-tight text-slate-900 leading-tight">
+            <h1 className="text-[22px] sm:text-[24px] font-semibold tracking-tight text-slate-900 leading-tight">
               {title}
             </h1>
             {badge}
@@ -92,20 +90,12 @@ export function LiveIndicator({ status = 'synced', lastUpdated, onRefresh, loadi
   const isError = status === 'error';
 
   return (
-    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 backdrop-blur-md border border-slate-200/90 text-[12px] text-slate-700 shadow-2xs">
-      <span className="relative flex h-2.5 w-2.5">
-        <span
-          className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-            isError ? 'bg-rose-400' : 'bg-emerald-400'
-          }`}
-        />
-        <span
-          className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-            isError ? 'bg-rose-500' : 'bg-emerald-500'
-          }`}
-        />
-      </span>
-      <span className="font-semibold text-slate-600">
+    <div className="inline-flex items-center gap-2 h-7 px-2.5 rounded-md bg-white border border-slate-200 text-[12px] text-slate-600">
+      <span
+        className={`inline-flex rounded-full h-2 w-2 ${isError ? 'bg-red-500' : 'bg-emerald-500'}`}
+        aria-hidden="true"
+      />
+      <span className="font-medium tabular-nums">
         {loading
           ? isEn ? 'Syncing…' : 'Đang đồng bộ…'
           : lastUpdated
@@ -117,8 +107,9 @@ export function LiveIndicator({ status = 'synced', lastUpdated, onRefresh, loadi
           type="button"
           onClick={onRefresh}
           disabled={loading}
-          className="p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer disabled:opacity-40 transition-colors"
+          className="p-1 rounded text-slate-500 hover:text-slate-900 hover:bg-slate-100 cursor-pointer disabled:opacity-40 transition-colors"
           title={isEn ? 'Sync now' : 'Đồng bộ ngay'}
+          aria-label={isEn ? 'Sync now' : 'Đồng bộ ngay'}
         >
           <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin text-blue-600' : ''}`} />
         </button>
@@ -130,7 +121,7 @@ export function LiveIndicator({ status = 'synced', lastUpdated, onRefresh, loadi
 /** Underlined tabs with smooth animated sliding indicator */
 export function Tabs({ tabs, value, onChange }) {
   return (
-    <div className="relative border-b border-slate-200/80 flex gap-6 overflow-x-auto scrollbar-none" role="tablist">
+    <div className="relative border-b border-slate-200 flex gap-5 overflow-x-auto scrollbar-none" role="tablist">
       {tabs.map((tab) => {
         const active = value === tab.value;
         return (
@@ -140,18 +131,16 @@ export function Tabs({ tabs, value, onChange }) {
             role="tab"
             aria-selected={active}
             onClick={() => onChange(tab.value)}
-            className={`relative pb-3.5 pt-1 text-[13px] sm:text-[14px] whitespace-nowrap cursor-pointer transition-colors ${
-              active
-                ? 'text-blue-600 font-bold'
-                : 'text-slate-500 hover:text-slate-900 font-medium'
+            className={`relative pb-3 pt-1 text-[13px] font-medium whitespace-nowrap cursor-pointer transition-colors ${
+              active ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
             }`}
           >
             <span className="relative z-10 flex items-center gap-2">
               {tab.label}
               {tab.count != null && (
                 <span
-                  className={`px-1.5 py-0.5 rounded-full text-[11px] font-bold tabular-nums transition-colors ${
-                    active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                  className={`px-1.5 rounded text-[11px] font-medium tabular-nums ${
+                    active ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
                   }`}
                 >
                   {tab.count}
@@ -161,8 +150,8 @@ export function Tabs({ tabs, value, onChange }) {
             {active && (
               <motion.div
                 layoutId="admin-active-tab-line"
-                className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-blue-600 to-indigo-600 rounded-full"
-                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                className="absolute -bottom-px left-0 right-0 h-0.5 bg-blue-600"
+                transition={{ duration: 0.15, ease: 'easeOut' }}
               />
             )}
           </button>
@@ -178,20 +167,20 @@ export function SearchInput({ value, onChange, placeholder, className = '' }) {
 
   return (
     <div className={`relative ${className}`}>
-      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
       <input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder || (isEn ? 'Search…' : 'Tìm kiếm…')}
         aria-label={placeholder || (isEn ? 'Search' : 'Tìm kiếm')}
-        className={`${ui.input} pl-9.5 pr-8 h-10 text-[13px]`}
+        className={`${ui.input} pl-9 pr-8 h-9`}
       />
       {value && (
         <button
           type="button"
           onClick={() => onChange('')}
-          className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer transition-colors"
           aria-label={isEn ? 'Clear search' : 'Xóa tìm kiếm'}
         >
           <X className="w-3.5 h-3.5" />
@@ -208,7 +197,7 @@ export function FilterSelect({ value, onChange, options, label, className = '' }
       value={value}
       onChange={(e) => onChange(e.target.value)}
       aria-label={label}
-      className={`${ui.select.replace('w-full ', '')} h-10 w-full sm:w-auto text-[13px] font-medium ${className}`}
+      className={`${ui.select.replace('w-full ', '')} h-9 w-full sm:w-auto ${className}`}
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>
@@ -230,13 +219,13 @@ export function FilterChips({ chips, onClearAll }) {
       {chips.map((chip) => (
         <span
           key={chip.key}
-          className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg bg-blue-50/80 border border-blue-200/80 text-blue-700 text-[12px] font-semibold shadow-2xs"
+          className="inline-flex items-center gap-1 pl-2 pr-1 h-6 rounded-md bg-slate-100 text-slate-700 text-[12px] font-medium ring-1 ring-inset ring-slate-200"
         >
           {chip.label}
           <button
             type="button"
             onClick={chip.onRemove}
-            className="p-0.5 rounded hover:bg-blue-200/60 cursor-pointer text-blue-600 transition-colors"
+            className="p-0.5 rounded hover:bg-slate-200 cursor-pointer text-slate-500 hover:text-slate-900 transition-colors"
             aria-label={`${isEn ? 'Remove filter' : 'Bỏ lọc'} ${chip.label}`}
           >
             <X className="w-3 h-3" />
@@ -247,7 +236,7 @@ export function FilterChips({ chips, onClearAll }) {
         <button
           type="button"
           onClick={onClearAll}
-          className="text-[12px] text-slate-500 hover:text-slate-900 font-semibold cursor-pointer underline underline-offset-2 ml-1 transition-colors"
+          className="text-[12px] text-slate-500 hover:text-slate-900 font-medium cursor-pointer underline underline-offset-2 ml-1 transition-colors"
         >
           {isEn ? 'Clear all' : 'Xóa tất cả'}
         </button>
@@ -261,23 +250,23 @@ export function Toolbar({ children }) {
 }
 
 const BADGE_TONES = {
-  success: 'bg-emerald-50 text-emerald-700 border-emerald-200/80 [--dot:#10B981] shadow-[0_1px_4px_rgba(16,185,129,0.15)]',
-  warning: 'bg-amber-50 text-amber-800 border-amber-200/80 [--dot:#F59E0B] shadow-[0_1px_4px_rgba(245,158,11,0.15)]',
-  danger: 'bg-rose-50 text-rose-700 border-rose-200/80 [--dot:#F43F5E] shadow-[0_1px_4px_rgba(244,63,94,0.15)]',
-  info: 'bg-blue-50 text-blue-700 border-blue-200/80 [--dot:#3B82F6] shadow-[0_1px_4px_rgba(59,130,246,0.15)]',
-  neutral: 'bg-slate-100 text-slate-700 border-slate-200 [--dot:#94A3B8]',
-  purple: 'bg-purple-50 text-purple-700 border-purple-200/80 [--dot:#A855F7] shadow-[0_1px_4px_rgba(168,85,247,0.15)]',
+  success: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 [--dot:var(--color-emerald-500)]',
+  warning: 'bg-amber-50 text-amber-800 ring-amber-600/20 [--dot:var(--color-amber-500)]',
+  danger: 'bg-red-50 text-red-700 ring-red-600/20 [--dot:var(--color-red-500)]',
+  info: 'bg-blue-50 text-blue-700 ring-blue-600/20 [--dot:var(--color-blue-500)]',
+  neutral: 'bg-slate-100 text-slate-700 ring-slate-500/20 [--dot:var(--color-slate-400)]',
+  purple: 'bg-violet-50 text-violet-700 ring-violet-600/20 [--dot:var(--color-violet-500)]',
 };
 
 /** Status pill with a coloured dot. Text always states the status; colour only supports it. */
 export function Badge({ tone = 'neutral', children, dot = true, className = '' }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold border whitespace-nowrap ${
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[12px] font-medium ring-1 ring-inset whitespace-nowrap ${
         BADGE_TONES[tone] || BADGE_TONES.neutral
       } ${className}`}
     >
-      {dot && <span className="w-1.5 h-1.5 rounded-full bg-(--dot) shrink-0 animate-pulse" aria-hidden="true" />}
+      {dot && <span className="w-1.5 h-1.5 rounded-full bg-(--dot) shrink-0" aria-hidden="true" />}
       {children}
     </span>
   );
@@ -293,10 +282,8 @@ export function Avatar({ name, size = 32, tone = 'neutral' }) {
     .join('');
   return (
     <span
-      className={`rounded-full shrink-0 inline-flex items-center justify-center font-bold tracking-tight border shadow-2xs ${
-        tone === 'brand'
-          ? 'bg-linear-to-br from-blue-50 to-indigo-100 text-blue-700 border-blue-200/80'
-          : 'bg-slate-100 text-slate-700 border-slate-200'
+      className={`rounded-full shrink-0 inline-flex items-center justify-center font-semibold ${
+        tone === 'brand' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
       }`}
       style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }}
       aria-hidden="true"
@@ -306,7 +293,7 @@ export function Avatar({ name, size = 32, tone = 'neutral' }) {
   );
 }
 
-/** Production KPI Stat Card with Motion hover lift, radiant accent glow, and trend */
+/** KPI card: label, tabular value, optional trend and subtitle. Clickable when `to`/`onClick` is set. */
 export function StatCard({
   title,
   value,
@@ -321,63 +308,54 @@ export function StatCard({
   alert = false,
 }) {
   const content = (
-    <motion.div
-      whileHover={{ y: -4, transition: { duration: 0.2 } }}
-      className={`relative p-5 bg-white/95 backdrop-blur-md rounded-2xl border transition-all duration-300 ${
-        alert
-          ? 'border-amber-300 bg-amber-50/20 shadow-[0_4px_20px_-4px_rgba(245,158,11,0.15)] ring-1 ring-amber-300/40'
-          : 'border-slate-200/80 hover:border-blue-200/80 shadow-[0_4px_20px_-4px_rgba(15,23,42,0.06),0_2px_6px_-2px_rgba(15,23,42,0.03)] hover:shadow-[0_12px_28px_-6px_rgba(37,99,235,0.12)]'
-      } ${to || onClick ? 'group cursor-pointer' : ''}`}
+    <div
+      className={`relative h-full p-4 bg-white rounded-xl border shadow-xs transition-colors duration-150 ${
+        alert ? 'border-amber-300' : 'border-slate-200'
+      } ${to || onClick ? 'hover:border-slate-300 hover:bg-slate-50/60 cursor-pointer' : ''}`}
     >
-      <div className={`absolute top-0 left-6 right-6 h-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
-        alert ? 'bg-amber-400' : 'bg-linear-to-r from-blue-500 to-indigo-500'
-      }`} />
-
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[13px] font-semibold text-slate-500 tracking-[-0.01em]">{title}</p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[13px] font-medium text-slate-500">{title}</p>
         {Icon && (
-          <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform duration-200 ${iconBg}`}>
-            <Icon className="w-5 h-5" />
-          </div>
+          <span className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${iconBg}`}>
+            <Icon className="w-4 h-4" aria-hidden="true" />
+          </span>
         )}
       </div>
 
-      <div className="mt-3">
-        <p className="admin-num text-[30px] font-black text-slate-900 tracking-[-0.03em] leading-tight">
-          {loading ? (
-            <span className="inline-block w-20 h-8 rounded-lg bg-slate-100 animate-pulse align-middle" />
-          ) : (
-            value
-          )}
-        </p>
-      </div>
+      <p className="admin-num mt-2 text-[28px] font-semibold text-slate-900 tabular-nums leading-tight">
+        {loading ? (
+          <span className="inline-block w-20 h-7 rounded-md bg-slate-100 animate-pulse align-middle" />
+        ) : (
+          value
+        )}
+      </p>
 
       {(subtitle || change) && (
-        <div className="mt-2.5 flex items-center gap-2 text-[12px]">
+        <div className="mt-1.5 flex items-center gap-2 text-[12px]">
           {change && (
             <span
-              className={`inline-flex items-center gap-0.5 font-bold ${
-                trend === 'up' ? 'text-emerald-600' : trend === 'down' ? 'text-rose-600' : 'text-slate-600'
+              className={`inline-flex items-center gap-0.5 font-medium tabular-nums ${
+                trend === 'up' ? 'text-emerald-700' : trend === 'down' ? 'text-red-700' : 'text-slate-600'
               }`}
             >
-              {trend === 'up' && <TrendingUp className="w-3.5 h-3.5" />}
-              {trend === 'down' && <TrendingDown className="w-3.5 h-3.5" />}
+              {trend === 'up' && <TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />}
+              {trend === 'down' && <TrendingDown className="w-3.5 h-3.5" aria-hidden="true" />}
               {change}
             </span>
           )}
           {subtitle && (
-            <span className={`truncate font-medium ${alert ? 'text-amber-800 font-semibold' : 'text-slate-500'}`}>
+            <span className={`truncate ${alert ? 'text-amber-800 font-medium' : 'text-slate-500'}`}>
               {subtitle}
             </span>
           )}
         </div>
       )}
-    </motion.div>
+    </div>
   );
 
   if (to) {
     return (
-      <Link to={to} className="block focus-visible:outline-none">
+      <Link to={to} className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
         {content}
       </Link>
     );
@@ -385,7 +363,7 @@ export function StatCard({
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className="w-full text-left focus-visible:outline-none">
+      <button type="button" onClick={onClick} className="w-full h-full text-left rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2">
         {content}
       </button>
     );
@@ -399,7 +377,7 @@ export function TableCard({ children, header, footer }) {
   return (
     <div className={`${ui.card} overflow-hidden`}>
       {header && (
-        <div className="px-5 py-4 border-b border-slate-100 bg-linear-to-r from-slate-50/60 via-white to-transparent flex items-center justify-between gap-3">
+        <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3">
           {header}
         </div>
       )}
@@ -418,7 +396,8 @@ export function Th({ children, className = '', align = 'left', sortKey, currentS
       <th
         scope="col"
         onClick={() => onSort(sortKey)}
-        className={`px-4 py-3.5 bg-slate-50/90 border-b border-slate-200/80 text-[11px] font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap cursor-pointer hover:bg-slate-100 hover:text-slate-900 transition-colors select-none ${
+        aria-sort={isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+        className={`px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap cursor-pointer hover:text-slate-900 transition-colors select-none ${
           ALIGN[align]
         } ${className}`}
       >
@@ -427,9 +406,9 @@ export function Th({ children, className = '', align = 'left', sortKey, currentS
           <span className="text-slate-400">
             {isSorted ? (
               sortDirection === 'asc' ? (
-                <ArrowUp className="w-3.5 h-3.5 text-blue-600" />
+                <ArrowUp className="w-3 h-3 text-slate-900" />
               ) : (
-                <ArrowDown className="w-3.5 h-3.5 text-blue-600" />
+                <ArrowDown className="w-3 h-3 text-slate-900" />
               )
             ) : (
               <ArrowUpDown className="w-3 h-3 opacity-40 hover:opacity-100" />
@@ -443,7 +422,7 @@ export function Th({ children, className = '', align = 'left', sortKey, currentS
   return (
     <th
       scope="col"
-      className={`px-4 py-3.5 bg-slate-50/90 border-b border-slate-200/80 text-[11px] font-bold text-slate-600 uppercase tracking-wider whitespace-nowrap select-none ${ALIGN[align]} ${className}`}
+      className={`px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap select-none ${ALIGN[align]} ${className}`}
     >
       {children}
     </th>
@@ -452,7 +431,7 @@ export function Th({ children, className = '', align = 'left', sortKey, currentS
 
 export function Td({ children, className = '', align = 'left' }) {
   return (
-    <td className={`px-4 py-3.5 text-[13px] text-slate-700 align-middle ${ALIGN[align]} ${className}`}>
+    <td className={`px-4 py-3 text-[13px] text-slate-700 align-middle ${ALIGN[align]} ${className}`}>
       {children}
     </td>
   );
@@ -462,7 +441,7 @@ export function SkeletonRows({ columns, rows = 6 }) {
   return Array.from({ length: rows }).map((_, i) => (
     <tr key={i} className="border-b border-slate-100 last:border-0">
       {Array.from({ length: columns }).map((__, j) => (
-        <td key={j} className="px-4 py-4">
+        <td key={j} className="px-4 py-3.5">
           <div className="h-4 rounded-md bg-slate-100 animate-pulse" style={{ width: `${45 + ((i + j) % 4) * 15}%` }} />
         </td>
       ))}
@@ -475,11 +454,11 @@ export function EmptyState({ title, description, action }) {
   const isEn = language === 'en';
 
   return (
-    <div className="px-6 py-16 text-center">
-      <span className="mx-auto w-14 h-14 rounded-2xl bg-linear-to-br from-slate-50 to-slate-100 text-slate-500 flex items-center justify-center border border-slate-200/80 shadow-xs">
-        <Inbox className="w-7 h-7" />
+    <div className="px-6 py-14 text-center">
+      <span className="mx-auto w-10 h-10 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center">
+        <Inbox className="w-5 h-5" aria-hidden="true" />
       </span>
-      <p className="mt-4 text-[15px] font-bold text-slate-900 tracking-tight">
+      <p className="mt-3 text-[14px] font-semibold text-slate-900">
         {title || (isEn ? 'No records found' : 'Chưa có dữ liệu')}
       </p>
       {description && <p className="mt-1 text-[13px] text-slate-500 max-w-[45ch] mx-auto leading-relaxed">{description}</p>}
@@ -494,10 +473,10 @@ export function ErrorState({ message, onRetry }) {
 
   return (
     <div className="px-6 py-14 text-center">
-      <span className="mx-auto w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200/80 shadow-xs">
-        <AlertTriangle className="w-7 h-7" />
+      <span className="mx-auto w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
+        <AlertTriangle className="w-5 h-5" aria-hidden="true" />
       </span>
-      <p className="mt-4 text-[15px] font-bold text-slate-900">
+      <p className="mt-3 text-[14px] font-semibold text-slate-900">
         {isEn ? 'Failed to load data' : 'Không tải được dữ liệu'}
       </p>
       <p className="mt-1 text-[13px] text-slate-500 max-w-[50ch] mx-auto leading-relaxed">
@@ -555,10 +534,10 @@ export function Pagination({ pagination, onPage, onLimitChange, disabled, unit }
   const to = Math.min(page * limit, total);
 
   return (
-    <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-[13px]">
+    <div className="px-5 py-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-[13px]">
       <div className="flex items-center gap-3 text-slate-500">
         <span>
-          {isEn ? 'Showing' : 'Hiển thị'} <span className="font-bold text-slate-900">{from}–{to}</span> {isEn ? 'of' : 'trong'} <span className="font-bold text-slate-900">{total}</span> {displayUnit}
+          {isEn ? 'Showing' : 'Hiển thị'} <span className="font-medium text-slate-900 tabular-nums">{from}–{to}</span> {isEn ? 'of' : 'trong'} <span className="font-medium text-slate-900 tabular-nums">{total}</span> {displayUnit}
         </span>
         {onLimitChange && (
           <div className="flex items-center gap-1.5 pl-3 border-l border-slate-200">
@@ -567,7 +546,8 @@ export function Pagination({ pagination, onPage, onLimitChange, disabled, unit }
               value={limit}
               onChange={(e) => onLimitChange(Number(e.target.value))}
               disabled={disabled}
-              className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-900 text-[12px] font-semibold cursor-pointer shadow-2xs hover:border-slate-300"
+              aria-label={isEn ? 'Rows per page' : 'Số dòng mỗi trang'}
+              className="h-7 px-2 rounded-md border border-slate-200 bg-white text-slate-900 text-[12px] font-medium tabular-nums cursor-pointer hover:border-slate-300"
             >
               {[10, 20, 50, 100].map((lim) => (
                 <option key={lim} value={lim}>
@@ -584,18 +564,18 @@ export function Pagination({ pagination, onPage, onLimitChange, disabled, unit }
           type="button"
           onClick={() => onPage(page - 1)}
           disabled={disabled || page <= 1}
-          className={`${ui.btnSecondary} px-3 py-1.5 text-[12px]`}
+          className={`${ui.btnSecondary} h-8 px-3 text-[12px]`}
         >
           {isEn ? 'Previous' : 'Trước'}
         </button>
-        <span className="text-[13px] text-slate-600 px-2 font-semibold">
+        <span className="text-[13px] text-slate-600 px-2 font-medium tabular-nums">
           {isEn ? 'Page' : 'Trang'} {page} / {Math.max(totalPages, 1)}
         </span>
         <button
           type="button"
           onClick={() => onPage(page + 1)}
           disabled={disabled || page >= totalPages}
-          className={`${ui.btnSecondary} px-3 py-1.5 text-[12px]`}
+          className={`${ui.btnSecondary} h-8 px-3 text-[12px]`}
         >
           {isEn ? 'Next' : 'Sau'}
         </button>
@@ -612,16 +592,17 @@ export function BulkActionBar({ selectedCount = 0, onClear, actions = [] }) {
   if (selectedCount <= 0) return null;
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 20, scale: 0.95 }}
-      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-950/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-[0_20px_50px_rgba(15,23,42,0.4)] flex items-center gap-4 border border-slate-800 max-w-[95vw]"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 8 }}
+      transition={{ duration: 0.15, ease: 'easeOut' }}
+      className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl flex items-center gap-4 max-w-[95vw]"
     >
       <div className="flex items-center gap-2.5 pr-3 border-r border-slate-800">
-        <span className="w-6 h-6 rounded-full bg-linear-to-r from-blue-600 to-indigo-600 text-white text-[11px] font-bold flex items-center justify-center shadow-xs">
+        <span className="min-w-6 h-6 px-1.5 rounded-md bg-blue-600 text-white text-[11px] font-semibold tabular-nums flex items-center justify-center">
           {selectedCount}
         </span>
-        <span className="text-[13px] font-semibold whitespace-nowrap">
+        <span className="text-[13px] font-medium whitespace-nowrap">
           {isEn ? `Selected ${selectedCount}` : `Đã chọn ${selectedCount}`}
         </span>
       </div>
@@ -632,12 +613,12 @@ export function BulkActionBar({ selectedCount = 0, onClear, actions = [] }) {
             type="button"
             onClick={act.onClick}
             disabled={act.disabled}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[13px] font-semibold transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed ${
+            className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[13px] font-medium transition-colors cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed ${
               act.danger
-                ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-xs'
+                ? 'bg-red-600 hover:bg-red-500 text-white'
                 : act.variant === 'primary'
-                ? 'bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-xs'
-                : 'bg-slate-800/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80'
+                ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-100'
             }`}
           >
             {act.icon && <act.icon className="w-3.5 h-3.5" />}
@@ -649,7 +630,7 @@ export function BulkActionBar({ selectedCount = 0, onClear, actions = [] }) {
         <button
           type="button"
           onClick={onClear}
-          className="text-[12px] text-slate-400 hover:text-white underline cursor-pointer ml-auto pl-2 whitespace-nowrap"
+          className="text-[12px] text-slate-300 hover:text-white underline underline-offset-2 cursor-pointer ml-auto pl-2 whitespace-nowrap"
         >
           {isEn ? 'Deselect' : 'Bỏ chọn'}
         </button>
@@ -687,7 +668,7 @@ export function RowMenu({ items, label }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+        className="p-1.5 rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
         aria-label={displayLabel}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -697,7 +678,7 @@ export function RowMenu({ items, label }) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-30 mt-1 min-w-52.5 rounded-2xl border border-slate-200/90 bg-white/95 backdrop-blur-md py-1.5 shadow-[0_16px_36px_-6px_rgba(15,23,42,0.15)] ring-1 ring-black/5"
+          className="absolute right-0 z-30 mt-1 min-w-52 rounded-lg border border-slate-200 bg-white p-1 shadow-lg"
         >
           {visible.map((item) => (
             <button
@@ -709,13 +690,13 @@ export function RowMenu({ items, label }) {
                 setOpen(false);
                 item.onClick();
               }}
-              className={`w-full text-left px-3.5 py-2 text-[13px] font-semibold flex items-center gap-2.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
+              className={`w-full text-left px-2.5 py-1.5 rounded-md text-[13px] flex items-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
                 item.danger
-                  ? 'text-rose-600 hover:bg-rose-50'
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'text-red-600 hover:bg-red-50'
+                  : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
-              {item.icon && <item.icon className="w-4 h-4 shrink-0" />}
+              {item.icon && <item.icon className="w-4 h-4 shrink-0" aria-hidden="true" />}
               <span className="truncate">{item.label}</span>
             </button>
           ))}
@@ -742,32 +723,32 @@ export function Modal({ title, description, onClose, busy, children, footer, wid
       onMouseDown={(e) => e.target === e.currentTarget && !busy && onClose()}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.94, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.94, y: 16 }}
-        transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-        className={`bg-white rounded-3xl w-full ${width} border border-slate-200/90 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.3)] overflow-hidden ring-1 ring-black/5`}
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.98 }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
+        className={`bg-white rounded-xl w-full ${width} border border-slate-200 shadow-xl overflow-hidden`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
-        <div className="flex items-start justify-between gap-3 px-6 pt-6 pb-2">
+        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-1">
           <div>
-            <h3 className="text-[19px] font-black text-slate-900 tracking-tight">{title}</h3>
-            {description && <p className="mt-1 text-[13px] text-slate-500 leading-relaxed font-normal">{description}</p>}
+            <h3 className="text-[16px] font-semibold text-slate-900">{title}</h3>
+            {description && <p className="mt-1 text-[13px] text-slate-500 leading-relaxed">{description}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
             aria-label={isEn ? 'Close' : 'Đóng'}
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="px-6 py-4">{children}</div>
-        {footer && <div className="px-6 py-4.5 bg-slate-50/80 border-t border-slate-100 flex justify-end gap-2.5">{footer}</div>}
+        <div className="px-5 py-4">{children}</div>
+        {footer && <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">{footer}</div>}
       </motion.div>
     </div>
   );
@@ -821,7 +802,7 @@ export function ConfirmDialog({ title, description, confirmLabel, danger, reason
         <div className="space-y-4">
           {reason && (
             <label className="block">
-              <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">
+              <span className="block text-[13px] font-medium text-slate-700 mb-1.5">
                 {reason.label || (isEn ? 'Reason' : 'Lý do')}{!reason.required && (isEn ? ' (optional)' : ' (không bắt buộc)')}
               </span>
               <textarea
@@ -832,7 +813,7 @@ export function ConfirmDialog({ title, description, confirmLabel, danger, reason
                 className={ui.input}
                 autoFocus
               />
-              <span className="block text-[12px] text-slate-500 mt-1.5 font-normal">
+              <span className="block text-[12px] text-slate-500 mt-1.5">
                 {reason.required && !reasonOk
                   ? isEn
                     ? `Must be at least ${reason.minLength || 5} characters. `
@@ -844,7 +825,7 @@ export function ConfirmDialog({ title, description, confirmLabel, danger, reason
           )}
           {password && (
             <label className="block">
-              <span className="block text-[13px] font-semibold text-slate-700 mb-1.5">
+              <span className="block text-[13px] font-medium text-slate-700 mb-1.5">
                 {isEn ? 'Your confirmation password' : 'Mật khẩu xác nhận của bạn'}
               </span>
               <input
@@ -854,7 +835,7 @@ export function ConfirmDialog({ title, description, confirmLabel, danger, reason
                 autoComplete="current-password"
                 className={ui.input}
               />
-              <span className="block text-[12px] text-slate-500 mt-1.5 font-normal">
+              <span className="block text-[12px] text-slate-500 mt-1.5">
                 {password.hint || (isEn ? 'Sensitive operations require confirming your password.' : 'Thao tác nhạy cảm cần xác nhận lại mật khẩu để bảo vệ hệ thống.')}
               </span>
             </label>
@@ -879,32 +860,32 @@ export function Drawer({ title, subtitle, badge, tabs, activeTab, onTabChange, o
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
       <div
-        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-slate-900/40"
         onClick={onClose}
       />
       <motion.aside
         initial={{ x: '100%' }}
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-        className={`absolute inset-y-0 right-0 w-full ${width} bg-white border-l border-slate-200 shadow-[0_25px_60px_-15px_rgba(15,23,42,0.3)] flex flex-col`}
+        transition={{ duration: 0.2, ease: [0.32, 0.72, 0, 1] }}
+        className={`absolute inset-y-0 right-0 w-full ${width} bg-white border-l border-slate-200 shadow-xl flex flex-col`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
       >
-        <div className="px-6 py-5 border-b border-slate-100 bg-linear-to-r from-slate-50/60 via-white to-transparent">
+        <div className="px-5 pt-4 border-b border-slate-200">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <h3 className="text-[19px] font-black text-slate-900 tracking-tight truncate">{title}</h3>
+                <h3 className="text-[16px] font-semibold text-slate-900 truncate">{title}</h3>
                 {badge}
               </div>
-              {subtitle && <p className="text-[13px] text-slate-500 mt-0.5 truncate font-normal">{subtitle}</p>}
+              {subtitle && <p className="text-[13px] text-slate-500 mt-0.5 truncate">{subtitle}</p>}
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
               aria-label={isEn ? 'Close' : 'Đóng'}
             >
               <X className="w-5 h-5" />
@@ -912,7 +893,7 @@ export function Drawer({ title, subtitle, badge, tabs, activeTab, onTabChange, o
           </div>
 
           {tabs && tabs.length > 0 && (
-            <div className="flex gap-4 mt-4 -mb-1 overflow-x-auto scrollbar-none border-b border-slate-200/60" role="tablist">
+            <div className="flex gap-5 mt-3 overflow-x-auto scrollbar-none" role="tablist">
               {tabs.map((tab) => {
                 const active = activeTab === tab.key;
                 return (
@@ -922,21 +903,21 @@ export function Drawer({ title, subtitle, badge, tabs, activeTab, onTabChange, o
                     role="tab"
                     aria-selected={active}
                     onClick={() => onTabChange && onTabChange(tab.key)}
-                    className={`relative pb-2.5 text-[13px] font-bold cursor-pointer transition-colors whitespace-nowrap ${
-                      active ? 'text-blue-600' : 'text-slate-500 hover:text-slate-900'
+                    className={`relative pb-2.5 text-[13px] font-medium cursor-pointer transition-colors whitespace-nowrap ${
+                      active ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'
                     }`}
                   >
                     {tab.label}
                     {tab.count != null && (
-                      <span className="ml-1.5 text-[11px] px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-700 font-bold">
+                      <span className="ml-1.5 text-[11px] px-1.5 rounded bg-slate-100 text-slate-600 font-medium tabular-nums">
                         {tab.count}
                       </span>
                     )}
                     {active && (
                       <motion.div
                         layoutId="drawer-tab-line"
-                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full"
-                        transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                        className="absolute -bottom-px left-0 right-0 h-0.5 bg-blue-600"
+                        transition={{ duration: 0.15, ease: 'easeOut' }}
                       />
                     )}
                   </button>
@@ -946,9 +927,9 @@ export function Drawer({ title, subtitle, badge, tabs, activeTab, onTabChange, o
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 text-[13px]">{children}</div>
+        <div className="flex-1 overflow-y-auto p-5 space-y-6 text-[13px]">{children}</div>
 
-        {footer && <div className="px-6 py-4.5 border-t border-slate-100 bg-slate-50/60 flex flex-wrap justify-end gap-2.5">{footer}</div>}
+        {footer && <div className="px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-wrap justify-end gap-2">{footer}</div>}
       </motion.aside>
     </div>
   );
@@ -959,11 +940,11 @@ export function DetailList({ rows }) {
   const isEn = language === 'en';
 
   return (
-    <dl className="rounded-2xl border border-slate-200/80 divide-y divide-slate-100 bg-white overflow-hidden shadow-2xs">
+    <dl className="rounded-lg border border-slate-200 divide-y divide-slate-100 bg-white overflow-hidden">
       {rows.map(([label, value]) => (
-        <div key={label} className="flex items-start justify-between gap-4 px-4 py-3.5 hover:bg-slate-50/50 transition-colors">
-          <dt className="text-[13px] font-semibold text-slate-500 shrink-0">{label}</dt>
-          <dd className="text-[13px] text-slate-900 font-semibold text-right wrap-break-word min-w-0">
+        <div key={label} className="flex items-start justify-between gap-4 px-4 py-2.5">
+          <dt className="text-[13px] text-slate-500 shrink-0">{label}</dt>
+          <dd className="text-[13px] text-slate-900 font-medium text-right wrap-break-word min-w-0">
             {value ?? <span className="text-slate-400 font-normal">{isEn ? 'Not set' : 'Chưa có'}</span>}
           </dd>
         </div>
@@ -976,10 +957,57 @@ export function Section({ title, children, action }) {
   return (
     <section>
       <div className="flex items-baseline justify-between gap-3 mb-2.5">
-        <h4 className="text-[14px] font-bold text-slate-900 tracking-tight">{title}</h4>
+        <h4 className="text-[13px] font-semibold text-slate-900">{title}</h4>
         {action}
       </div>
       {children}
     </section>
+  );
+}
+
+/**
+ * Thẻ nội dung có tiêu đề chuẩn: icon · tên · mô tả · thao tác bên phải.
+ * Dùng cho mọi khối trong panel để các trang trông đồng nhất.
+ */
+export function PanelCard({ icon: Icon, title, description, actions, children, footer, bodyClassName = 'p-5' }) {
+  return (
+    <section className={`${ui.card} overflow-hidden`}>
+      {(title || actions) && (
+        <div className="px-5 py-3.5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            {Icon && (
+              <span className="w-8 h-8 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                <Icon className="w-4 h-4" aria-hidden="true" />
+              </span>
+            )}
+            <div className="min-w-0">
+              <h2 className="text-[14px] font-semibold text-slate-900">{title}</h2>
+              {description && <p className="text-[12px] text-slate-500 mt-0.5 leading-relaxed">{description}</p>}
+            </div>
+          </div>
+          {actions && <div className="flex flex-wrap items-center gap-2 shrink-0">{actions}</div>}
+        </div>
+      )}
+      {children !== undefined && children !== null && children !== false && <div className={bodyClassName}>{children}</div>}
+      {footer && <div className="px-5 py-3 border-t border-slate-200 bg-slate-50">{footer}</div>}
+    </section>
+  );
+}
+
+/** Dải tóm tắt nhiều ô ngang (label + giá trị), gọn hơn một hàng StatCard. `items` = [{ label, value, hint, tone }]. */
+export function SummaryStrip({ items, loading }) {
+  const TONE = { danger: 'text-red-700', warning: 'text-amber-800', success: 'text-emerald-700' };
+  return (
+    <dl className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
+      {items.map((item) => (
+        <div key={item.label} className="px-5 py-3.5 min-w-0">
+          <dt className="text-[12px] text-slate-500">{item.label}</dt>
+          <dd className={`mt-0.5 text-[14px] font-medium tabular-nums truncate ${TONE[item.tone] || 'text-slate-900'}`}>
+            {loading ? <span className="inline-block w-24 h-4 rounded bg-slate-100 animate-pulse align-middle" /> : item.value}
+          </dd>
+          {item.hint && !loading && <p className="mt-0.5 text-[12px] text-slate-500 truncate">{item.hint}</p>}
+        </div>
+      ))}
+    </dl>
   );
 }
