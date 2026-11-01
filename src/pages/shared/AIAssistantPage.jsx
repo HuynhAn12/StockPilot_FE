@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bot, Plus, Trash2, MessageSquare, Sparkles,
+  Mic, MicOff, Volume2, VolumeX,
   Copy, Check, ArrowRight, RefreshCw,
   Search, PanelLeftClose, PanelLeft, TrendingUp, AlertTriangle, Package, DollarSign, ShoppingCart, ArrowUpRight, Lightbulb, CheckCircle2,
   ArrowDown, RotateCcw
@@ -14,6 +15,7 @@ import { useStickToBottom } from '../../features/assistant/useStickToBottom';
 import { useTranslation } from '../../i18n/useTranslation';
 import { AISourceBadge } from '../../components/assistant/AISourceBadge';
 import { AISuggestionsPanel } from '../../components/assistant/AISuggestionsPanel';
+import { useVoiceAssistant } from '../../hooks/useVoiceAssistant';
 
 function parseInlineMarkdown(text) {
   if (!text) return null;
@@ -161,6 +163,42 @@ export function AIAssistantPage() {
     sessions, activeSession, setActiveId, send, newChat, deleteChat,
     isSending, sendingSessionId, isHistoryLoading, isHistoryFetching, historyError, refetchHistory,
   } = useAssistantChat({ isEn });
+
+  const {
+    isListening,
+    isSpeaking,
+    speakingMessageId,
+    voiceSupported,
+    startListening,
+    stopListening,
+    speak,
+    stopSpeaking,
+  } = useVoiceAssistant();
+
+  const handleToggleVoice = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening({
+        onInterim: (text) => {
+          setInputMessage(text);
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 144)}px`;
+          }
+        },
+        onFinal: (finalText) => {
+          setInputMessage(finalText);
+          if (finalText.trim()) {
+            handleSendMessage(finalText.trim());
+          }
+        },
+        onError: (err) => {
+          console.warn('Voice error:', err);
+        },
+      });
+    }
+  };
   const activeChatId = activeSession.id;
   const isTyping = isSending && sendingSessionId === activeChatId;
 
@@ -679,24 +717,55 @@ export function AIAssistantPage() {
                       {!isUser && <AISourceBadge source={msg.source} fallbackReason={msg.fallbackReason} isEn={isEn} />}
 
                       {!isUser && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(msg.id, msg.text)}
-                          className="flex items-center gap-1 hover:text-blue-600 transition-colors ml-2 cursor-pointer"
-                          title={isEn ? "Copy response" : "Sao chép câu trả lời"}
-                        >
-                          {copiedId === msg.id ? (
-                            <>
-                              <Check className="w-3 h-3 text-emerald-600" />
-                              <span className="text-emerald-600 font-bold">{isEn ? 'Copied' : 'Đã sao chép'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3 h-3" />
-                              <span>{isEn ? 'Copy' : 'Sao chép'}</span>
-                            </>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(msg.id, msg.text)}
+                            className="flex items-center gap-1 hover:text-blue-600 transition-colors ml-2 cursor-pointer"
+                            title={isEn ? "Copy response" : "Sao chép câu trả lời"}
+                          >
+                            {copiedId === msg.id ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-600" />
+                                <span className="text-emerald-600 font-bold">{isEn ? 'Copied' : 'Đã sao chép'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>{isEn ? 'Copy' : 'Sao chép'}</span>
+                              </>
+                            )}
+                          </button>
+
+                          {voiceSupported.tts && (
+                            <button
+                              type="button"
+                              onClick={() => speak(msg.text, msg.id)}
+                              className={`flex items-center gap-1 transition-colors ml-2 cursor-pointer ${
+                                isSpeaking && speakingMessageId === msg.id
+                                  ? 'text-blue-600 font-bold animate-pulse'
+                                  : 'hover:text-blue-600 text-slate-400'
+                              }`}
+                              title={
+                                isSpeaking && speakingMessageId === msg.id
+                                  ? (isEn ? "Stop reading" : "Dừng đọc")
+                                  : (isEn ? "Read aloud" : "Đọc câu trả lời bằng giọng nói")
+                              }
+                            >
+                              {isSpeaking && speakingMessageId === msg.id ? (
+                                <>
+                                  <VolumeX className="w-3 h-3 text-blue-600" />
+                                  <span className="text-blue-600 font-bold">{isEn ? 'Stop' : 'Dừng'}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Volume2 className="w-3 h-3" />
+                                  <span>{isEn ? 'Listen' : 'Đọc'}</span>
+                                </>
+                              )}
+                            </button>
                           )}
-                        </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -747,6 +816,26 @@ export function AIAssistantPage() {
         {/* Input Bar */}
         <div className="p-4 bg-gradient-to-t from-white via-white to-white/80 border-t border-slate-100">
           <div className="max-w-3xl mx-auto w-full">
+            {/* Listening Indicator Bar */}
+            {isListening && (
+              <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-gradient-to-r from-rose-50 to-amber-50 border border-rose-200 rounded-2xl text-xs text-rose-700 animate-pulse shadow-sm">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
+                </span>
+                <span className="font-bold">
+                  {isEn ? "Listening to your voice... Speak your question now" : "Đang lắng nghe giọng nói của bạn... Hãy đặt câu hỏi cho AI"}
+                </span>
+                <button
+                  type="button"
+                  onClick={stopListening}
+                  className="ml-auto text-[11px] underline font-bold hover:text-rose-900 cursor-pointer"
+                >
+                  {isEn ? "Stop" : "Dừng lại"}
+                </button>
+              </div>
+            )}
+
             <div className="relative bg-white border border-slate-300 rounded-3xl shadow-sm focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20 transition-all p-2 flex items-end gap-2">
               <textarea
                 ref={textareaRef}
@@ -765,6 +854,38 @@ export function AIAssistantPage() {
                 }
                 className="flex-1 max-h-36 bg-transparent text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm px-3 py-1.5 resize-none focus:outline-none font-medium leading-relaxed"
               />
+
+              {/* Nút Micro thu âm giọng nói */}
+              {voiceSupported.stt && (
+                <button
+                  type="button"
+                  onClick={handleToggleVoice}
+                  disabled={isSending || isHistoryLoading}
+                  aria-label={isListening ? "Dừng nghe" : "Hỏi bằng giọng nói"}
+                  className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer mb-0.5 relative ${
+                    isListening
+                      ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md shadow-rose-500/30 ring-2 ring-rose-400/50'
+                      : 'bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 active:scale-95'
+                  }`}
+                  title={
+                    isListening
+                      ? (isEn ? "Listening... Click to stop" : "Đang lắng nghe... Bấm để dừng")
+                      : (isEn ? "Ask with voice (Vietnamese)" : "Nhấn để nói tiếng Việt (Nhận diện siêu nhanh)")
+                  }
+                >
+                  {isListening ? (
+                    <>
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                      </span>
+                      <Mic className="w-4 h-4 animate-bounce" />
+                    </>
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
+                </button>
+              )}
 
               <button
                 type="button"

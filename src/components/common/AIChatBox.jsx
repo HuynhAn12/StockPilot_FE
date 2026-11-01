@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bot, X, Send, Sparkles, RefreshCw, ArrowUpRight } from 'lucide-react';
+import { Bot, X, Send, Sparkles, RefreshCw, ArrowUpRight, Mic, Volume2, VolumeX } from 'lucide-react';
+import { useVoiceAssistant } from '../../hooks/useVoiceAssistant';
 import { useTranslation } from '../../i18n/useTranslation';
 import { apiChatWithAssistant } from '../../services/analyticsService';
 import { AISourceBadge } from '../assistant/AISourceBadge';
@@ -21,6 +22,37 @@ export function AIChatBox() {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+
+  const {
+    isListening,
+    isSpeaking,
+    speakingMessageId,
+    voiceSupported,
+    startListening,
+    stopListening,
+    speak,
+  } = useVoiceAssistant();
+
+  const handleToggleVoice = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening({
+        onInterim: (text) => {
+          setInputValue(text);
+        },
+        onFinal: (finalText) => {
+          setInputValue(finalText);
+          if (finalText.trim()) {
+            handleSendMessage(finalText.trim());
+          }
+        },
+        onError: (err) => {
+          console.warn('Voice error:', err);
+        },
+      });
+    }
+  };
   const [, setUnreadCount] = useState(0);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -257,6 +289,26 @@ export function AIChatBox() {
                 <span className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1 px-1">
                   {msg.timestamp}
                   {msg.sender === 'ai' && <AISourceBadge source={msg.source} fallbackReason={msg.fallbackReason} isEn={isEn} />}
+                  {msg.sender === 'ai' && voiceSupported.tts && (
+                    <button
+                      type="button"
+                      onClick={() => speak(msg.text, msg.id || msg.timestamp)}
+                      className="hover:text-blue-600 text-slate-400 ml-1 p-0.5 cursor-pointer inline-flex items-center gap-0.5"
+                      title={isSpeaking && speakingMessageId === (msg.id || msg.timestamp) ? (isEn ? "Stop" : "Dừng đọc") : (isEn ? "Read" : "Đọc bằng giọng nói")}
+                    >
+                      {isSpeaking && speakingMessageId === (msg.id || msg.timestamp) ? (
+                        <>
+                          <VolumeX className="w-3 h-3 text-blue-600" />
+                          <span className="text-blue-600 font-bold">{isEn ? 'Stop' : 'Dừng'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3 h-3" />
+                          <span>{isEn ? 'Listen' : 'Đọc'}</span>
+                        </>
+                      )}
+                    </button>
+                  )}
                 </span>
 
                 {/* Suggestions Pills from AI */}
@@ -339,12 +391,30 @@ export function AIChatBox() {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={
-                  isEn
-                    ? 'Ask AI about inventory, pricing, stock levels...'
-                    : 'Hỏi AI về tồn kho, giá bán, nhập hàng...'
+                  isListening
+                    ? (isEn ? 'Listening... Speak your question' : 'Đang lắng nghe... Hãy đặt câu hỏi')
+                    : (isEn ? 'Ask AI about inventory, pricing, stock levels...' : 'Hỏi AI về tồn kho, giá bán, nhập hàng...')
                 }
-                className="flex-1 bg-slate-100 text-slate-900 placeholder:text-slate-400 text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all font-medium"
+                className={`flex-1 text-slate-900 placeholder:text-slate-400 text-xs px-3.5 py-2.5 rounded-xl border focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all font-medium ${
+                  isListening ? 'bg-rose-50 border-rose-300 ring-2 ring-rose-300/30' : 'bg-slate-100 border-slate-200'
+                }`}
               />
+
+              {voiceSupported.stt && (
+                <button
+                  type="button"
+                  onClick={handleToggleVoice}
+                  disabled={isTyping}
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all cursor-pointer relative ${
+                    isListening
+                      ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md shadow-rose-500/30'
+                      : 'bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600'
+                  }`}
+                  title={isListening ? 'Dừng lắng nghe' : 'Hỏi bằng giọng nói (Tiếng Việt)'}
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
+              )}
 
               <button
                 type="submit"
