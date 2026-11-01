@@ -164,6 +164,8 @@ export function AIAssistantPage() {
     isSending, sendingSessionId, isHistoryLoading, isHistoryFetching, historyError, refetchHistory,
   } = useAssistantChat({ isEn });
 
+  const [voiceInterimText, setVoiceInterimText] = useState('');
+
   const {
     isListening,
     isTranscribing,
@@ -182,7 +184,8 @@ export function AIAssistantPage() {
     if (isListening) {
       stopListening({
         onFinal: (finalText) => {
-          setInputMessage(finalText);
+          setVoiceInterimText('');
+          setInputMessage('');
           if (finalText.trim()) {
             handleSendMessage(finalText.trim());
           }
@@ -192,22 +195,21 @@ export function AIAssistantPage() {
       if (isSpeaking) {
         stopSpeaking();
       }
+      setVoiceInterimText('');
       startListening({
         onInterim: (text) => {
-          setInputMessage(text);
-          if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 144)}px`;
-          }
+          setVoiceInterimText(text);
         },
         onFinal: (finalText) => {
-          setInputMessage(finalText);
+          setVoiceInterimText('');
+          setInputMessage('');
           if (finalText.trim()) {
             handleSendMessage(finalText.trim());
           }
         },
         onError: (err) => {
           console.warn('Voice error:', err);
+          setVoiceInterimText('');
         },
       });
     }
@@ -266,10 +268,8 @@ export function AIAssistantPage() {
     if (!text) return;
     stick();
     if (!send(text)) return;
-    if (textToSend === undefined) {
-      setInputMessage('');
-      if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    }
+    setInputMessage('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
   const handleRetry = (turnId, text) => {
@@ -843,21 +843,32 @@ export function AIAssistantPage() {
           <div className="max-w-3xl mx-auto w-full">
             {/* Voice Status Indicators */}
             {isListening && (
-              <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-gradient-to-r from-rose-50 to-amber-50 border border-rose-200 rounded-2xl text-xs text-rose-700 animate-pulse shadow-sm">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
-                </span>
-                <span className="font-bold">
-                  {isEn ? "Listening to your voice... (Groq Whisper AI ready)" : "Đang lắng nghe giọng nói của bạn... (Tích hợp Groq Whisper AI)"}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleToggleVoice}
-                  className="ml-auto text-[11px] bg-rose-600 text-white px-2.5 py-0.5 rounded-lg font-bold hover:bg-rose-700 cursor-pointer shadow-xs"
-                >
-                  {isEn ? "Done Speaking" : "Nói xong / Gửi ngay"}
-                </button>
+              <div className="flex flex-col gap-1.5 px-4 py-2.5 mb-2 bg-gradient-to-r from-rose-50 via-amber-50 to-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 shadow-sm animate-pulse">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
+                  </span>
+                  <span className="font-bold">
+                    {isEn ? "Listening... (Auto-sends 2s after you stop speaking)" : "Đang lắng nghe... (Tự động gửi sau 2 giây khi bạn nói xong)"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopListening();
+                      setVoiceInterimText('');
+                      setInputMessage('');
+                    }}
+                    className="ml-auto text-[11px] text-slate-500 hover:text-rose-700 underline cursor-pointer"
+                  >
+                    {isEn ? "Cancel" : "Hủy"}
+                  </button>
+                </div>
+                {voiceInterimText && (
+                  <p className="text-[12px] font-semibold text-rose-900 bg-white/80 px-2.5 py-1 rounded-lg border border-rose-200/60 italic">
+                    "{voiceInterimText}"
+                  </p>
+                )}
               </div>
             )}
 

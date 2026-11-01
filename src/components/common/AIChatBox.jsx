@@ -37,11 +37,14 @@ export function AIChatBox() {
     stopSpeaking,
   } = useVoiceAssistant();
 
+  const [voiceInterimText, setVoiceInterimText] = useState('');
+
   const handleToggleVoice = () => {
     if (isListening) {
       stopListening({
         onFinal: (finalText) => {
-          setInputValue(finalText);
+          setVoiceInterimText('');
+          setInputValue('');
           if (finalText.trim()) {
             handleSendMessage(finalText.trim());
           }
@@ -51,18 +54,21 @@ export function AIChatBox() {
       if (isSpeaking) {
         stopSpeaking();
       }
+      setVoiceInterimText('');
       startListening({
         onInterim: (text) => {
-          setInputValue(text);
+          setVoiceInterimText(text);
         },
         onFinal: (finalText) => {
-          setInputValue(finalText);
+          setVoiceInterimText('');
+          setInputValue('');
           if (finalText.trim()) {
             handleSendMessage(finalText.trim());
           }
         },
         onError: (err) => {
           console.warn('Voice error:', err);
+          setVoiceInterimText('');
         },
       });
     }
@@ -411,7 +417,7 @@ export function AIChatBox() {
                 onKeyDown={handleKeyDown}
                 placeholder={
                   isListening
-                    ? (isEn ? 'Listening... Speak your question' : 'Đang lắng nghe... Hãy đặt câu hỏi')
+                    ? (voiceInterimText ? `"${voiceInterimText}"` : (isEn ? 'Listening... (Auto-sends 2s after you stop speaking)' : 'Đang lắng nghe... (Tự động gửi sau 2s khi nói xong)'))
                     : (isEn ? 'Ask AI about inventory, pricing, stock levels...' : 'Hỏi AI về tồn kho, giá bán, nhập hàng...')
                 }
                 className={`flex-1 text-slate-900 placeholder:text-slate-400 text-xs px-3.5 py-2.5 rounded-xl border focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all font-medium ${
