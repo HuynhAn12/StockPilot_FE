@@ -843,14 +843,14 @@ export function AIAssistantPage() {
           <div className="max-w-3xl mx-auto w-full">
             {/* Voice Status Indicators */}
             {isListening && (
-              <div className="flex flex-col gap-1.5 px-4 py-2.5 mb-2 bg-gradient-to-r from-rose-50 via-amber-50 to-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 shadow-sm animate-pulse">
+              <div className="flex flex-col gap-1.5 px-4 py-2.5 mb-2 bg-gradient-to-r from-purple-50 via-fuchsia-50 to-purple-50 border border-purple-200 rounded-2xl text-xs text-purple-700 shadow-sm animate-pulse">
                 <div className="flex items-center gap-2">
                   <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-600"></span>
                   </span>
-                  <span className="font-bold">
-                    {isEn ? "Listening... (Auto-sends 2s after you stop speaking)" : "Đang lắng nghe... (Tự động gửi sau 2 giây khi bạn nói xong)"}
+                  <span className="font-bold text-purple-700 text-[13px]">
+                    {isEn ? "Listening..." : "Đang Lắng Nghe..."}
                   </span>
                   <button
                     type="button"
@@ -859,13 +859,13 @@ export function AIAssistantPage() {
                       setVoiceInterimText('');
                       setInputMessage('');
                     }}
-                    className="ml-auto text-[11px] text-slate-500 hover:text-rose-700 underline cursor-pointer"
+                    className="ml-auto text-[11px] text-purple-600 hover:text-purple-800 underline cursor-pointer font-medium"
                   >
                     {isEn ? "Cancel" : "Hủy"}
                   </button>
                 </div>
                 {voiceInterimText && (
-                  <p className="text-[12px] font-semibold text-rose-900 bg-white/80 px-2.5 py-1 rounded-lg border border-rose-200/60 italic">
+                  <p className="text-[12px] font-semibold text-purple-900 bg-white/80 px-2.5 py-1 rounded-lg border border-purple-200/60 italic">
                     "{voiceInterimText}"
                   </p>
                 )}
@@ -949,20 +949,20 @@ export function AIAssistantPage() {
                   aria-label={isListening ? "Dừng nghe" : "Hỏi bằng giọng nói"}
                   className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer mb-0.5 relative ${
                     isListening
-                      ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md shadow-rose-500/30 ring-2 ring-rose-400/50'
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white animate-pulse shadow-md shadow-purple-500/30 ring-2 ring-purple-400/50'
                       : 'bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 active:scale-95'
                   }`}
                   title={
                     isListening
-                      ? (isEn ? "Listening... Click to finish" : "Đang lắng nghe... Bấm để gửi")
+                      ? (isEn ? "Listening... Click to finish" : "Đang Lắng Nghe... Bấm để gửi")
                       : (isEn ? "Ask with voice (Groq Whisper AI)" : "Nhấn để nói (Tự động nhận diện Groq Whisper & Trả lời bằng giọng nói)")
                   }
                 >
                   {isListening ? (
                     <>
                       <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-600"></span>
                       </span>
                       <Mic className="w-4 h-4 animate-bounce" />
                     </>

@@ -417,11 +417,11 @@ export function AIChatBox() {
                 onKeyDown={handleKeyDown}
                 placeholder={
                   isListening
-                    ? (voiceInterimText ? `"${voiceInterimText}"` : (isEn ? 'Listening... (Auto-sends 2s after you stop speaking)' : 'Đang lắng nghe... (Tự động gửi sau 2s khi nói xong)'))
+                    ? (voiceInterimText ? `"${voiceInterimText}"` : (isEn ? 'Listening...' : 'Đang Lắng Nghe...'))
                     : (isEn ? 'Ask AI about inventory, pricing, stock levels...' : 'Hỏi AI về tồn kho, giá bán, nhập hàng...')
                 }
-                className={`flex-1 text-slate-900 placeholder:text-slate-400 text-xs px-3.5 py-2.5 rounded-xl border focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none transition-all font-medium ${
-                  isListening ? 'bg-rose-50 border-rose-300 ring-2 ring-rose-300/30' : 'bg-slate-100 border-slate-200'
+                className={`flex-1 text-slate-900 placeholder:text-purple-600 text-xs px-3.5 py-2.5 rounded-xl border focus:bg-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none transition-all font-medium ${
+                  isListening ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-300/30 font-semibold text-purple-700' : 'bg-slate-100 border-slate-200'
                 }`}
               />
 
@@ -450,10 +450,10 @@ export function AIChatBox() {
                   disabled={isTyping || isTranscribing}
                   className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all cursor-pointer relative ${
                     isListening
-                      ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md shadow-rose-500/30'
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white animate-pulse shadow-md shadow-purple-500/30 ring-2 ring-purple-400/50'
                       : 'bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600'
                   }`}
-                  title={isListening ? 'Nói xong / Gửi ngay' : 'Hỏi bằng giọng nói (Groq Whisper AI)'}
+                  title={isListening ? 'Đang Lắng Nghe... Bấm để gửi' : 'Hỏi bằng giọng nói (Groq Whisper AI)'}
                 >
                   <Mic className="w-4 h-4" />
                 </button>
