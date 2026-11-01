@@ -170,12 +170,15 @@
     50%       { transform: translateY(-8px); }
   }
 
-  /* Animation classes */
-  .animate-in               { animation: fade-in 0.22s ease-out forwards; }
-  .fade-in-0                { animation: fade-in 0.18s ease-out forwards; }
-  .zoom-in-95               { animation: scale-in 0.18s ease-out forwards; }
-  .slide-in-from-right-full { animation: slide-in-right 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-  .fade-in-50               { animation: fade-in 0.22s ease-out forwards; }
+  /* Animation classes
+     Dùng `backwards`, KHÔNG dùng `forwards`: `forwards` giữ lại transform cuối (translateY(0)/scale(1)),
+     biến phần tử thành khung tham chiếu cho mọi con `position: fixed` → modal/overlay bên trong
+     bị căn theo phần tử đó thay vì màn hình. `backwards` cho hình ảnh giống hệt nhưng không để lại transform. */
+  .animate-in               { animation: fade-in 0.22s ease-out backwards; }
+  .fade-in-0                { animation: fade-in 0.18s ease-out backwards; }
+  .zoom-in-95               { animation: scale-in 0.18s ease-out backwards; }
+  .slide-in-from-right-full { animation: slide-in-right 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+  .fade-in-50               { animation: fade-in 0.22s ease-out backwards; }
   .duration-200             { animation-duration: 0.2s; }
   .duration-300             { animation-duration: 0.3s; }
   .animate-bounce-in        { animation: bounce-in 0.3s ease-out; }
