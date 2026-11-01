@@ -34,7 +34,7 @@ export const canEditCostPrice = (role) => isOwner(role);
 export const canEditSellingPrice = (role) => isOwner(role);
 export const canApprovePricing = (role) => isOwner(role);
 export const canCancelOrder = (role) => isOwner(role);
-export const canAccessOrders = (role) => isOwner(role);
+export const canAccessOrders = (role) => isOwner(role) || isStaff(role);
 export const canViewOrderFinancialSummary = (role) => isOwner(role);
 export const canAccessPricing = (role) => isOwner(role);
 export const canAccessAnalytics = (role) => isOwner(role);
@@ -68,7 +68,7 @@ export const ROUTE_PERMISSIONS = {
   '/dashboard': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF, ROLES.ADMIN],
   '/products': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
   '/pos': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
-  '/orders': [ROLES.SHOP_OWNER],
+  '/orders': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
   '/inventory': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
   '/alerts': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
   '/ai-assistant': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],

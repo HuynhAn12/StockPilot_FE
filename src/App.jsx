@@ -187,7 +187,7 @@ export default function App() {
             <Route
               path="/orders"
               element={
-                <RequireRole roles={['store_owner']}>
+                <RequireRole roles={['store_owner', 'warehouse_staff']}>
                   <ErrorBoundary><OrdersPage /></ErrorBoundary>
                 </RequireRole>
               }

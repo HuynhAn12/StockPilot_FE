@@ -1343,7 +1343,7 @@ export function OrdersPage() {
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {staffMode ? (
-                            /* Role Nhân viên: CHỈ CÓ IN VÀ HỦY */
+                            /* Role Nhân viên: CHỈ IN HÓA ĐƠN (hủy đơn chỉ dành cho Chủ shop — backend chặn) */
                             <>
                               {/* In hóa đơn */}
                               <button
@@ -1355,7 +1355,7 @@ export function OrdersPage() {
                               </button>
 
                               {/* Hủy đơn hàng (Khách đến trả hàng / Hủy giao dịch) */}
-                              {ord.status === 'CANCELED' || ord.status === 'CANCELLED' ? (
+                              {!canCancel ? null : ord.status === 'CANCELED' || ord.status === 'CANCELLED' ? (
                                 <span
                                   className="w-8 h-8 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
                                   title="Đơn hàng này đã bị hủy"
