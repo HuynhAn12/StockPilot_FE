@@ -565,7 +565,7 @@ export function AIAssistantPage() {
   ];
 
   return (
-    <div className="ai-assistant-page-scoped relative flex h-[calc(100vh-84px)] -m-3 sm:-m-5 lg:-m-6 bg-[#fcfcfd] overflow-hidden">
+    <div className="ai-assistant-page-scoped relative flex flex-1 h-[calc(100vh-64px)] h-[calc(100dvh-64px)] w-full bg-[#fcfcfd] overflow-hidden">
       <style>{`
         .ai-assistant-page-scoped {
           --ifm-color-primary: #2563eb;

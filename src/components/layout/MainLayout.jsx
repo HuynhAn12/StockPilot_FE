@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { PlatformAnnouncement } from './PlatformAnnouncement';
@@ -12,6 +12,8 @@ export function MainLayout() {
   const { sidebarCollapsed } = useUIStore();
   const { user } = useAuthStore();
   const isAdmin = normalizeRole(user?.role) === 'admin';
+  const location = useLocation();
+  const isAIAssistant = location.pathname.startsWith('/ai-assistant');
 
   return (
     <div
@@ -35,8 +37,8 @@ export function MainLayout() {
 
         <main
           className={cn(
-            'flex-1 p-3 sm:p-5 lg:p-6 w-full mx-auto',
-            'max-w-[1720px]'
+            'flex-1 w-full mx-auto flex flex-col min-h-0',
+            isAIAssistant ? 'p-0 max-w-none' : 'p-3 sm:p-5 lg:p-6 max-w-[1720px]'
           )}
         >
           <Outlet />
@@ -44,7 +46,7 @@ export function MainLayout() {
       </div>
 
       {/* Floating AI Assistant Chat Box (Chỉ cho Chủ shop & Nhân viên kho có dữ liệu sản phẩm) */}
-      {!isAdmin && <AIChatBox />}
+      {!isAdmin && !isAIAssistant && <AIChatBox />}
     </div>
   );
 }
