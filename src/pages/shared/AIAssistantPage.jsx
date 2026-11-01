@@ -909,14 +909,7 @@ export function AIAssistantPage() {
               </div>
             )}
 
-            {isTranscribing && (
-              <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-indigo-50 border border-indigo-200 rounded-2xl text-xs text-indigo-700 shadow-sm animate-pulse">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                <span className="font-bold">
-                  {isEn ? "Groq Whisper AI is processing speech..." : "Groq Whisper AI đang nhận diện giọng nói siêu nhanh..."}
-                </span>
-              </div>
-            )}
+
 
             {isSpeaking && (
               <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl text-xs text-blue-800 shadow-sm">
