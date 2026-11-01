@@ -111,14 +111,14 @@ export async function apiChatWithAssistant(question, stockItemId = null) {
   return data.data;
 }
 
-export async function apiGetAssistantHistory({ limit = 20 } = {}) {
-  const { data } = await apiClient.get('/assistant/history', { params: { limit } });
+export async function apiGetAssistantHistory({ limit = 20, signal } = {}) {
+  const { data } = await apiClient.get('/assistant/history', { params: { limit }, signal });
   return data.data;
 }
 
 // GET /assistant/suggestions — gợi ý hành động (chỉ đề xuất; duyệt bằng các endpoint nghiệp vụ có sẵn)
-export async function apiGetAssistantSuggestions() {
-  const { data } = await apiClient.get('/assistant/suggestions');
+export async function apiGetAssistantSuggestions({ signal } = {}) {
+  const { data } = await apiClient.get('/assistant/suggestions', { signal });
   return data.data;
 }
 

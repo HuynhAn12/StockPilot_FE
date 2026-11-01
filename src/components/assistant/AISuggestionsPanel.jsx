@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   Lightbulb, RefreshCw, Loader2, CheckCircle2, XCircle, BellRing, PackagePlus,
   ArrowUpRight, X, AlertTriangle,
 } from 'lucide-react';
-import { apiGetAssistantSuggestions, apiAcceptPricingRecommendation, apiRejectPricingRecommendation } from '../../services/analyticsService';
+import { apiAcceptPricingRecommendation, apiRejectPricingRecommendation } from '../../services/analyticsService';
+import { assistantKeys, useAssistantScope, useAssistantSuggestions } from '../../features/assistant/queries';
 import { apiAcknowledgeAlert } from '../../services/inventoryService';
 import { useToast } from '../common/Toast';
 import { AISourceBadge } from './AISourceBadge';
@@ -62,26 +64,24 @@ const errorMessage = (err, fallback) => err?.response?.data?.error?.message || e
 export function AISuggestionsPanel({ isEn, onClose }) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [state, setState] = useState({ status: 'loading', data: null, error: null });
+  const queryClient = useQueryClient();
+  const { userId, storeId } = useAssistantScope();
+  // Cache TanStack Query: quay lại trang hiện ngay gợi ý đã có, làm mới ở nền khi dữ liệu cũ hơn 60 giây.
+  const suggestionsQuery = useAssistantSuggestions();
   const [confirmKey, setConfirmKey] = useState(null);
   const [busyKey, setBusyKey] = useState(null);
   const [doneKeys, setDoneKeys] = useState({});
 
-  const load = useCallback(async () => {
-    setState((prev) => ({ ...prev, status: 'loading', error: null }));
+  const status = suggestionsQuery.isPending ? 'loading' : suggestionsQuery.isError ? 'error' : 'ready';
+  const loadError = suggestionsQuery.isError
+    ? errorMessage(suggestionsQuery.error, isEn ? 'Could not load suggestions' : 'Không tải được gợi ý')
+    : null;
+
+  const load = () => {
     setConfirmKey(null);
     setDoneKeys({});
-    try {
-      const data = await apiGetAssistantSuggestions();
-      setState({ status: 'ready', data, error: null });
-    } catch (err) {
-      setState({ status: 'error', data: null, error: errorMessage(err, isEn ? 'Could not load suggestions' : 'Không tải được gợi ý') });
-    }
-  }, [isEn]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+    suggestionsQuery.refetch();
+  };
 
   const runAction = async (suggestion, key) => {
     const config = kindConfig(suggestion.kind, isEn);
@@ -89,6 +89,7 @@ export function AISuggestionsPanel({ isEn, onClose }) {
     try {
       await config.run(suggestion.targetId);
       setDoneKeys((prev) => ({ ...prev, [key]: config.done }));
+      queryClient.invalidateQueries({ queryKey: assistantKeys.suggestions(userId, storeId), refetchType: 'none' });
       toast({ type: 'success', title: config.done, message: suggestion.title });
     } catch (err) {
       toast({ type: 'error', title: isEn ? 'Action failed' : 'Không thực hiện được', message: errorMessage(err, '') });
@@ -98,7 +99,7 @@ export function AISuggestionsPanel({ isEn, onClose }) {
     }
   };
 
-  const suggestions = state.data?.suggestions || [];
+  const suggestions = suggestionsQuery.data?.suggestions || [];
 
   return (
     <div className="flex h-full flex-col bg-white">
@@ -106,17 +107,17 @@ export function AISuggestionsPanel({ isEn, onClose }) {
         <div className="flex min-w-0 items-center gap-2">
           <Lightbulb className="h-4 w-4 shrink-0 text-amber-500" />
           <h3 className="truncate text-sm font-semibold text-slate-900">{isEn ? 'Suggested actions' : 'Gợi ý hành động'}</h3>
-          {state.status === 'ready' && <AISourceBadge source={state.data?.source} isEn={isEn} />}
+          {status === 'ready' && <AISourceBadge source={suggestionsQuery.data?.source} isEn={isEn} />}
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={load}
-            disabled={state.status === 'loading'}
+            disabled={suggestionsQuery.isFetching}
             className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 cursor-pointer"
             title={isEn ? 'Refresh suggestions' : 'Làm mới gợi ý'}
           >
-            <RefreshCw className={`h-4 w-4 ${state.status === 'loading' ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${suggestionsQuery.isFetching ? 'animate-spin' : ''}`} />
           </button>
           {onClose && (
             <button
@@ -138,7 +139,7 @@ export function AISuggestionsPanel({ isEn, onClose }) {
       </p>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
-        {state.status === 'loading' && (
+        {status === 'loading' && (
           <div className="space-y-3" aria-busy="true">
             {[0, 1, 2].map((i) => (
               <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-100" />
@@ -146,20 +147,20 @@ export function AISuggestionsPanel({ isEn, onClose }) {
           </div>
         )}
 
-        {state.status === 'error' && (
+        {status === 'error' && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
             <div className="flex items-center gap-1.5 font-semibold">
               <AlertTriangle className="h-3.5 w-3.5" />
               {isEn ? 'Could not load suggestions' : 'Không tải được gợi ý'}
             </div>
-            <p className="mt-1">{state.error}</p>
+            <p className="mt-1">{loadError}</p>
             <button type="button" onClick={load} className="mt-2 font-semibold underline cursor-pointer">
               {isEn ? 'Try again' : 'Thử lại'}
             </button>
           </div>
         )}
 
-        {state.status === 'ready' && suggestions.length === 0 && (
+        {status === 'ready' && suggestions.length === 0 && (
           <div className="flex flex-col items-center py-8 text-center">
             <CheckCircle2 className="mb-2 h-8 w-8 text-emerald-500" />
             <p className="text-sm font-medium text-slate-900">{isEn ? 'Nothing needs attention' : 'Chưa có việc cần xử lý'}</p>
@@ -169,7 +170,7 @@ export function AISuggestionsPanel({ isEn, onClose }) {
           </div>
         )}
 
-        {state.status === 'ready' &&
+        {status === 'ready' &&
           suggestions.map((suggestion) => {
             const key = `${suggestion.kind}:${suggestion.targetId}`;
             const config = kindConfig(suggestion.kind, isEn);

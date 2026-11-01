@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Bot, X, Send, Sparkles, RefreshCw, ArrowUpRight } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
 import { apiChatWithAssistant } from '../../services/analyticsService';
 import { AISourceBadge } from '../assistant/AISourceBadge';
+import { assistantKeys, useAssistantScope } from '../../features/assistant/queries';
 
 const FOLLOW_UPS = {
   vi: ['Hàng nào sắp hết kho?', 'Tổng quan tồn kho hôm nay', 'Cảnh báo rủi ro đọng vốn'],
@@ -21,6 +23,8 @@ export function AIChatBox() {
   const [isTyping, setIsTyping] = useState(false);
   const [, setUnreadCount] = useState(0);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { userId, storeId } = useAssistantScope();
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -88,6 +92,8 @@ export function AIChatBox() {
     let aiMsg;
     try {
       const response = await apiChatWithAssistant(text);
+      // Cùng một lịch sử với trang Trợ lý AI: trang đang mở thì tải lại ngay, không thì lần mở sau.
+      queryClient.invalidateQueries({ queryKey: assistantKeys.history(userId, storeId) });
       aiMsg = {
         id: `ai-${response.id || Date.now()}`,
         sender: 'ai',
