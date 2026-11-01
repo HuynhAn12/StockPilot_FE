@@ -182,15 +182,7 @@ export function AIAssistantPage() {
 
   const handleToggleVoice = () => {
     if (isListening) {
-      stopListening({
-        onFinal: (finalText) => {
-          setVoiceInterimText('');
-          setInputMessage('');
-          if (finalText.trim()) {
-            handleSendMessage(finalText.trim());
-          }
-        },
-      });
+      stopListening();
     } else {
       if (isSpeaking) {
         stopSpeaking();
@@ -283,9 +275,27 @@ export function AIAssistantPage() {
     if (!products.length) fetchProducts();
   }, []);
 
+  // Chống gửi trùng lặp câu hỏi (duplicate voice submission guard)
+  const lastSentTextRef = useRef('');
+  const lastSentTimeRef = useRef(0);
+
   const handleSendMessage = (textToSend) => {
     const text = (textToSend ?? inputMessage).trim();
     if (!text) return;
+
+    // Ngăn chặn duplicate tin nhắn gửi dồn trong vòng 1.5 giây
+    const now = Date.now();
+    if (now - lastSentTimeRef.current < 1500) {
+      const isVerySimilar =
+        text === lastSentTextRef.current ||
+        text.toLowerCase() === lastSentTextRef.current.toLowerCase();
+      if (isVerySimilar) {
+        return;
+      }
+    }
+    lastSentTextRef.current = text;
+    lastSentTimeRef.current = now;
+
     stick();
     shouldSpeakNextResponseRef.current = true;
     if (!send(text)) {

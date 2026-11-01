@@ -41,15 +41,7 @@ export function AIChatBox() {
 
   const handleToggleVoice = () => {
     if (isListening) {
-      stopListening({
-        onFinal: (finalText) => {
-          setVoiceInterimText('');
-          setInputValue('');
-          if (finalText.trim()) {
-            handleSendMessage(finalText.trim());
-          }
-        },
-      });
+      stopListening();
     } else {
       if (isSpeaking) {
         stopSpeaking();
@@ -123,11 +115,27 @@ export function AIChatBox() {
     }
   }, [isOpen, messages, isTyping]);
 
+  const lastSentTextRef = useRef('');
+  const lastSentTimeRef = useRef(0);
+
   const handleSendMessage = async (textToSend) => {
     const text = (textToSend || inputValue).trim();
     if (!text) return;
 
     if (isTyping) return;
+
+    // Ngăn duplicate tin nhắn gửi dồn trong vòng 1.5 giây
+    const now = Date.now();
+    if (now - lastSentTimeRef.current < 1500) {
+      const isVerySimilar =
+        text === lastSentTextRef.current ||
+        text.toLowerCase() === lastSentTextRef.current.toLowerCase();
+      if (isVerySimilar) {
+        return;
+      }
+    }
+    lastSentTextRef.current = text;
+    lastSentTimeRef.current = now;
 
     const userMsg = {
       id: `user-${Date.now()}`,

@@ -70,10 +70,12 @@ export function useVoiceAssistant() {
   const activeUtteranceRef = useRef(null);
   const currentVoiceRef = useRef(null);
 
-  // 2s Auto-Submit Silence Timer refs
+  // 2s Auto-Submit Silence Timer refs & Submission Guards
   const silenceTimeoutRef = useRef(null);
   const onFinalCallbackRef = useRef(null);
   const capturedTextRef = useRef('');
+  const hasSubmittedTurnRef = useRef(false);
+  const isTranscribingRef = useRef(false);
 
   // Check Web Speech & Audio recording support
   useEffect(() => {
@@ -109,7 +111,26 @@ export function useVoiceAssistant() {
     };
   }, []);
 
-  // ─── 1. Dừng nghe và tự động gửi ───
+  // ─── 0. Đảm bảo mỗi lượt nói chỉ gửi duy nhất 1 lần (Chống duplicate Web Speech vs Groq Whisper) ───
+  const submitTextOnce = useCallback((text) => {
+    const trimmed = (text || '').trim();
+    if (!trimmed) return;
+    if (hasSubmittedTurnRef.current) return;
+    hasSubmittedTurnRef.current = true;
+
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current);
+      silenceTimeoutRef.current = null;
+    }
+    capturedTextRef.current = '';
+
+    const callback = onFinalCallbackRef.current;
+    if (callback) {
+      callback(trimmed);
+    }
+  }, []);
+
+  // ─── 1. Dừng nghe và gửi kết quả duy nhất ───
   const stopListening = useCallback(async ({ onFinal, onError } = {}) => {
     if (silenceTimeoutRef.current) {
       clearTimeout(silenceTimeoutRef.current);
@@ -117,7 +138,14 @@ export function useVoiceAssistant() {
     }
     setIsListening(false);
 
-    const finalCallback = onFinal || onFinalCallbackRef.current;
+    if (onFinal) {
+      onFinalCallbackRef.current = onFinal;
+    }
+
+    // Nếu đã submit hoặc đang xử lý Whisper cho lượt nói này thì không xử lý thêm lần 2
+    if (hasSubmittedTurnRef.current || isTranscribingRef.current) {
+      return;
+    }
 
     // 1. Dừng Web Speech Recognition
     if (recognitionRef.current) {
@@ -127,7 +155,9 @@ export function useVoiceAssistant() {
     // 2. Thu thập âm thanh từ MediaRecorder và gửi Groq Whisper
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== 'inactive') {
+      isTranscribingRef.current = true;
       setIsTranscribing(true);
+
       recorder.onstop = async () => {
         try {
           if (mediaStreamRef.current) {
@@ -142,8 +172,7 @@ export function useVoiceAssistant() {
             // Gửi sang backend -> Groq Whisper API với model whisper-large-v3
             const whisperText = await apiTranscribeAudio(audioBlob);
             if (whisperText && whisperText.trim()) {
-              setIsTranscribing(false);
-              if (finalCallback) finalCallback(whisperText.trim());
+              submitTextOnce(whisperText.trim());
               return;
             }
           }
@@ -151,11 +180,12 @@ export function useVoiceAssistant() {
           console.warn('Groq Whisper transcribe failed, fallback to Web Speech:', err);
         } finally {
           setIsTranscribing(false);
+          isTranscribingRef.current = false;
         }
 
         // Fallback sang text đã nhận diện từ Web Speech nếu Groq Whisper rỗng
         if (capturedTextRef.current && capturedTextRef.current.trim()) {
-          if (finalCallback) finalCallback(capturedTextRef.current.trim());
+          submitTextOnce(capturedTextRef.current.trim());
         }
       };
 
@@ -163,17 +193,19 @@ export function useVoiceAssistant() {
         recorder.stop();
       } catch (e) {
         setIsTranscribing(false);
-        if (capturedTextRef.current && capturedTextRef.current.trim() && finalCallback) {
-          finalCallback(capturedTextRef.current.trim());
+        isTranscribingRef.current = false;
+        if (capturedTextRef.current && capturedTextRef.current.trim()) {
+          submitTextOnce(capturedTextRef.current.trim());
         }
       }
     } else {
       setIsTranscribing(false);
-      if (capturedTextRef.current && capturedTextRef.current.trim() && finalCallback) {
-        finalCallback(capturedTextRef.current.trim());
+      isTranscribingRef.current = false;
+      if (capturedTextRef.current && capturedTextRef.current.trim()) {
+        submitTextOnce(capturedTextRef.current.trim());
       }
     }
-  }, []);
+  }, [submitTextOnce]);
 
   // ─── 2. Speech-To-Text với Groq Whisper và Tự động gửi sau 2 giây im lặng ───
   const startListening = useCallback(async ({ onInterim, onFinal, onError }) => {
@@ -191,6 +223,8 @@ export function useVoiceAssistant() {
       silenceTimeoutRef.current = null;
     }
 
+    hasSubmittedTurnRef.current = false;
+    isTranscribingRef.current = false;
     onFinalCallbackRef.current = onFinal;
     capturedTextRef.current = '';
     setAskedByVoice(true);
@@ -229,11 +263,15 @@ export function useVoiceAssistant() {
         }
         const recognition = new SpeechRecognition();
         recognition.lang = 'vi-VN';
-        recognition.continuous = true; // Tiếp tục nghe cho tới khi người dùng im lặng 2 giây
+        recognition.continuous = true;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
 
         recognition.onresult = (event) => {
+          if (hasSubmittedTurnRef.current || isTranscribingRef.current) {
+            return;
+          }
+
           let interimTranscript = '';
           for (let i = event.resultIndex; i < event.results.length; i++) {
             const trans = event.results[i][0].transcript;
@@ -258,7 +296,7 @@ export function useVoiceAssistant() {
             }
 
             silenceTimeoutRef.current = setTimeout(() => {
-              // Đã 2 giây người dùng dừng nói -> Tự động đưa câu hỏi vô luôn khỏi cần chấp nhận
+              // Đã 2 giây người dùng dừng nói -> Tự động gửi câu hỏi
               stopListening({ onFinal: onFinalCallbackRef.current });
             }, 2000);
           }
