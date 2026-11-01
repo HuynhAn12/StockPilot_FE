@@ -60,14 +60,115 @@ function renderRichMarkdown(text, isUser) {
     return <span className="whitespace-pre-wrap">{text}</span>;
   }
 
-  const lines = text.split('\n');
+  const rawLines = text.split('\n');
+  const blocks = [];
+  let i = 0;
+
+  while (i < rawLines.length) {
+    const line = rawLines[i];
+    const trimmed = line.trim();
+
+    // Check if this line starts a Markdown Table: "| col 1 | col 2 |" followed by "|---|---|"
+    if (
+      trimmed.startsWith('|') &&
+      trimmed.endsWith('|') &&
+      i + 1 < rawLines.length &&
+      /^\|(\s*:?-+:?\s*\|)+$/.test(rawLines[i + 1].trim())
+    ) {
+      const headerRow = trimmed.slice(1, -1).split('|').map((c) => c.trim());
+      const dividerRow = rawLines[i + 1].trim().slice(1, -1).split('|').map((c) => c.trim());
+      const alignments = dividerRow.map((col) => {
+        if (col.startsWith(':') && col.endsWith(':')) return 'center';
+        if (col.endsWith(':')) return 'right';
+        return 'left';
+      });
+
+      const tableRows = [];
+      i += 2;
+      while (i < rawLines.length && rawLines[i].trim().startsWith('|') && rawLines[i].trim().endsWith('|')) {
+        const rowCells = rawLines[i].trim().slice(1, -1).split('|').map((c) => c.trim());
+        tableRows.push(rowCells);
+        i++;
+      }
+
+      blocks.push({
+        type: 'table',
+        headers: headerRow,
+        alignments,
+        rows: tableRows,
+      });
+      continue;
+    }
+
+    blocks.push({
+      type: 'line',
+      line,
+      trimmed,
+    });
+    i++;
+  }
+
   return (
     <div className="ai-prose space-y-2 text-[#303233]">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
+      {blocks.map((block, idx) => {
+        if (block.type === 'table') {
+          return (
+            <div key={idx} className="overflow-x-auto my-3 rounded-2xl border border-slate-200/90 shadow-2xs bg-white">
+              <table className="min-w-full text-xs text-left border-collapse">
+                <thead className="bg-slate-100/90 text-slate-800 font-bold border-b border-slate-200">
+                  <tr>
+                    {block.headers.map((h, hIdx) => (
+                      <th
+                        key={hIdx}
+                        className={`px-3.5 py-2.5 font-bold text-slate-800 ${
+                          block.alignments[hIdx] === 'center'
+                            ? 'text-center'
+                            : block.alignments[hIdx] === 'right'
+                            ? 'text-right'
+                            : 'text-left'
+                        }`}
+                      >
+                        {parseInlineMarkdown(h)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {block.rows.map((row, rIdx) => (
+                    <tr
+                      key={rIdx}
+                      className="hover:bg-blue-50/40 transition-colors even:bg-slate-50/40"
+                    >
+                      {row.map((cell, cIdx) => (
+                        <td
+                          key={cIdx}
+                          className={`px-3.5 py-2.5 text-slate-700 whitespace-nowrap sm:whitespace-normal ${
+                            block.alignments[cIdx] === 'center'
+                              ? 'text-center'
+                              : block.alignments[cIdx] === 'right'
+                              ? 'text-right'
+                              : 'text-left'
+                          }`}
+                        >
+                          {parseInlineMarkdown(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        const { line, trimmed } = block;
 
         if (!trimmed) {
           return <div key={idx} className="h-1.5" />;
+        }
+
+        if (trimmed === '---' || trimmed === '***') {
+          return <hr key={idx} className="my-2.5 border-t border-slate-200/80" />;
         }
 
         // Heading 3: ###
@@ -93,6 +194,19 @@ function renderRichMarkdown(text, isUser) {
             >
               {headingText}
             </h2>
+          );
+        }
+
+        // Heading 1: #
+        if (trimmed.startsWith('# ')) {
+          const headingText = trimmed.replace(/^#\s+/, '');
+          return (
+            <h1
+              key={idx}
+              className="text-lg sm:text-xl font-black text-slate-900 mt-4 mb-2 flex items-center gap-1.5"
+            >
+              {headingText}
+            </h1>
           );
         }
 

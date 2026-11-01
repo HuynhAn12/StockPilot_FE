@@ -15,6 +15,141 @@ const FOLLOW_UPS = {
 
 const nowLabel = (isEn) => new Date().toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' });
 
+function renderChatMessage(text, isUser) {
+  if (isUser) {
+    return <span>{text}</span>;
+  }
+
+  const rawLines = text.split('\n');
+  const blocks = [];
+  let i = 0;
+
+  while (i < rawLines.length) {
+    const line = rawLines[i];
+    const trimmed = line.trim();
+
+    if (
+      trimmed.startsWith('|') &&
+      trimmed.endsWith('|') &&
+      i + 1 < rawLines.length &&
+      /^\|(\s*:?-+:?\s*\|)+$/.test(rawLines[i + 1].trim())
+    ) {
+      const headerRow = trimmed.slice(1, -1).split('|').map((c) => c.trim());
+      const dividerRow = rawLines[i + 1].trim().slice(1, -1).split('|').map((c) => c.trim());
+      const alignments = dividerRow.map((col) => {
+        if (col.startsWith(':') && col.endsWith(':')) return 'center';
+        if (col.endsWith(':')) return 'right';
+        return 'left';
+      });
+
+      const tableRows = [];
+      i += 2;
+      while (i < rawLines.length && rawLines[i].trim().startsWith('|') && rawLines[i].trim().endsWith('|')) {
+        const rowCells = rawLines[i].trim().slice(1, -1).split('|').map((c) => c.trim());
+        tableRows.push(rowCells);
+        i++;
+      }
+
+      blocks.push({
+        type: 'table',
+        headers: headerRow,
+        alignments,
+        rows: tableRows,
+      });
+      continue;
+    }
+
+    blocks.push({
+      type: 'line',
+      line,
+      trimmed,
+    });
+    i++;
+  }
+
+  const parseInline = (str) => {
+    const parts = str.split(/(\*\*.*?\*\*|`.*?`)/g);
+    return parts.map((p, idx) => {
+      if (p.startsWith('**') && p.endsWith('**')) {
+        return <strong key={idx} className="font-bold text-slate-900">{p.slice(2, -2)}</strong>;
+      }
+      if (p.startsWith('`') && p.endsWith('`')) {
+        return <code key={idx} className="bg-blue-50 text-blue-600 px-1 rounded">{p.slice(1, -1)}</code>;
+      }
+      return p;
+    });
+  };
+
+  return (
+    <div className="space-y-1.5">
+      {blocks.map((block, idx) => {
+        if (block.type === 'table') {
+          return (
+            <div key={idx} className="overflow-x-auto my-2 rounded-xl border border-slate-200 bg-white">
+              <table className="min-w-full text-[11px] text-left border-collapse">
+                <thead className="bg-slate-100 text-slate-800 font-bold border-b border-slate-200">
+                  <tr>
+                    {block.headers.map((h, hIdx) => (
+                      <th
+                        key={hIdx}
+                        className={`px-2.5 py-1.5 font-bold ${
+                          block.alignments[hIdx] === 'center'
+                            ? 'text-center'
+                            : block.alignments[hIdx] === 'right'
+                            ? 'text-right'
+                            : 'text-left'
+                        }`}
+                      >
+                        {parseInline(h)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {block.rows.map((row, rIdx) => (
+                    <tr key={rIdx} className="hover:bg-blue-50/30">
+                      {row.map((cell, cIdx) => (
+                        <td
+                          key={cIdx}
+                          className={`px-2.5 py-1.5 whitespace-nowrap ${
+                            block.alignments[cIdx] === 'center'
+                              ? 'text-center'
+                              : block.alignments[cIdx] === 'right'
+                              ? 'text-right'
+                              : 'text-left'
+                          }`}
+                        >
+                          {parseInline(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        const { line, trimmed } = block;
+        if (!trimmed) return <div key={idx} className="h-1" />;
+        if (trimmed === '---' || trimmed === '***') return <hr key={idx} className="my-1.5 border-t border-slate-200" />;
+
+        const isHeading = /^#{1,6}\s+/.test(trimmed);
+        if (isHeading) {
+          const headingText = trimmed.replace(/^#{1,6}\s+/, '');
+          return <div key={idx} className="font-bold text-slate-900 mt-2 mb-1">{parseInline(headingText)}</div>;
+        }
+
+        return (
+          <div key={idx} className="leading-relaxed">
+            {parseInline(line)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function AIChatBox() {
   const { language } = useTranslation();
   const isEn = language === 'en';
@@ -280,22 +415,8 @@ export function AIChatBox() {
                         : 'bg-white text-slate-800 rounded-bl-xs border border-slate-200/80'
                     }`}
                   >
-                    <div className="whitespace-pre-line">
-                      {msg.text.split('\n').map((line, i) => {
-                        // Minimal markdown: "#" headings become bold lines, **bold** spans stay bold
-                        const heading = /^#{1,6}\s+/.test(line);
-                        const parts = line.replace(/^#{1,6}\s+/, '').split(/(\*\*.*?\*\*)/g);
-                        return (
-                          <span key={i} className={`block min-h-[1.2em] ${heading ? 'font-semibold text-slate-900 mt-1' : ''}`}>
-                            {parts.map((p, idx) => {
-                              if (p.startsWith('**') && p.endsWith('**')) {
-                                return <strong key={idx} className={msg.sender === 'user' ? 'text-white font-bold' : 'text-slate-900 font-bold'}>{p.slice(2, -2)}</strong>;
-                              }
-                              return p;
-                            })}
-                          </span>
-                        );
-                      })}
+                    <div>
+                      {renderChatMessage(msg.text, msg.sender === 'user')}
                     </div>
 
                     {msg.actionLinks && msg.actionLinks.length > 0 && (
