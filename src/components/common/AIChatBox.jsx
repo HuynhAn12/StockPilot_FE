@@ -68,13 +68,34 @@ function renderChatMessage(text, isUser) {
   }
 
   const parseInline = (str) => {
-    const parts = str.split(/(\*\*.*?\*\*|`.*?`)/g);
+    if (!str) return null;
+    if (/<br\s*\/?>/i.test(str)) {
+      const segs = str.split(/<br\s*\/?>/gi);
+      return segs.map((s, sIdx) => (
+        <span key={sIdx}>
+          {parseInline(s)}
+          {sIdx < segs.length - 1 && <br />}
+        </span>
+      ));
+    }
+
+    const parts = str.split(/(\*\*.*?\*\*|`.*?`|[█▉▊▋▌▍▎▏■]+)/g);
     return parts.map((p, idx) => {
       if (p.startsWith('**') && p.endsWith('**')) {
         return <strong key={idx} className="font-bold text-slate-900">{p.slice(2, -2)}</strong>;
       }
       if (p.startsWith('`') && p.endsWith('`')) {
         return <code key={idx} className="bg-blue-50 text-blue-600 px-1 rounded">{p.slice(1, -1)}</code>;
+      }
+      if (/^[█▉▊▋▌▍▎▏■]+$/.test(p)) {
+        const widthPx = Math.min(80, Math.max(15, p.length * 7));
+        return (
+          <span
+            key={idx}
+            className="inline-block h-2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 align-middle mx-1 shadow-2xs"
+            style={{ width: `${widthPx}px` }}
+          />
+        );
       }
       return p;
     });

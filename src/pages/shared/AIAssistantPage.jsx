@@ -19,7 +19,20 @@ import { useVoiceAssistant } from '../../hooks/useVoiceAssistant';
 
 function parseInlineMarkdown(text) {
   if (!text) return null;
-  const regex = /(\*\*.*?\*\*|`.*?`|\(SP\d+\))/g;
+
+  // Render <br> or <br/> tags as real HTML line breaks
+  if (/<br\s*\/?>/i.test(text)) {
+    const segments = text.split(/<br\s*\/?>/gi);
+    return segments.map((seg, sIdx) => (
+      <span key={sIdx}>
+        {parseInlineMarkdown(seg)}
+        {sIdx < segments.length - 1 && <br />}
+      </span>
+    ));
+  }
+
+  // Handle bold, code, SKU chips, and ASCII block bars
+  const regex = /(\*\*.*?\*\*|`.*?`|\(SP\d+\)|[█▉▊▋▌▍▎▏■]+)/g;
   const parts = text.split(regex);
 
   return parts.map((part, idx) => {
@@ -49,6 +62,17 @@ function parseInlineMarkdown(text) {
         >
           {part}
         </span>
+      );
+    }
+    if (/^[█▉▊▋▌▍▎▏■]+$/.test(part)) {
+      // Modern visual progress bar pill instead of raw black ASCII blocks
+      const widthPx = Math.min(120, Math.max(20, part.length * 9));
+      return (
+        <span
+          key={idx}
+          className="inline-block h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 align-middle mx-1 shadow-2xs"
+          style={{ width: `${widthPx}px` }}
+        />
       );
     }
     return part;
