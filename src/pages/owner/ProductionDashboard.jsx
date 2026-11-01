@@ -18,6 +18,9 @@ import {
 } from '../../components/DashboardIllustrations';
 import { apiGetAnalyticsSummary } from '../../services/analyticsService';
 import { useTranslation } from '../../i18n/useTranslation';
+import { useAuthStore } from '../../components/store/authStore';
+import { isOwner } from '../../config/permissions.config';
+import { RevenueThresholdCard } from '../../features/tax-support/components/RevenueThresholdCard';
 
 function getDaysInMonth(year, monthIndex) {
   return new Date(year, monthIndex + 1, 0).getDate();
@@ -66,6 +69,7 @@ export function ProductionDashboard() {
   const { toast } = useToast();
   const { language } = useTranslation();
   const isEn = language === 'en';
+  const showTaxThreshold = isOwner(useAuthStore((s) => s.user?.role));
 
   // API data state
   const [metrics, setMetrics] = useState(null);
@@ -501,6 +505,9 @@ export function ProductionDashboard() {
           <GroceryBagIllustration className="w-24 h-24 sm:w-26 sm:h-26" />
         </div>
       </header>
+
+      {/* Ngưỡng doanh thu hóa đơn điện tử (chỉ chủ shop — dữ liệu tài chính) */}
+      {showTaxThreshold && <RevenueThresholdCard isEn={isEn} />}
 
       {/* ============================================================== */}
       {/* 2. TIME FILTER TOOLBAR                                         */}
