@@ -239,14 +239,34 @@ export function AIAssistantPage() {
 
   const lastTurn = activeSession.turns[activeSession.turns.length - 1];
 
-  // Tự động phát âm thanh ngay lập tức khi AI vừa trả lời xong (không cần bấm vào loa)
+  // Chỉ phát âm thanh khi người dùng VỪA BẮT ĐẦU HỎI trong phiên hiện tại (không đọc lại lịch sử cũ khi vừa vào trang)
+  const shouldSpeakNextResponseRef = useRef(false);
   const lastSpokenTurnIdRef = useRef(null);
+
+  // Khi chuyển đoạn chat hoặc vừa vào trang, reset cờ và dừng phát âm cũ
+  useEffect(() => {
+    shouldSpeakNextResponseRef.current = false;
+    stopSpeaking();
+    if (lastTurn?.id) {
+      lastSpokenTurnIdRef.current = lastTurn.id;
+    }
+  }, [activeChatId]);
+
+  // Tự động phát âm thanh khi AI vừa trả lời xong câu hỏi người dùng vừa hỏi
   useEffect(() => {
     if (!lastTurn || !lastTurn.answer || lastTurn.status !== 'done') return;
+
+    // Nếu người dùng chưa hỏi câu nào trong phiên làm việc này (vừa vào trang / load lịch sử)
+    if (!shouldSpeakNextResponseRef.current) {
+      lastSpokenTurnIdRef.current = lastTurn.id;
+      return;
+    }
+
     if (lastSpokenTurnIdRef.current === lastTurn.id) return;
 
     if (autoSpeakEnabled) {
       lastSpokenTurnIdRef.current = lastTurn.id;
+      shouldSpeakNextResponseRef.current = false; // Đã đọc xong câu trả lời này
       speak(lastTurn.answer, `${lastTurn.id}-a`);
     }
   }, [lastTurn, autoSpeakEnabled, speak]);
@@ -267,17 +287,24 @@ export function AIAssistantPage() {
     const text = (textToSend ?? inputMessage).trim();
     if (!text) return;
     stick();
-    if (!send(text)) return;
+    shouldSpeakNextResponseRef.current = true;
+    if (!send(text)) {
+      shouldSpeakNextResponseRef.current = false;
+      return;
+    }
     setInputMessage('');
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
   const handleRetry = (turnId, text) => {
     stick();
+    shouldSpeakNextResponseRef.current = true;
     send(text, turnId);
   };
 
   const handleNewChat = () => {
+    shouldSpeakNextResponseRef.current = false;
+    stopSpeaking();
     newChat();
     setInputMessage('');
   };
