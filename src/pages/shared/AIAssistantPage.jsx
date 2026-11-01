@@ -714,7 +714,7 @@ export function AIAssistantPage() {
                           </button>
                         </span>
                       )}
-                      {!isUser && <AISourceBadge source={msg.source} fallbackReason={msg.fallbackReason} isEn={isEn} />}
+
 
                       {!isUser && (
                         <>

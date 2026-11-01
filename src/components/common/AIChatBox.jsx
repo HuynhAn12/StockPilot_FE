@@ -288,7 +288,7 @@ export function AIChatBox() {
 
                 <span className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1 px-1">
                   {msg.timestamp}
-                  {msg.sender === 'ai' && <AISourceBadge source={msg.source} fallbackReason={msg.fallbackReason} isEn={isEn} />}
+
                   {msg.sender === 'ai' && voiceSupported.tts && (
                     <button
                       type="button"
