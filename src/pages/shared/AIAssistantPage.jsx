@@ -678,12 +678,9 @@ export function AIAssistantPage() {
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-3 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center gap-1.5 font-bold text-slate-700">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>AI Pilot Live Sync</span>
-          </div>
-          <span className="text-[10px] text-slate-400">MySQL Database</span>
+        <div className="p-3 border-t border-slate-100 bg-slate-50/70 flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>AI Pilot Live Sync</span>
         </div>
       </div>
 
@@ -1130,8 +1127,8 @@ export function AIAssistantPage() {
 
             <p className="text-[10px] text-center text-slate-400 mt-2">
               {isEn
-                ? 'AI Pilot responds automatically based on live store data. You can click action buttons to navigate instantly.'
-                : 'AI Pilot trả lời tự động dựa trên dữ liệu thật của cửa hàng. Bạn có thể bấm vào các nút điều hướng để thao tác ngay.'}
+                ? 'AI Pilot responds automatically based on store data. You can click action buttons to navigate instantly.'
+                : 'AI Pilot trả lời tự động dựa trên dữ liệu của cửa hàng. Bạn có thể bấm vào các nút điều hướng để thao tác ngay.'}
             </p>
           </div>
         </div>
