@@ -236,18 +236,27 @@ export const useProductStore = create((set, get) => ({
     }
   },
 
-  toggleProductStatus: (id) => {
+  toggleProductStatus: async (id) => {
+    const p = get().products.find((item) => item.id === id);
+    if (!p) return;
+    const nextActive = !(p.isActive ?? (p.status === 'active'));
     set((state) => ({
-      products: state.products.map((p) =>
-        p.id === id
+      products: state.products.map((item) =>
+        item.id === id
           ? {
-              ...p,
-              isActive: !p.isActive,
-              status: p.status === 'active' ? 'inactive' : 'active',
+              ...item,
+              isActive: nextActive,
+              status: nextActive ? 'active' : 'inactive',
             }
-          : p
+          : item
       ),
     }));
+    broadcastProductChange('UPDATE', { id, isActive: nextActive, status: nextActive ? 'active' : 'inactive' });
+    try {
+      await apiUpdateProduct(id, { isActive: nextActive });
+    } catch (e) {
+      console.warn('Lỗi khi cập nhật trạng thái sản phẩm lên backend:', e);
+    }
   },
 
   resetToDefault: () => {
