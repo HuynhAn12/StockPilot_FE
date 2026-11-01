@@ -166,8 +166,11 @@ export function AIAssistantPage() {
 
   const {
     isListening,
+    isTranscribing,
     isSpeaking,
     speakingMessageId,
+    autoSpeakEnabled,
+    setAutoSpeakEnabled,
     voiceSupported,
     startListening,
     stopListening,
@@ -177,8 +180,18 @@ export function AIAssistantPage() {
 
   const handleToggleVoice = () => {
     if (isListening) {
-      stopListening();
+      stopListening({
+        onFinal: (finalText) => {
+          setInputMessage(finalText);
+          if (finalText.trim()) {
+            handleSendMessage(finalText.trim());
+          }
+        },
+      });
     } else {
+      if (isSpeaking) {
+        stopSpeaking();
+      }
       startListening({
         onInterim: (text) => {
           setInputMessage(text);
@@ -223,6 +236,18 @@ export function AIAssistantPage() {
   }, [activeSession.turns, isEn]);
 
   const lastTurn = activeSession.turns[activeSession.turns.length - 1];
+
+  // Tự động phát âm thanh ngay lập tức khi AI vừa trả lời xong (không cần bấm vào loa)
+  const lastSpokenTurnIdRef = useRef(null);
+  useEffect(() => {
+    if (!lastTurn || !lastTurn.answer || lastTurn.status !== 'done') return;
+    if (lastSpokenTurnIdRef.current === lastTurn.id) return;
+
+    if (autoSpeakEnabled) {
+      lastSpokenTurnIdRef.current = lastTurn.id;
+      speak(lastTurn.answer, `${lastTurn.id}-a`);
+    }
+  }, [lastTurn, autoSpeakEnabled, speak]);
   const { containerRef: feedRef, onScroll: onFeedScroll, scrollToBottom, stick, hasUnseen } = useStickToBottom({
     sessionKey: activeChatId,
     itemCount: messages.length,
@@ -816,7 +841,7 @@ export function AIAssistantPage() {
         {/* Input Bar */}
         <div className="p-4 bg-gradient-to-t from-white via-white to-white/80 border-t border-slate-100">
           <div className="max-w-3xl mx-auto w-full">
-            {/* Listening Indicator Bar */}
+            {/* Voice Status Indicators */}
             {isListening && (
               <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-gradient-to-r from-rose-50 to-amber-50 border border-rose-200 rounded-2xl text-xs text-rose-700 animate-pulse shadow-sm">
                 <span className="relative flex h-2.5 w-2.5">
@@ -824,14 +849,39 @@ export function AIAssistantPage() {
                   <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600"></span>
                 </span>
                 <span className="font-bold">
-                  {isEn ? "Listening to your voice... Speak your question now" : "Đang lắng nghe giọng nói của bạn... Hãy đặt câu hỏi cho AI"}
+                  {isEn ? "Listening to your voice... (Groq Whisper AI ready)" : "Đang lắng nghe giọng nói của bạn... (Tích hợp Groq Whisper AI)"}
                 </span>
                 <button
                   type="button"
-                  onClick={stopListening}
-                  className="ml-auto text-[11px] underline font-bold hover:text-rose-900 cursor-pointer"
+                  onClick={handleToggleVoice}
+                  className="ml-auto text-[11px] bg-rose-600 text-white px-2.5 py-0.5 rounded-lg font-bold hover:bg-rose-700 cursor-pointer shadow-xs"
                 >
-                  {isEn ? "Stop" : "Dừng lại"}
+                  {isEn ? "Done Speaking" : "Nói xong / Gửi ngay"}
+                </button>
+              </div>
+            )}
+
+            {isTranscribing && (
+              <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-indigo-50 border border-indigo-200 rounded-2xl text-xs text-indigo-700 shadow-sm animate-pulse">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                <span className="font-bold">
+                  {isEn ? "Groq Whisper AI is processing speech..." : "Groq Whisper AI đang nhận diện giọng nói siêu nhanh..."}
+                </span>
+              </div>
+            )}
+
+            {isSpeaking && (
+              <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl text-xs text-blue-800 shadow-sm">
+                <Volume2 className="w-4 h-4 text-blue-600 animate-bounce" />
+                <span className="font-semibold">
+                  {isEn ? "AI Pilot is speaking the response..." : "AI Pilot đang trả lời bằng giọng nói..."}
+                </span>
+                <button
+                  type="button"
+                  onClick={stopSpeaking}
+                  className="ml-auto text-[11px] bg-white border border-blue-300 text-blue-700 px-2 py-0.5 rounded-lg font-bold hover:bg-blue-100 cursor-pointer"
+                >
+                  {isEn ? "Stop Speaking" : "Tắt tiếng"}
                 </button>
               </div>
             )}
@@ -855,12 +905,36 @@ export function AIAssistantPage() {
                 className="flex-1 max-h-36 bg-transparent text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm px-3 py-1.5 resize-none focus:outline-none font-medium leading-relaxed"
               />
 
+              {/* Nút bật/tắt tự động đọc giọng nói */}
+              {voiceSupported.tts && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSpeaking) stopSpeaking();
+                    setAutoSpeakEnabled(!autoSpeakEnabled);
+                  }}
+                  aria-label={autoSpeakEnabled ? "Tắt tự động đọc giọng nói" : "Bật tự động đọc giọng nói"}
+                  className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer mb-0.5 ${
+                    autoSpeakEnabled
+                      ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 ring-1 ring-blue-300/60'
+                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                  }`}
+                  title={
+                    autoSpeakEnabled
+                      ? (isEn ? "Auto-speak answers: ON (Click to mute)" : "Tự động đọc giọng nói: Đang BẬT (Bấm để tắt)")
+                      : (isEn ? "Auto-speak answers: OFF (Click to enable)" : "Tự động đọc giọng nói: Đang TẮT (Bấm để bật)")
+                  }
+                >
+                  {autoSpeakEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </button>
+              )}
+
               {/* Nút Micro thu âm giọng nói */}
               {voiceSupported.stt && (
                 <button
                   type="button"
                   onClick={handleToggleVoice}
-                  disabled={isSending || isHistoryLoading}
+                  disabled={isSending || isHistoryLoading || isTranscribing}
                   aria-label={isListening ? "Dừng nghe" : "Hỏi bằng giọng nói"}
                   className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer mb-0.5 relative ${
                     isListening
@@ -869,8 +943,8 @@ export function AIAssistantPage() {
                   }`}
                   title={
                     isListening
-                      ? (isEn ? "Listening... Click to stop" : "Đang lắng nghe... Bấm để dừng")
-                      : (isEn ? "Ask with voice (Vietnamese)" : "Nhấn để nói tiếng Việt (Nhận diện siêu nhanh)")
+                      ? (isEn ? "Listening... Click to finish" : "Đang lắng nghe... Bấm để gửi")
+                      : (isEn ? "Ask with voice (Groq Whisper AI)" : "Nhấn để nói (Tự động nhận diện Groq Whisper & Trả lời bằng giọng nói)")
                   }
                 >
                   {isListening ? (

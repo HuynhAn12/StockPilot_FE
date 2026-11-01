@@ -25,18 +25,32 @@ export function AIChatBox() {
 
   const {
     isListening,
+    isTranscribing,
     isSpeaking,
     speakingMessageId,
+    autoSpeakEnabled,
+    setAutoSpeakEnabled,
     voiceSupported,
     startListening,
     stopListening,
     speak,
+    stopSpeaking,
   } = useVoiceAssistant();
 
   const handleToggleVoice = () => {
     if (isListening) {
-      stopListening();
+      stopListening({
+        onFinal: (finalText) => {
+          setInputValue(finalText);
+          if (finalText.trim()) {
+            handleSendMessage(finalText.trim());
+          }
+        },
+      });
     } else {
+      if (isSpeaking) {
+        stopSpeaking();
+      }
       startListening({
         onInterim: (text) => {
           setInputValue(text);
@@ -149,6 +163,11 @@ export function AIChatBox() {
       setIsTyping(false);
     }
     setMessages((prev) => [...prev, aiMsg]);
+
+    // Tự động phát âm thanh ngay lập tức
+    if (autoSpeakEnabled && aiMsg.text) {
+      speak(aiMsg.text, aiMsg.id);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -400,17 +419,35 @@ export function AIChatBox() {
                 }`}
               />
 
+              {voiceSupported.tts && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSpeaking) stopSpeaking();
+                    setAutoSpeakEnabled(!autoSpeakEnabled);
+                  }}
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                    autoSpeakEnabled
+                      ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                  }`}
+                  title={autoSpeakEnabled ? 'Tự động đọc giọng nói: BẬT' : 'Tự động đọc giọng nói: TẮT'}
+                >
+                  {autoSpeakEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </button>
+              )}
+
               {voiceSupported.stt && (
                 <button
                   type="button"
                   onClick={handleToggleVoice}
-                  disabled={isTyping}
+                  disabled={isTyping || isTranscribing}
                   className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all cursor-pointer relative ${
                     isListening
                       ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-md shadow-rose-500/30'
                       : 'bg-slate-100 hover:bg-blue-50 text-slate-600 hover:text-blue-600'
                   }`}
-                  title={isListening ? 'Dừng lắng nghe' : 'Hỏi bằng giọng nói (Tiếng Việt)'}
+                  title={isListening ? 'Nói xong / Gửi ngay' : 'Hỏi bằng giọng nói (Groq Whisper AI)'}
                 >
                   <Mic className="w-4 h-4" />
                 </button>
