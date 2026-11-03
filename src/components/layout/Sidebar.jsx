@@ -16,13 +16,14 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { useAlertsStore } from '../store/alertsStore';
 import { usePricingStore } from '../store/pricingStore';
 import { StockPilotLogoIcon } from '../common/StockPilotLogo';
+import { Gauge } from 'lucide-react';
 
 const NAV_ITEM_CONFIG = [
   // Hệ thống & Nghiệp vụ Cửa hàng (Chủ shop & Nhân viên)
   { key: 'navDashboard', sectionKey: 'systemSection', defaultName: 'Tổng quan', defaultSection: 'Hệ thống', href: '/dashboard', icon: LayoutDashboard, roles: ['store_owner','warehouse_staff','admin'] },
   { key: 'navProducts', defaultName: 'Sản phẩm', href: '/products', icon: Package, roles: ['store_owner','warehouse_staff'] },
   { key: 'navPos', defaultName: 'Thanh toán', href: '/pos', icon: ShoppingBag, roles: ['store_owner','warehouse_staff'] },
-  { key: 'navOrders', defaultName: 'Đơn hàng', href: '/orders', icon: ShoppingCart, roles: ['store_owner'] },
+  { key: 'navOrders', defaultName: 'Đơn hàng', href: '/orders', icon: ShoppingCart, roles: ['store_owner','warehouse_staff'] },
   { key: 'navStaff', defaultName: 'Nhân viên', href: '/staff', icon: Users, roles: ['store_owner'] },
   { key: 'navInventory', defaultName: 'Quản lý kho', href: '/inventory', icon: Boxes, roles: ['store_owner','warehouse_staff'] },
   // Hỗ trợ quyết định (Chủ shop & Nhân viên)
@@ -41,6 +42,8 @@ const NAV_ITEM_CONFIG = [
   { key: 'navAdminSupport', defaultName: 'Hỗ trợ khách hàng', href: '/admin/support', icon: LifeBuoy, badgeKey: 'support', badgeVariant: 'error', roles: ['admin'] },
   { key: 'navLeads', defaultName: 'Khách hàng tiềm năng', href: '/admin/leads', icon: UserCheck, badgeKey: 'leads', roles: ['admin'] },
   { key: 'navSystem', defaultName: 'Hệ thống & AI', href: '/admin/system', icon: Server, roles: ['admin'] },
+  { key: 'navAdminOps', defaultName: 'Vận hành nền tảng', href: '/admin/ops', icon: Gauge, roles: ['admin'] },
+  { key: 'navAdminSecurity', defaultName: 'Bảo mật & Kiểm soát', href: '/admin/security', icon: ShieldCheck, roles: ['admin'] },
 ];
 
 import { normalizeRole } from '../../config/permissions.config';

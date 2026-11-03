@@ -24,8 +24,9 @@ export function normalizeUser(user) {
 }
 
 // POST /auth/login
-export async function apiLogin({ email, password }) {
-  const { data } = await apiClient.post('/auth/login', { email, password });
+export async function apiLogin({ email, password, otpCode }) {
+  // otpCode: mã 2FA (6 số) hoặc mã khôi phục — chỉ gửi khi admin đã bật xác thực 2 lớp
+  const { data } = await apiClient.post('/auth/login', { email, password, ...(otpCode ? { otpCode } : {}) });
   const raw = data.data;
   return {
     user: normalizeUser({ ...raw.user, store: raw.store }),

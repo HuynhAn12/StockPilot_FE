@@ -34,16 +34,17 @@ export const useAuthStore = create(
       setHydrated: (val) => set({ isHydrated: val }),
 
       // ─── Đăng nhập thật qua API ───
-      login: async ({ email, password }) => {
+      login: async ({ email, password, otpCode }) => {
         set({ isLoading: true, error: null });
         try {
-          const { user, token, refreshToken } = await apiLogin({ email, password });
+          const { user, token, refreshToken } = await apiLogin({ email, password, otpCode });
           set({ user, token, refreshToken, isLoading: false, error: null });
           return { success: true, user };
         } catch (err) {
           const message = getApiError(err);
           set({ isLoading: false, error: message });
-          return { success: false, error: message };
+          const twoFactorRequired = Boolean(err?.response?.data?.error?.details?.twoFactorRequired);
+          return { success: false, error: message, twoFactorRequired };
         }
       },
 

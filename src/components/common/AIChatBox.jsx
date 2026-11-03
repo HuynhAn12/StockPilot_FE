@@ -1,11 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
-import {
-  Bot, X, Send, Sparkles, RefreshCw, AlertTriangle,
-  Package, DollarSign, ArrowRight, CheckCircle2,
-  ChevronDown, Minimize2, MessageSquare, Zap
-} from 'lucide-react';
-import { useProductStore } from '../store/productStore';
+import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { Bot, X, Send, Sparkles, RefreshCw, ArrowUpRight } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
+import { apiChatWithAssistant } from '../../services/analyticsService';
+import { AISourceBadge } from '../assistant/AISourceBadge';
+import { assistantKeys, useAssistantScope } from '../../features/assistant/queries';
+
+const FOLLOW_UPS = {
+  vi: ['Hàng nào sắp hết kho?', 'Tổng quan tồn kho hôm nay', 'Cảnh báo rủi ro đọng vốn'],
+  en: ['Which items are low in stock?', "Today's inventory summary", 'Overstock & capital risk alert'],
+};
+
+const nowLabel = (isEn) => new Date().toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' });
 
 export function AIChatBox() {
   const { language } = useTranslation();
@@ -14,9 +21,10 @@ export function AIChatBox() {
   const [isOpen, setIsOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  const { products } = useProductStore();
+  const [, setUnreadCount] = useState(0);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { userId, storeId } = useAssistantScope();
 
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
@@ -63,84 +71,51 @@ export function AIChatBox() {
     }
   }, [isOpen, messages, isTyping]);
 
-  // Generate intelligent response based on current real store data
-  const generateAIResponse = (userQuestion) => {
-    const q = userQuestion.toLowerCase();
-    const productList = products || [];
-
-    // 1. Quản lý hết hàng / sắp hết
-    if (q.includes('hết') || q.includes('sắp hết') || q.includes('thiếu hàng') || q.includes('tồn thấp')) {
-      const lowStock = productList.filter(p => p.stock <= (p.alertThreshold || 10));
-      if (lowStock.length > 0) {
-        const items = lowStock.slice(0, 4).map(p => `• **${p.name}**: chỉ còn **${p.stock} ${p.unit || 'sản phẩm'}** (ngưỡng báo động: ${p.alertThreshold || 10})`).join('\n');
-        return `⚠️ **Phát hiện ${lowStock.length} sản phẩm sắp hết trong kho:**\n\n${items}\n\n💡 **Khuyến nghị AI Pilot:** Bạn nên liên hệ nhà cung cấp để lên đơn nhập hàng bổ sung trong 48h tới nhằm tránh gián đoạn bán hàng!`;
-      } else {
-        return `✅ **Tuyệt vời!** Hiện tại không có mặt hàng nào dưới ngưỡng an toàn. Tất cả ${productList.length} sản phẩm đều đang duy trì mức tồn kho ổn định.`;
-      }
-    }
-
-    // 2. Rủi ro đọng vốn / tồn dư
-    if (q.includes('đọng vốn') || q.includes('tồn dư') || q.includes('chậm bán') || q.includes('tồn kho cao')) {
-      const highStock = [...productList].sort((a, b) => (b.stock * b.costPrice) - (a.stock * a.costPrice)).slice(0, 3);
-      if (highStock.length > 0) {
-        const items = highStock.map(p => `• **${p.name}**: tồn **${p.stock} ${p.unit}** (giá trị vốn giam: ~${((p.stock * p.costPrice) / 1000).toLocaleString('vi-VN')}k đ)`).join('\n');
-        return `📊 **Phân tích rủi ro đọng vốn:**\n\nCác mặt hàng đang giữ tỷ trọng vốn tồn kho lớn nhất:\n${items}\n\n💡 **Gợi ý từ AI:** Cân nhắc tạo chương trình Combo giảm giá 5-10% hoặc Flash Sale cuối tuần để giải phóng dòng tiền nhanh!`;
-      }
-    }
-
-    // 3. Tổng quan kho hàng
-    if (q.includes('tổng quan') || q.includes('tình hình') || q.includes('doanh thu') || q.includes('bao nhiêu sản phẩm')) {
-      const totalStock = productList.reduce((acc, p) => acc + (p.stock || 0), 0);
-      const totalValue = productList.reduce((acc, p) => acc + ((p.stock || 0) * (p.costPrice || 0)), 0);
-      return `📈 **Báo cáo nhanh kho hàng:**\n\n• Tổng số mã sản phẩm: **${productList.length} mã**\n• Tổng số lượng tồn: **${totalStock.toLocaleString('vi-VN')} đơn vị**\n• Tổng giá trị vốn kho: **${(totalValue / 1000000).toFixed(1)} triệu VNĐ**\n• Sức khỏe kho hàng: **94/100 (Tốt)**\n\nBạn có muốn xem chi tiết nhóm hàng nào không?`;
-    }
-
-    // 4. Giá bán & Lợi nhuận
-    if (q.includes('giá') || q.includes('lợi nhuận') || q.includes('biên lợi nhuận') || q.includes('tối ưu')) {
-      return `💰 **Đề xuất chiến lược giá bán:**\n\n• **Nhóm Đồ ăn & Thực phẩm:** Biên lợi nhuận hiện tại đạt ~19%. Đang có thể nâng giá bán nhẹ 2-3% cho các dòng bánh nhập khẩu.\n• **Nhóm Nước ngọt & Nước ép:** Tỷ lệ quay vòng nhanh, nên giữ nguyên giá niêm yết để duy trì lượng khách quen.\n\n*Hệ thống chỉ gợi ý — Chủ shop toàn quyền quyết định mức giá!*`;
-    }
-
-    // 5. Chào hỏi
-    if (q.includes('chào') || q.includes('hello') || q.includes('hi') || q.includes('ơi')) {
-      return `Chào bạn! Tôi luôn sẵn sàng 24/7 đồng hành cùng cửa hàng của bạn. Bạn muốn tôi kiểm tra kho hàng, tìm kiếm sản phẩm hay phân tích giá bán?`;
-    }
-
-    // Default intelligent answer
-    return `Tôi đã ghi nhận câu hỏi: "*${userQuestion}*".\n\nHiện tại kho của bạn đang vận hành với **${productList.length} sản phẩm**. Theo dữ liệu thời gian thực, luồng hàng nhập xuất diễn ra bình thường.\n\nBạn có thể thử hỏi tôi các lệnh nhanh:\n• *"Hàng nào sắp hết kho?"*\n• *"Cảnh báo đọng vốn"*`;
-  };
-
   const handleSendMessage = async (textToSend) => {
     const text = (textToSend || inputValue).trim();
     if (!text) return;
+
+    if (isTyping) return;
 
     const userMsg = {
       id: `user-${Date.now()}`,
       sender: 'user',
       text: text,
-      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+      timestamp: nowLabel(isEn)
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInputValue('');
     setIsTyping(true);
 
-    // Simulate AI thinking and reply
-    await new Promise((r) => setTimeout(r, 650));
-
-    const replyText = generateAIResponse(text);
-    const aiMsg = {
-      id: `ai-${Date.now()}`,
-      sender: 'ai',
-      text: replyText,
-      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      suggestions: [
-        'Hàng nào sắp hết kho?',
-        'Tổng quan tồn kho hôm nay',
-        'Cảnh báo rủi ro đọng vốn'
-      ]
-    };
-
-    setIsTyping(false);
+    // The backend answers from Decision Engine data (AI, or the rule-based fallback) and applies role limits.
+    let aiMsg;
+    try {
+      const response = await apiChatWithAssistant(text);
+      // Cùng một lịch sử với trang Trợ lý AI: trang đang mở thì tải lại ngay, không thì lần mở sau.
+      queryClient.invalidateQueries({ queryKey: assistantKeys.history(userId, storeId) });
+      aiMsg = {
+        id: `ai-${response.id || Date.now()}`,
+        sender: 'ai',
+        text: response.answer || (isEn ? 'No answer was returned. Please try again.' : 'Chưa nhận được câu trả lời. Vui lòng thử lại.'),
+        timestamp: nowLabel(isEn),
+        source: response.source,
+        fallbackReason: response.fallbackReason,
+        actionLinks: response.actionLinks || [],
+        suggestions: FOLLOW_UPS[isEn ? 'en' : 'vi']
+      };
+    } catch (err) {
+      aiMsg = {
+        id: `ai-err-${Date.now()}`,
+        sender: 'ai',
+        text: isEn
+          ? `**Could not reach the assistant.** ${err?.response?.data?.error?.message || err?.message || 'Network error'}`
+          : `**Không kết nối được trợ lý.** ${err?.response?.data?.error?.message || err?.message || 'Lỗi mạng'}`,
+        timestamp: nowLabel(isEn)
+      };
+    } finally {
+      setIsTyping(false);
+    }
     setMessages((prev) => [...prev, aiMsg]);
   };
 
@@ -156,13 +131,11 @@ export function AIChatBox() {
       {
         id: `welcome-${Date.now()}`,
         sender: 'ai',
-        text: 'Cuộc trò chuyện đã được làm mới. Bạn cần AI Pilot hỗ trợ tra cứu số liệu kho hàng nào?',
-        timestamp: 'Vừa xong',
-        suggestions: [
-          'Hàng nào sắp hết kho?',
-          'Cảnh báo rủi ro đọng vốn',
-          'Tổng quan tồn kho hôm nay'
-        ]
+        text: isEn
+          ? 'Conversation cleared. What would you like AI Pilot to look up?'
+          : 'Cuộc trò chuyện đã được làm mới. Bạn cần AI Pilot hỗ trợ tra cứu số liệu kho hàng nào?',
+        timestamp: isEn ? 'Just now' : 'Vừa xong',
+        suggestions: FOLLOW_UPS[isEn ? 'en' : 'vi']
       }
     ]);
   };
@@ -244,10 +217,11 @@ export function AIChatBox() {
                   >
                     <div className="whitespace-pre-line">
                       {msg.text.split('\n').map((line, i) => {
-                        // Simple bold markdown parser
-                        const parts = line.split(/(\*\*.*?\*\*)/g);
+                        // Minimal markdown: "#" headings become bold lines, **bold** spans stay bold
+                        const heading = /^#{1,6}\s+/.test(line);
+                        const parts = line.replace(/^#{1,6}\s+/, '').split(/(\*\*.*?\*\*)/g);
                         return (
-                          <span key={i} className="block min-h-[1.2em]">
+                          <span key={i} className={`block min-h-[1.2em] ${heading ? 'font-semibold text-slate-900 mt-1' : ''}`}>
                             {parts.map((p, idx) => {
                               if (p.startsWith('**') && p.endsWith('**')) {
                                 return <strong key={idx} className={msg.sender === 'user' ? 'text-white font-bold' : 'text-slate-900 font-bold'}>{p.slice(2, -2)}</strong>;
@@ -258,11 +232,31 @@ export function AIChatBox() {
                         );
                       })}
                     </div>
+
+                    {msg.actionLinks && msg.actionLinks.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap gap-1.5">
+                        {msg.actionLinks.map((link, lIdx) => (
+                          <button
+                            key={lIdx}
+                            type="button"
+                            onClick={() => {
+                              navigate(link.path || link.url);
+                              setIsOpen(false);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold rounded-lg border border-blue-200 transition-colors cursor-pointer"
+                          >
+                            <span>{link.label}</span>
+                            <ArrowUpRight className="w-3 h-3" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <span className="text-[10px] text-slate-400 mt-1 px-1">
+                <span className="flex items-center gap-1.5 text-[10px] text-slate-400 mt-1 px-1">
                   {msg.timestamp}
+                  {msg.sender === 'ai' && <AISourceBadge source={msg.source} fallbackReason={msg.fallbackReason} isEn={isEn} />}
                 </span>
 
                 {/* Suggestions Pills from AI */}
@@ -354,7 +348,7 @@ export function AIChatBox() {
 
               <button
                 type="submit"
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || isTyping}
                 className="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-40 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/30 transition-all cursor-pointer disabled:cursor-not-allowed"
                 title={isEn ? 'Send message (Enter)' : 'Gửi tin nhắn (Enter)'}
               >

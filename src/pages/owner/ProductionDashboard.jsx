@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Boxes, DollarSign, TrendingUp, AlertTriangle,
@@ -17,6 +18,9 @@ import {
 } from '../../components/DashboardIllustrations';
 import { apiGetAnalyticsSummary } from '../../services/analyticsService';
 import { useTranslation } from '../../i18n/useTranslation';
+import { useAuthStore } from '../../components/store/authStore';
+import { isOwner } from '../../config/permissions.config';
+import { RevenueThresholdCard } from '../../features/tax-support/components/RevenueThresholdCard';
 
 function getDaysInMonth(year, monthIndex) {
   return new Date(year, monthIndex + 1, 0).getDate();
@@ -30,11 +34,6 @@ function getFirstDayOfWeekVN(year, monthIndex) {
 // Format currency VND
 const formatVND = (n) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n ?? 0);
-
-const formatMillions = (n) => {
-  const val = (n ?? 0) / 1_000_000;
-  return val >= 1000 ? `${(val / 1000).toFixed(3)} tỷ` : `${val.toFixed(3)} tr`;
-};
 
 // Compact VND formatting (e.g. 72k, 1.200tr, 1.200 tỷ)
 const formatCompactVND = (n) => {
@@ -55,8 +54,6 @@ const formatKPIValue = (n, isEn = false) => {
   return { val: val.toLocaleString('vi-VN'), unit: '₫' };
 };
 
-const BAR_SOLID = '#2563eb'; // Classic flat blue — no gradient
-
 const STANDARD_CATEGORIES = [
   { name: 'Thực phẩm', nameEn: 'Food', lines: ['Thực phẩm'], linesEn: ['Food'], match: ['thực phẩm', 'thuc pham', 'tpcn', 'thuc-pham', 'do-an'] },
   { name: 'Đồ uống', nameEn: 'Beverages', lines: ['Đồ uống'], linesEn: ['Beverages'], match: ['đồ uống', 'do uong', 'drink', 'do-uong'] },
@@ -72,6 +69,7 @@ export function ProductionDashboard() {
   const { toast } = useToast();
   const { language } = useTranslation();
   const isEn = language === 'en';
+  const showTaxThreshold = isOwner(useAuthStore((s) => s.user?.role));
 
   // API data state
   const [metrics, setMetrics] = useState(null);
@@ -88,13 +86,25 @@ export function ProductionDashboard() {
   const [pickerMonthIndex, setPickerMonthIndex] = useState(9); // 0-indexed: 9 = Tháng 10
 
   const [c3Tab, setC3Tab] = useState('best');
-  const [hoveredDonut, setHoveredDonut] = useState(null);
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [hoveredCatBar, setHoveredCatBar] = useState(null);
 
   // Modals state
   const [activeQuickAction, setActiveQuickAction] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Modal đang mở: Esc để đóng, khóa cuộn trang phía sau.
+  useEffect(() => {
+    if (!activeQuickAction) return undefined;
+    const onKeyDown = (e) => { if (e.key === 'Escape' && !isProcessing) setActiveQuickAction(null); };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [activeQuickAction, isProcessing]);
 
   // Live timestamp & refresh
   const [lastUpdated, setLastUpdated] = useState(() => {
@@ -190,7 +200,9 @@ export function ProductionDashboard() {
           fetchMetrics(timeRange);
         }
       };
-    } catch (_) {}
+    } catch {
+      // BroadcastChannel không có trên trình duyệt cũ → chỉ bỏ đồng bộ giữa các tab.
+    }
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
@@ -214,7 +226,7 @@ export function ProductionDashboard() {
   };
 
   // Derived data from API — C1 bar chart with 7 requested categories
-  const revenueByCat = STANDARD_CATEGORIES.map((std, i) => {
+  const revenueByCat = STANDARD_CATEGORIES.map((std) => {
     const found = (metrics?.categoryStats ?? []).find((c) => {
       const cName = String(c.name || '').toLowerCase();
       return std.match.some(m => cName.includes(m)) || cName === std.name.toLowerCase();
@@ -237,8 +249,6 @@ export function ProductionDashboard() {
       isPos: margin >= 0,
     };
   });
-
-  const totalCatRev = revenueByCat.reduce((sum, c) => sum + c.revRaw, 0);
 
   // ─── C1: Setup Vertical Column Chart for 7 Categories ───
   const C1_SVG_W = 580;
@@ -391,12 +401,6 @@ export function ProductionDashboard() {
     cy: toChartY(m.revenue),
   }));
 
-  const total6MonthsRev = monthlyRevenue.reduce((s, p) => s + p.revenue, 0);
-  const total6MonthsOrders = monthlyRevenue.reduce((s, p) => s + p.orderCount, 0);
-
-  // Donut chart – simple split: normal vs low vs over
-  const totalSKU = metrics?.totalStockQuantity ?? 0;
-
   // Quick Action Handler
   const handleQuickActionSubmit = (e) => {
     e.preventDefault();
@@ -501,6 +505,9 @@ export function ProductionDashboard() {
           <GroceryBagIllustration className="w-24 h-24 sm:w-26 sm:h-26" />
         </div>
       </header>
+
+      {/* Ngưỡng doanh thu hóa đơn điện tử (chỉ chủ shop — dữ liệu tài chính) */}
+      {showTaxThreshold && <RevenueThresholdCard isEn={isEn} />}
 
       {/* ============================================================== */}
       {/* 2. TIME FILTER TOOLBAR                                         */}
@@ -1645,11 +1652,19 @@ export function ProductionDashboard() {
       {/* ============================================================== */}
       {/* 6. MODALS: QUICK ACTIONS                                       */}
       {/* ============================================================== */}
-      {activeQuickAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200 animate-in zoom-in-95">
+      {activeQuickAction && createPortal(
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setActiveQuickAction(null); }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quick-action-title"
+            className="bg-white rounded-3xl max-w-lg w-full max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 sm:p-8 shadow-2xl border border-slate-200 animate-in zoom-in-95"
+          >
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <h3 id="quick-action-title" className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 {activeQuickAction === 'add_product' && <PackagePlus className="w-5 h-5 text-blue-600" />}
                 {activeQuickAction === 'stock_trans' && <ArrowDownUp className="w-5 h-5 text-emerald-600" />}
                 {activeQuickAction === 'report' && <FileText className="w-5 h-5 text-amber-600" />}
@@ -1661,7 +1676,9 @@ export function ProductionDashboard() {
                 {activeQuickAction === 'print_barcode' && (isEn ? 'Print barcode & price tag' : 'In tem mã vạch & bảng giá')}
               </h3>
               <button
+                type="button"
                 onClick={() => setActiveQuickAction(null)}
+                aria-label={isEn ? 'Close' : 'Đóng'}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
               >
                 <X className="w-5 h-5" />
@@ -1770,7 +1787,8 @@ export function ProductionDashboard() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>

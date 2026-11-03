@@ -1,8 +1,6 @@
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Boxes,
-  BarChart3,
   CheckCircle2,
   ArrowRight,
   Smartphone,
@@ -18,16 +16,15 @@ import {
   Shirt,
   Coffee,
   Phone,
-  Star,
   Sparkles,
   AlertTriangle,
-  Quote,
   Mail,
   Store,
   Clock,
   TrendingUp,
   Cpu,
-  Tag
+  Tag,
+  ShieldCheck
 } from 'lucide-react';
 import { StockPilotLogo } from '../components/common/StockPilotLogo';
 import { apiClient } from '../lib/apiClient';
@@ -37,16 +34,26 @@ import { useTranslation } from '../i18n/useTranslation';
 
 // ─── Sub-Components: Hero Mockup ───
 import { HeroDashboardMockup } from '../components/landing/HeroDashboardMockup';
+import { FeatureScrollShowcase } from '../components/landing/FeatureScrollShowcase';
 
 // ─── Sub-Hero Stats & Integration Partners (from original design) ───
 const STATS = [
-  { value: '1.200+', valueEn: '1,200+', labelVi: 'Cửa hàng đang sử dụng', labelEn: 'Active Stores' },
-  { value: '3,5 triệu', valueEn: '3.5M', labelVi: 'Hóa đơn xử lý mỗi tháng', labelEn: 'Monthly Invoices' },
-  { value: '60 giây', valueEn: '60s', labelVi: 'Khởi tạo cửa hàng mới', labelEn: 'Instant Setup' },
-  { value: '24/7', valueEn: '24/7', labelVi: 'Hỗ trợ kỹ thuật', labelEn: '24/7 Support' }
+  // Chỉ nêu thông tin sản phẩm kiểm chứng được — không dùng số khách hàng/hóa đơn chưa có số liệu thật
+  { value: '60 giây', valueEn: '60s', labelVi: 'Khởi tạo cửa hàng mới', labelEn: 'Store setup' },
+  { value: '3', valueEn: '3', labelVi: 'Loại rủi ro tồn kho được theo dõi tự động', labelEn: 'Inventory risks monitored automatically' },
+  { value: '2', valueEn: '2', labelVi: 'Cổng thanh toán QR: VietQR & MoMo', labelEn: 'QR payment options: VietQR & MoMo' },
+  { value: '80mm', valueEn: '80mm', labelVi: 'In hóa đơn nhiệt ngay tại quầy', labelEn: 'Thermal receipts at the counter' }
 ];
 
-const INTEGRATIONS = ['VietQR', 'MoMo', 'ZaloPay', 'VNPay', 'Napas', 'Xprinter', 'Sunmi'];
+// Chỉ liệt kê thanh toán & thiết bị hệ thống thực sự hỗ trợ
+const INTEGRATIONS = [
+  { vi: 'VietQR', en: 'VietQR' },
+  { vi: 'PayOS', en: 'PayOS' },
+  { vi: 'Ví MoMo', en: 'MoMo Wallet' },
+  { vi: 'Máy in nhiệt 80mm', en: '80mm Thermal Printer' },
+  { vi: 'Máy quét mã vạch USB', en: 'USB Barcode Scanner' },
+  { vi: 'Camera điện thoại', en: 'Phone Camera Scanner' }
+];
 
 // ─── 3 Core Operational Pillars ───
 const VALUES = [
@@ -192,36 +199,34 @@ const HARDWARE_ITEMS = [
   }
 ];
 
-const TESTIMONIALS = [
+// Kịch bản sử dụng minh họa theo loại cửa hàng (không phải lời chứng thực của khách hàng thật)
+const USE_CASES = [
   {
-    avatar: '/avatar1.svg',
-    name: 'Chị Lê Thu Hà',
-    storeVi: 'Tạp hóa Thu Hà • Quận 7, TP.HCM',
-    storeEn: 'Thu Ha Grocery • District 7, HCMC',
-    quoteVi: 'Nhờ Decision Engine nhắc trước 2 ngày, tiệm của tôi không còn cảnh hết bia, hết dầu ăn vào cuối tuần. Thuật toán gợi ý đúng số lượng cần nhập, không thừa không thiếu.',
-    quoteEn: 'Thanks to Decision Engine alerting me 2 days early, our store never runs out of beer or cooking oil on weekends. It suggests the exact restock quantity needed.',
-    metricVi: 'Giảm 100% tình trạng đứt hàng',
-    metricEn: 'Zero Weekend Stockouts'
+    icon: Store,
+    industryVi: 'Tạp hóa & siêu thị mini',
+    industryEn: 'Grocery & mini-marts',
+    scenarioVi: 'Nước giải khát, dầu ăn, mì gói được theo dõi tốc độ bán mỗi ngày. Khi tồn kho chạm điểm đặt hàng lại, chủ tiệm nhận cảnh báo kèm số lượng nên nhập để kịp hàng trước cuối tuần.',
+    scenarioEn: 'Fast movers like drinks, cooking oil and noodles are tracked daily. When stock hits the reorder point, the owner gets an alert with a suggested quantity in time for the weekend rush.',
+    featureVi: 'Decision Engine · Cảnh báo nhập hàng',
+    featureEn: 'Decision Engine · Restock alerts'
   },
   {
-    avatar: '/avatar2.svg',
-    name: 'Anh Trần Minh Quân',
-    storeVi: 'Chuỗi cà phê Mộc • 3 chi nhánh, Đà Nẵng',
-    storeEn: 'Moc Coffee Chain • 3 Branches, Da Nang',
-    quoteVi: 'Mỗi sáng tôi chỉ cần mở điện thoại xem Decision Engine cảnh báo là biết ngay kho nào sắp thiếu cà phê, sữa tươi. Không còn phải cộng trừ sổ sách bằng tay.',
-    quoteEn: 'Every morning I simply open the app to check the Decision Engine summary. It immediately shows which branch needs coffee beans or milk restocking.',
-    metricVi: 'Tiết kiệm 8 giờ quản lý/tuần',
-    metricEn: 'Saves 8 hrs/week'
+    icon: Coffee,
+    industryVi: 'Quán cà phê & F&B',
+    industryEn: 'Cafés & F&B',
+    scenarioVi: 'Cà phê hạt, sữa tươi mỗi loại có thời gian giao khác nhau. Thời gian giao của từng nhà cung cấp được tính vào điểm đặt hàng lại, nên mỗi sáng chủ quán chỉ cần xem danh sách cần nhập.',
+    scenarioEn: 'Coffee beans and milk each have different supplier lead times. Those lead times feed the reorder point, so each morning the owner just checks the restock list.',
+    featureVi: 'Quản lý kho · Sổ cái biến động',
+    featureEn: 'Inventory · Stock ledger'
   },
   {
-    avatar: '/avatar3.svg',
-    name: 'Chị Nguyễn Bảo Ngọc',
-    storeVi: 'Ngọc Boutique • Hoàn Kiếm, Hà Nội',
-    storeEn: 'Ngoc Boutique • Hoan Kiem, Hanoi',
-    quoteVi: 'Tính năng phát hiện hàng đọng vốn 90 ngày giúp tôi thu hồi lại hơn 60 triệu tiền vốn bị chôn trong các mẫu váy cũ. Đề xuất giảm giá có giá sàn nên không lo bán lỗ.',
-    quoteEn: 'The 90-day dead stock detection helped me recover over 60M VND trapped in old apparel batches. The price floor prevented selling below cost.',
-    metricVi: 'Thu hồi 60 triệu tiền vốn',
-    metricEn: 'Recovered 60M VND Capital'
+    icon: Shirt,
+    industryVi: 'Thời trang & phụ kiện',
+    industryEn: 'Fashion & accessories',
+    scenarioVi: 'Mẫu cũ không bán được quá 90 ngày được đánh dấu là hàng tồn đọng. Hệ thống đề xuất mức giảm giá hợp lý nhưng không thấp hơn giá sàn, chủ shop duyệt trước khi áp dụng.',
+    scenarioEn: 'Styles unsold for 90+ days are flagged as dead stock. StockPilot suggests a sensible markdown that never drops below the price floor, and the owner approves it first.',
+    featureVi: 'Đề xuất giá · Giá sàn',
+    featureEn: 'Pricing · Price floor'
   }
 ];
 
@@ -281,21 +286,6 @@ function SectionBadge({ children }) {
   );
 }
 
-function BulletList({ items }) {
-  return (
-    <ul className="space-y-2.5 pt-2">
-      {items.map((item, idx) => (
-        <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700 leading-relaxed">
-          <span className="w-5 h-5 rounded-full bg-blue-50 text-[#006FFF] flex items-center justify-center shrink-0 mt-0.5 border border-blue-100 font-bold text-xs">
-            ✓
-          </span>
-          <span>{item}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
 // ─── Bilingual Dictionary (VI / EN) for Landing Page ───
 const CONTENT = {
   vi: {
@@ -316,7 +306,7 @@ const CONTENT = {
       line2: 'Dự báo tồn kho.',
       line3: 'Tối ưu lợi nhuận.',
       desc: 'Không chỉ là phần mềm bán hàng thông thường — StockPilot tích hợp Động cơ Ra Quyết Định (Decision Engine): Tự động dự báo điểm đặt hàng lại (Reorder Point), phát hiện hàng ế đọng vốn và đề xuất giá bán tối ưu lợi nhuận cho cửa hàng của bạn.',
-      primaryCta: 'Dùng thử miễn phí 14 ngày',
+      primaryCta: 'Dùng thử ngay',
       secondaryCta: 'Tìm hiểu cơ chế hoạt động',
       check1: 'Tự động tính điểm đặt hàng lại',
       check2: 'Phát hiện hàng đọng vốn 90 ngày',
@@ -338,8 +328,9 @@ const CONTENT = {
       desc: 'Không cần đầu tư máy móc đắt đỏ. StockPilot hoạt động mượt mà trên máy tính, điện thoại và máy in bill thông dụng tại Việt Nam.'
     },
     testimonials: {
-      tag: 'Hiệu quả thực tế',
-      title: 'Chủ cửa hàng nói gì sau khi sử dụng Decision Engine'
+      tag: 'Kịch bản sử dụng',
+      title: 'StockPilot hỗ trợ từng loại cửa hàng như thế nào',
+      note: 'Kịch bản minh họa'
     },
     faq: {
       tag: 'Hỗ trợ & Giải đáp',
@@ -370,8 +361,8 @@ const CONTENT = {
     banner: {
       tag: 'Chấm dứt quản lý theo cảm tính',
       title: 'Sẵn sàng để Decision Engine dẫn lối kinh doanh của bạn?',
-      desc: 'Tham gia cùng hơn 1.200 chủ cửa hàng đã tối ưu hóa dòng tiền và giải phóng hàng tồn kho với StockPilot.',
-      primaryCta: 'Bắt đầu dùng thử miễn phí 14 ngày',
+      desc: 'Khởi tạo cửa hàng trong khoảng 60 giây, nhập danh sách sản phẩm từ Excel và để Decision Engine bắt đầu theo dõi tồn kho cho bạn.',
+      primaryCta: 'Bắt đầu dùng thử ngay',
       secondaryCta: 'Đăng ký tư vấn 1-1',
       perk1: 'Cài đặt và hướng dẫn từ xa 1-1',
       perk2: 'Nạp dữ liệu mẫu thử nghiệm 60 giây',
@@ -386,7 +377,7 @@ const CONTENT = {
       features: 'Hệ thống cốt lõi',
       account: 'Tài khoản & Truy cập',
       signIn: 'Đăng nhập hệ thống cửa hàng →',
-      startFree: 'Đăng ký trải nghiệm 14 ngày →',
+      startFree: 'Đăng ký dùng thử ngay →',
       copyright: '© 2026 StockPilot Decision Engine. Nền tảng quản lý bán lẻ & ra quyết định định lượng.',
       terms: 'Điều khoản dịch vụ',
       privacy: 'Chính sách bảo mật dữ liệu',
@@ -410,7 +401,7 @@ const CONTENT = {
       line2: 'Predict Inventory.',
       line3: 'Maximize Profits.',
       desc: 'Beyond standard POS checkout — StockPilot integrates a Quantitative Decision Engine: automatically calculating Reorder Points, detecting 90-day dead stock, and recommending safe promotional pricing.',
-      primaryCta: 'Start 14-Day Free Trial',
+      primaryCta: 'Start Free Trial Now',
       secondaryCta: 'How the Engine Works',
       check1: 'Automated Reorder Point Calculation',
       check2: '90-Day Dead Stock Detection',
@@ -432,8 +423,9 @@ const CONTENT = {
       desc: 'No expensive proprietary equipment needed. StockPilot runs reliably on standard devices and retail peripherals.'
     },
     testimonials: {
-      tag: 'Proven Results',
-      title: 'What Store Owners Say After Using Decision Engine'
+      tag: 'Use cases',
+      title: 'How StockPilot fits different kinds of stores',
+      note: 'Illustrative scenario'
     },
     faq: {
       tag: 'Support & FAQ',
@@ -464,8 +456,8 @@ const CONTENT = {
     banner: {
       tag: 'Stop Guesswork Management',
       title: 'Ready to Let Decision Engine Steer Your Business?',
-      desc: 'Join over 1,200 retail store owners who optimize cashflow and eliminate stockouts with StockPilot.',
-      primaryCta: 'Start 14-Day Free Trial',
+      desc: 'Set up your store in about 60 seconds, import your products from Excel, and let the Decision Engine start watching your stock.',
+      primaryCta: 'Start Free Trial Now',
       secondaryCta: 'Request 1-on-1 Consultation',
       perk1: 'Remote 1-on-1 setup and onboarding',
       perk2: 'Instant 60-second sandbox catalog demo',
@@ -509,19 +501,6 @@ export function LandingPage() {
       setIsLangTransitioning(false);
     }, 180);
   };
-  // Interactive Live Inventory Counter (Capability Row 3)
-  const [stockCount, setStockCount] = useState(12);
-  const [isStockUpdating, setIsStockUpdating] = useState(false);
-  const [selectedStockRow, setSelectedStockRow] = useState(1);
-
-  const handleAdjustStock = (delta) => {
-    setIsStockUpdating(true);
-    setStockCount((prev) => Math.max(0, prev + delta));
-    setTimeout(() => setIsStockUpdating(false), 300);
-  };
-
-  // Interactive Report Metric (Capability Row 5)
-  const [selectedReportMetric, setSelectedReportMetric] = useState(0);
 
   // Consultation lead form state
   const [leadForm, setLeadForm] = useState({
@@ -884,34 +863,20 @@ export function LandingPage() {
                 </span>
               </div>
 
-              {/* Social Proof Row */}
-              <div className="pt-2 flex items-center justify-center lg:justify-start gap-3 border-t border-slate-200/70">
-                <div className="flex -space-x-2">
-                  <span className="inline-flex w-8 h-8 rounded-full ring-2 ring-white bg-blue-500 text-white text-[11px] font-bold items-center justify-center">
-                    H
-                  </span>
-                  <span className="inline-flex w-8 h-8 rounded-full ring-2 ring-white bg-indigo-500 text-white text-[11px] font-bold items-center justify-center">
-                    Q
-                  </span>
-                  <span className="inline-flex w-8 h-8 rounded-full ring-2 ring-white bg-emerald-500 text-white text-[11px] font-bold items-center justify-center">
-                    N
-                  </span>
-                  <span className="inline-flex w-8 h-8 rounded-full ring-2 ring-white bg-amber-500 text-white text-[11px] font-bold items-center justify-center">
-                    +
-                  </span>
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center text-amber-400">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className="w-3.5 h-3.5 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    {language === 'en'
-                      ? 'Decision Engine trusted by 1,200+ retail stores nationwide'
-                      : 'Hơn 1.200+ cửa hàng bán lẻ tối ưu dòng tiền cùng Decision Engine'}
-                  </p>
-                </div>
+              {/* Trust Row — chỉ nêu những gì hệ thống thực sự làm được */}
+              <div className="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-2 border-t border-slate-200/70 text-[11.5px] font-medium text-slate-500">
+                <span className="flex items-center gap-1.5">
+                  <QrCode className="w-3.5 h-3.5 text-[#006FFF] shrink-0" aria-hidden />
+                  {language === 'en' ? 'VietQR (PayOS) & MoMo payments' : 'Thanh toán VietQR (PayOS) & MoMo'}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#006FFF] shrink-0" aria-hidden />
+                  {language === 'en' ? 'Data isolated per store' : 'Dữ liệu tách biệt theo từng cửa hàng'}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Printer className="w-3.5 h-3.5 text-[#006FFF] shrink-0" aria-hidden />
+                  {language === 'en' ? '80mm thermal receipts' : 'In hóa đơn nhiệt 80mm'}
+                </span>
               </div>
 
             </div>
@@ -954,7 +919,7 @@ export function LandingPage() {
                     key={idx}
                     className="px-6 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-black text-slate-400 tracking-tight whitespace-nowrap"
                   >
-                    {partner}
+                    {language === 'en' ? partner.en : partner.vi}
                   </span>
                 ))}
               </div>
@@ -1226,614 +1191,8 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* ─── 6. 5 CORE CAPABILITIES ROWS (DECISION ENGINE IS ROW 1!) ─── */}
-      <section id="capabilities" className="py-16 lg:py-24 bg-white scroll-mt-20">
-        <div id="showcase" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-20 lg:space-y-32">
-          
-          {/* ─── ROW 1: 01. StockPilot Decision Engine (THE HERO FEATURE FIRST!) ─── */}
-          <div id="decision-engine" className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center scroll-mt-24">
-            
-            <div className="lg:col-span-5 space-y-4">
-              <SectionBadge>
-                {language === 'en' ? '01. Core Focus: Decision Engine' : '01. Trọng tâm: Decision Engine'}
-              </SectionBadge>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {language === 'en'
-                  ? 'AI Restock Forecaster & Proactive Supply Alerts'
-                  : 'Bộ não dự báo tồn kho & Gợi ý nhập hàng kịp thời'}
-              </h2>
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-                {language === 'en'
-                  ? 'Converts raw transaction velocity into proactive, actionable orders, ensuring you never run out of goods during weekend rushes.'
-                  : 'Biến toàn bộ số liệu bán hàng thành các đề xuất đặt hàng thiết thực, giúp cửa hàng của bạn không bao giờ bị đứt hàng vào các dịp cao điểm.'}
-              </p>
-              <BulletList
-                items={
-                  language === 'en'
-                    ? [
-                        'Calculates statistical Reorder Point (ROP) & Safety Stock with 95% service level confidence.',
-                        'Detects 60-day slow-moving items and 90-day dead stock to free tied-up working capital.',
-                        '1-click auto-generates purchase orders without manual catalog re-entry.'
-                      ]
-                    : [
-                        'Tự động tính Điểm Đặt Hàng Lại (Reorder Point) và Tồn an toàn (Safety Stock) với độ tin cậy 95%.',
-                        'Phát hiện hàng chậm luân chuyển >60 ngày và hàng chết >90 ngày để chủ shop giải phóng dòng tiền.',
-                        '1-click tạo ngay phiếu nhập hàng đề xuất mà không cần gõ lại mã hàng thủ công.'
-                      ]
-                }
-              />
-            </div>
-
-            <div className="lg:col-span-7">
-              <div className="bg-[#0F172A] p-5 sm:p-6 rounded-3xl space-y-3.5 border border-slate-800 shadow-xl">
-                <div className="flex items-center justify-between text-white text-xs font-bold pb-2 border-b border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="w-4 h-4 text-[#006FFF]" />
-                    <span>
-                      {language === 'en'
-                        ? 'StockPilot Decision Engine • Automated Analysis'
-                        : 'StockPilot Decision Engine • Phân tích dữ liệu tự động'}
-                    </span>
-                  </div>
-                  <span className="text-[10px] bg-slate-800 text-slate-300 border border-slate-700 px-2.5 py-0.5 rounded-full font-mono">
-                    Service Level: 95%
-                  </span>
-                </div>
-
-                {/* Amber Warning Card */}
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 mt-0.5 border border-amber-200">
-                      <AlertTriangle className="w-5 h-5" />
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900">
-                          {language === 'en'
-                            ? 'Weekend Supply Shortage Alert'
-                            : 'Cảnh báo thiếu hụt nguồn cung cuối tuần'}
-                        </span>
-                        <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-bold">
-                          {language === 'en' ? 'High Priority' : 'Ưu tiên cao'}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        {language === 'en' ? (
-                          <>
-                            Item <strong>Neptune Cooking Oil 1L (DA-NP01)</strong> has only <strong>3 bottles</strong> remaining. Average velocity: 6 bottles/day. Predicted out of stock tomorrow afternoon.
-                          </>
-                        ) : (
-                          <>
-                            Mặt hàng <strong>Dầu ăn Neptune 1L (DA-NP01)</strong> hiện chỉ còn <strong>3 chai</strong>. Tốc độ bán trung bình 6 chai/ngày. Dự kiến sẽ hết hàng vào chiều mai.
-                          </>
-                        )}
-                      </p>
-                      <div className="pt-2 flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={() => {
-                            toast({
-                              title: language === 'en' ? 'Created Proposed Restock PO' : 'Đã tạo phiếu nhập hàng đề xuất',
-                              description: language === 'en'
-                                ? 'Purchase order for 24 bottles of Neptune Oil added to Inventory Restock module.'
-                                : 'Phiếu nhập 24 chai Dầu ăn Neptune đã được thêm vào mục Quản lý nhập kho.',
-                              type: 'info'
-                            });
-                          }}
-                          className="px-3.5 py-1.5 bg-[#006FFF] hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-sm shadow-blue-500/20"
-                        >
-                          {language === 'en' ? 'Create Restock PO (+24 bottles)' : 'Tạo phiếu nhập đề xuất (+24 chai)'}
-                        </button>
-                        <span className="text-[11px] text-slate-500 font-mono">
-                          {language === 'en' ? 'Lead time: 1 day' : 'Thời gian giao: 1 ngày'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Natural Language AI Q&A Preview */}
-                <div className="bg-slate-800/90 p-3.5 rounded-2xl border border-slate-700 text-xs space-y-2.5">
-                  <p className="text-slate-200 flex items-start gap-2">
-                    <span className="bg-slate-700 text-white rounded-md px-1.5 py-0.5 font-bold shrink-0 text-[11px]">
-                      {language === 'en' ? 'Merchant' : 'Chủ shop'}
-                    </span>
-                    <span>
-                      {language === 'en'
-                        ? '"Which product generated the highest revenue today?"'
-                        : '"Hôm nay mặt hàng nào có doanh thu và tỷ suất lợi nhuận cao nhất?"'}
-                    </span>
-                  </p>
-                  <p className="text-slate-300 flex items-start gap-2 pt-2 border-t border-slate-700/80">
-                    <span className="bg-blue-600 text-white rounded-md px-1.5 py-0.5 font-bold shrink-0 text-[11px]">
-                      AI
-                    </span>
-                    <span>
-                      {language === 'en'
-                        ? '"Iced Milk Coffee leads with 214 cups sold, generating 5,992,000 VND revenue with 48% gross margin."'
-                        : '"Cà phê sữa đá dẫn đầu với 214 ly bán ra, đạt doanh thu 5.992.000 đ với biên lợi nhuận gộp 48%."'}
-                    </span>
-                  </p>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-
-          {/* ─── ROW 2: 02. Tối ưu giá bán & Giải phóng hàng đọng vốn ─── */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-            
-            <div className="lg:col-span-7 order-2 lg:order-1">
-              <div className="bg-slate-50 p-4 sm:p-6 rounded-3xl border border-slate-200 space-y-3">
-                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-                  <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                      <Tag className="w-4 h-4 text-amber-600" />
-                      {language === 'en' ? 'Dynamic Pricing & Dead Stock Auditor' : 'Đề xuất giá bán & Giải phóng hàng đọng'}
-                    </span>
-                    <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold border border-emerald-200">
-                      {language === 'en' ? 'Margin Safeguard Active' : 'Giá sàn an toàn bật'}
-                    </span>
-                  </div>
-
-                  <div className="p-4 space-y-3 text-xs">
-                    <div className="flex items-center justify-between p-3 rounded-xl bg-amber-50/60 border border-amber-150">
-                      <div>
-                        <p className="font-bold text-slate-900">
-                          {language === 'en' ? 'White Silk Shirt (SM-TR02)' : 'Áo sơ mi lụa trắng (SM-TR02)'}
-                        </p>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
-                          {language === 'en' ? 'Dead stock: 94 days without sales • 18 units' : 'Hàng chết: 94 ngày chưa bán • Tồn 18 chiếc'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] text-slate-500 block">
-                          {language === 'en' ? 'Trapped Capital' : 'Vốn chôn'}
-                        </span>
-                        <span className="font-mono font-bold text-rose-600">3.240.000 đ</span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
-                        <span className="text-[10px] text-slate-500 block">
-                          {language === 'en' ? 'List Price' : 'Giá niêm yết'}
-                        </span>
-                        <span className="font-mono font-bold text-slate-900 line-through text-xs">320.000 đ</span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                        <span className="text-[10px] text-emerald-700 font-bold block">
-                          {language === 'en' ? 'Clearance (-25%)' : 'Gợi ý xả hàng (-25%)'}
-                        </span>
-                        <span className="font-mono font-bold text-emerald-700 text-xs">240.000 đ</span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200">
-                        <span className="text-[10px] text-blue-700 font-bold block">
-                          {language === 'en' ? 'Safe Floor' : 'Giá sàn bảo vệ'}
-                        </span>
-                        <span className="font-mono font-bold text-[#006FFF] text-xs">210.000 đ</span>
-                      </div>
-                    </div>
-
-                    <p className="text-[11px] text-slate-600 italic bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                      {language === 'en'
-                        ? 'Formula: Safe Price Floor = Cost / (1 - Min Margin). Guarantees you never sell below minimum profit threshold.'
-                        : 'Công thức: Giá sàn an toàn = Giá vốn / (1 - Biên lợi nhuận tối thiểu). Đảm bảo thanh lý nhanh mà tuyệt đối không bị bán lỗ.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="lg:col-span-5 space-y-4 order-1 lg:order-2">
-              <SectionBadge>
-                {language === 'en' ? '02. Price Optimization & Capital Recovery' : '02. Tối ưu giá & Giải phóng vốn'}
-              </SectionBadge>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {language === 'en'
-                  ? 'Dynamic Pricing & Dead Stock Liquidation'
-                  : 'Tối ưu giá bán & Giải phóng vốn chôn'}
-              </h2>
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-                {language === 'en'
-                  ? 'Identify stale goods tying down cashflow and receive algorithmic discount recommendations strictly locked to minimum profit floors.'
-                  : 'Nhận diện ngay những mặt hàng đang chôn vùi dòng tiền của bạn và nhận đề xuất giảm giá thông minh có khóa giá sàn bảo vệ.'}
-              </p>
-              <BulletList
-                items={
-                  language === 'en'
-                    ? [
-                        'Calculates mathematical minimum price floor: Cost / (1 - Min Margin).',
-                        'Proposes smart promotional markdown discounts for overstocked SKUs.',
-                        'Tracks historical price modifications in an immutable PriceHistory log.'
-                      ]
-                    : [
-                        'Thuật toán tính giá sàn an toàn: Giá vốn / (1 - Biên lợi nhuận tối thiểu).',
-                        'Đề xuất chiết khấu thông minh cho hàng dư thừa để thu hồi dòng tiền nhanh nhất.',
-                        'Lưu nhật ký tăng giảm giá minh bạch (Price History) để đánh giá độ co giãn nhu cầu.'
-                      ]
-                }
-              />
-            </div>
-
-          </div>
-
-          {/* ─── ROW 3: 03. Quản lý kho & Sổ cái bất biến (LIVE INTERACTIVE STOCK TABLE) ─── */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-            
-            <div className="lg:col-span-5 space-y-4">
-              <SectionBadge>
-                {language === 'en' ? '03. Clean Data Foundation' : '03. Nền tảng dữ liệu sạch'}
-              </SectionBadge>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {language === 'en'
-                  ? 'Strict Inventory Ledger, 100% Anti-Negative Stock'
-                  : 'Sổ cái kho bất biến, chống âm kho 100%'}
-              </h2>
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-                {language === 'en'
-                  ? 'Decision Engine requires clean data. Our Insert-Only stock ledger records every unit variation without delays or negative numbers.'
-                  : 'Decision Engine chỉ tính đúng khi số liệu kho chuẩn xác. Cơ chế sổ cái Insert-Only ghi nhận mọi biến động xuất/nhập, đảm bảo không bao giờ âm kho.'}
-              </p>
-              <BulletList
-                items={
-                  language === 'en'
-                    ? [
-                        'Strict transaction isolation prevents concurrent double deductions.',
-                        'Automatic real-time deduction upon cashier POS sale confirmation.',
-                        'Stocktaking variance automatically generates balancing audit adjustments.'
-                      ]
-                    : [
-                        'Khóa giao dịch chống thất thoát và trừ trùng khi mạng chập chờn.',
-                        'Kho hàng tự động trừ theo thời gian thực ngay khi thu ngân bấm in hóa đơn.',
-                        'Kiểm kê định kỳ đối soát thực tế, tự động cân bằng lệch kho bằng bút toán minh bạch.'
-                      ]
-                }
-              />
-            </div>
-
-            <div className="lg:col-span-7">
-              <div className="relative">
-                <div className="rounded-3xl overflow-hidden aspect-16/10 shadow-xl shadow-slate-900/10">
-                  <img
-                    src="/warehouse.svg"
-                    alt="Kho hàng được quản lý bằng StockPilot"
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 rounded-3xl bg-linear-to-t from-slate-900/40 to-transparent" />
-                </div>
-
-                {/* Floating Interactive Stock Monitor Card */}
-                <div
-                  className="relative -mt-20 mx-2 sm:mx-6 bg-white rounded-2xl overflow-hidden border border-slate-200"
-                  style={{
-                    boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.22)'
-                  }}
-                >
-                  <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                      <Boxes className="w-4 h-4 text-[#006FFF]" />
-                      {language === 'en' ? 'Real-time Stock Ledger Feed' : 'Sổ cái theo dõi tồn thực tế'}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleAdjustStock(20)}
-                        disabled={isStockUpdating}
-                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#006FFF] border border-blue-200 rounded-lg text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-60"
-                      >
-                        {language === 'en' ? '+ Restock 20' : '+ Nhập 20 chai'}
-                      </button>
-                      <button
-                        onClick={() => handleAdjustStock(-1)}
-                        disabled={isStockUpdating || stockCount === 0}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 rounded-lg text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-60"
-                      >
-                        {language === 'en' ? '- Sell 1' : '- Bán 1 chai'}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="divide-y divide-slate-100 text-xs">
-                    <div className="grid grid-cols-12 px-4 py-2 bg-slate-50/60 text-[11px] font-bold text-slate-500">
-                      <span className="col-span-3">{language === 'en' ? 'SKU' : 'Mã SKU'}</span>
-                      <span className="col-span-4">{language === 'en' ? 'Item Name' : 'Tên hàng'}</span>
-                      <span className="col-span-2 text-right">{language === 'en' ? 'Stock' : 'Tồn thực'}</span>
-                      <span className="col-span-3 text-right">{language === 'en' ? 'Status' : 'Trạng thái'}</span>
-                    </div>
-
-                    {/* Row 1: Gạo ST25 */}
-                    <div
-                      onClick={() => setSelectedStockRow(0)}
-                      className={`grid grid-cols-12 px-4 py-3 items-center cursor-pointer transition-all border-l-4 ${
-                        selectedStockRow === 0
-                          ? 'bg-blue-50/40 border-l-[#006FFF]'
-                          : 'border-l-transparent hover:bg-slate-50'
-                      }`}
-                    >
-                      <span className="col-span-3 font-mono text-[11px] text-slate-500">GAO-ST25</span>
-                      <span className="col-span-4 font-semibold text-slate-900">
-                        {language === 'en' ? 'ST25 Rice 5kg' : 'Gạo ST25 5kg'}
-                      </span>
-                      <span className="col-span-2 text-right font-mono font-bold text-slate-900">
-                        42 {language === 'en' ? 'bags' : 'bao'}
-                      </span>
-                      <div className="col-span-3 text-right">
-                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700">
-                          {language === 'en' ? 'In Stock' : 'Đủ hàng'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Row 2: Dầu ăn Neptune (Live interactive stock) */}
-                    <div
-                      onClick={() => setSelectedStockRow(1)}
-                      className={`grid grid-cols-12 px-4 py-3 items-center cursor-pointer transition-all border-l-4 ${
-                        selectedStockRow === 1
-                          ? 'bg-blue-50/40 border-l-[#006FFF]'
-                          : 'border-l-transparent hover:bg-slate-50'
-                      }`}
-                    >
-                      <span className="col-span-3 font-mono text-[11px] text-slate-500">DA-NP01</span>
-                      <span className="col-span-4 font-semibold text-slate-900">
-                        {language === 'en' ? 'Neptune Cooking Oil 1L' : 'Dầu ăn Neptune 1L'}
-                      </span>
-                      <span className="col-span-2 text-right font-mono font-bold text-slate-900 flex items-center justify-end gap-1">
-                        <span
-                          className={`inline-block transition-transform duration-200 ${
-                            isStockUpdating ? 'text-[#006FFF] scale-125 font-black' : ''
-                          }`}
-                        >
-                          {stockCount}
-                        </span>
-                        <span className="text-[11px] text-slate-500">{language === 'en' ? 'pcs' : 'chai'}</span>
-                      </span>
-                      <div className="col-span-3 text-right">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
-                            stockCount >= 10
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200'
-                          }`}
-                        >
-                          {stockCount >= 10
-                            ? language === 'en' ? 'In Stock' : 'Đủ hàng'
-                            : language === 'en' ? 'Low Stock' : 'Sắp hết hàng'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          {/* ─── ROW 4: 04. Quầy thu ngân POS — Bán hàng siêu tốc ─── */}
-          <div id="pos-features" className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center scroll-mt-24">
-            
-            <div className="lg:col-span-7 order-2 lg:order-1">
-              <div className="relative">
-                <div className="rounded-3xl overflow-hidden aspect-4/3 sm:aspect-16/10 shadow-xl shadow-slate-900/10">
-                  <img
-                    src="/posCashier.svg"
-                    alt="Thu ngân thanh toán cho khách tại quầy"
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
-
-                {/* Floating Retail Receipt Card */}
-                <div className="relative -mt-24 sm:mt-0 sm:absolute sm:-bottom-8 sm:-left-6 mx-3 sm:mx-0 sm:w-85 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xl shadow-slate-900/15">
-                  <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-900">
-                      {language === 'en' ? 'Retail Receipt' : 'Hóa đơn bán lẻ'}
-                    </span>
-                    <span className="font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold text-[10px]">
-                      VietQR ✓
-                    </span>
-                  </div>
-                  <div className="p-4 space-y-2">
-                    {[
-                      {
-                        name: language === 'en' ? 'Iced Milk Coffee' : 'Cà phê sữa đá',
-                        sku: 'CF-001',
-                        qty: 2,
-                        total: '56.000 đ'
-                      },
-                      {
-                        name: language === 'en' ? 'Pate Bread Stick' : 'Bánh mì que Pate',
-                        sku: 'BM-014',
-                        qty: 1,
-                        total: '18.000 đ'
-                      }
-                    ].map((item) => (
-                      <div key={item.sku} className="grid grid-cols-12 text-xs py-1.5 items-center border-b border-slate-50">
-                        <div className="col-span-7">
-                          <p className="font-semibold text-slate-900">{item.name}</p>
-                          <span className="font-mono text-[10px] text-slate-400">SKU: {item.sku}</span>
-                        </div>
-                        <span className="col-span-1 text-center font-mono">{item.qty}</span>
-                        <span className="col-span-4 text-right font-mono font-bold text-slate-900">{item.total}</span>
-                      </div>
-                    ))}
-                    <div className="pt-1 flex justify-between items-center text-xs">
-                      <span className="text-slate-600 font-medium">
-                        {language === 'en' ? 'Customer Total' : 'Khách cần thanh toán'}
-                      </span>
-                      <span className="text-base font-black font-mono text-[#006FFF]">74.000 đ</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Floating 8s Speed Pill */}
-                <div className="hidden sm:flex absolute top-5 right-5 items-center gap-2 bg-white/95 backdrop-blur-sm px-3.5 py-2 rounded-xl shadow-lg text-xs font-bold text-slate-900 border border-slate-200/60">
-                  <Clock className="w-4 h-4 text-[#006FFF]" />
-                  <span>
-                    {language === 'en' ? 'Average Checkout: 8 seconds' : 'Thanh toán trung bình 8 giây/đơn'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="lg:col-span-5 space-y-4 order-1 lg:order-2">
-              <SectionBadge>
-                {language === 'en' ? '04. POS Cashier Terminal' : '04. Quầy thu ngân POS'}
-              </SectionBadge>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {language === 'en'
-                  ? 'High-Speed Checkout, Instant Inventory Sync'
-                  : 'Giao diện bán hàng trực quan, thanh toán tích tắc'}
-              </h2>
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-                {language === 'en'
-                  ? 'Optimized cashier flow that captures every sale immediately, feeding fresh transactional demand into the Decision Engine.'
-                  : 'Tối ưu tốc độ bán hàng tại quầy với giao diện thân thiện, ghi nhận doanh thu và trừ tồn kho ngay lập tức để nạp dữ liệu cho Decision Engine.'}
-              </p>
-              <BulletList
-                items={
-                  language === 'en'
-                    ? [
-                        'Rapid item selection or barcode scanning with USB / Bluetooth readers.',
-                        'Integrated cash, automatic VietQR confirmation, and card terminals.',
-                        'Hold and open multiple pending customer bills without cart loss.'
-                      ]
-                    : [
-                        'Chọn món nhanh hoặc quét mã vạch bằng máy đọc barcode USB / Bluetooth.',
-                        'Tích hợp thanh toán tiền mặt, chuyển khoản quét mã VietQR tự động và thẻ ngân hàng.',
-                        'Mở nhiều tab đơn hàng chờ đồng thời mà không bị mất giỏ hàng đang phục vụ.'
-                      ]
-                }
-              />
-            </div>
-
-          </div>
-
-          {/* ─── ROW 5: 05. Báo cáo tài chính & Phân quyền bảo mật đa tầng ─── */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
-            
-            <div className="lg:col-span-5 space-y-4">
-              <SectionBadge>
-                {language === 'en' ? '05. Reports & Security' : '05. Báo cáo & Bảo mật'}
-              </SectionBadge>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                {language === 'en'
-                  ? 'Financial Intelligence & Role Data Masking'
-                  : 'Báo cáo doanh thu & Bảo mật phân quyền dữ liệu'}
-              </h2>
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-                {language === 'en'
-                  ? 'Gain complete visibility into your store P&L while keeping sensitive supplier costs strictly hidden from staff.'
-                  : 'Nắm bắt toàn bộ bức tranh tài chính (Doanh thu, Giá vốn, Lợi nhuận) trong khi giá vốn luôn được ẩn hoàn toàn trước nhân viên thu ngân.'}
-              </p>
-              <BulletList
-                items={
-                  language === 'en'
-                    ? [
-                        'Automatic calculation of Net Revenue, Cost of Goods Sold (COGS), and Gross Margin.',
-                        'Strict data masking at API layer hides cost prices from cashier accounts.',
-                        'Export clean UTF-8 Vietnamese Excel (CSV) reports ready for accounting.'
-                      ]
-                    : [
-                        'Thống kê doanh thu thuần, giá vốn hàng bán (COGS) và biên lợi nhuận gộp.',
-                        'Cơ chế bảo mật che giấu giá vốn (Data Masking) triệt để đối với nhân viên thu ngân.',
-                        'Hỗ trợ xuất file Excel (CSV) tiếng Việt UTF-8 chuẩn xác cho kế toán.'
-                      ]
-                }
-              />
-            </div>
-
-            <div className="lg:col-span-7">
-              <div className="bg-slate-50 p-4 sm:p-6 rounded-3xl border border-slate-200 space-y-3">
-                
-                {/* 3 Interactive Metric Buttons */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    {
-                      label: language === 'en' ? 'Net Revenue' : 'Doanh thu thực',
-                      value: '42.850.000 đ',
-                      note: '+18.4%',
-                      noteClass: 'text-emerald-600 font-bold',
-                      valueClass: 'text-slate-900'
-                    },
-                    {
-                      label: language === 'en' ? 'COGS Cost' : 'Giá vốn COGS',
-                      value: '28.400.000 đ',
-                      note: language === 'en' ? '66% share' : 'Chiếm 66%',
-                      noteClass: 'text-slate-500 font-medium',
-                      valueClass: 'text-slate-900'
-                    },
-                    {
-                      label: language === 'en' ? 'Gross Profit' : 'Lợi nhuận gộp',
-                      value: '14.450.000 đ',
-                      note: language === 'en' ? '33.8% Margin' : 'Tỷ suất 33.8%',
-                      noteClass: 'text-emerald-600 font-bold',
-                      valueClass: 'text-[#006FFF]'
-                    }
-                  ].map((metric, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setSelectedReportMetric(idx)}
-                      className={`text-left bg-white p-3.5 rounded-2xl border cursor-pointer transition-all ${
-                        selectedReportMetric === idx
-                          ? 'border-[#006FFF] shadow-md shadow-blue-500/10 ring-2 ring-[#006FFF]/20'
-                          : 'border-slate-200 hover:border-slate-300'
-                      }`}
-                    >
-                      <span className="text-[11px] text-slate-500 font-medium">{metric.label}</span>
-                      <p className={`text-base font-black font-mono mt-1 ${metric.valueClass}`}>{metric.value}</p>
-                      <span className={`text-[10px] ${metric.noteClass}`}>{metric.note}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* 7-Day Revenue Bar Chart */}
-                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 text-xs">
-                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                      <BarChart3 className="w-4 h-4 text-[#006FFF]" />
-                      {language === 'en' ? '7-Day Sales Trend' : 'Doanh thu 7 ngày gần nhất'}
-                    </span>
-                    <span className="text-[11px] text-slate-500">
-                      {language === 'en' ? 'Unit: Million VND' : 'Đơn vị: Triệu VNĐ'}
-                    </span>
-                  </div>
-
-                  <div className="pt-4 flex items-end justify-between h-36 gap-2">
-                    {[
-                      { dayVi: 'T2', dayEn: 'Mon', val: 5.2 },
-                      { dayVi: 'T3', dayEn: 'Tue', val: 4.8 },
-                      { dayVi: 'T4', dayEn: 'Wed', val: 6.1 },
-                      { dayVi: 'T5', dayEn: 'Thu', val: 5.7 },
-                      { dayVi: 'T6', dayEn: 'Fri', val: 7.4 },
-                      { dayVi: 'T7', dayEn: 'Sat', val: 8.9 },
-                      { dayVi: 'CN', dayEn: 'Sun', val: 9.3 }
-                    ].map((bar, idx) => (
-                      <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                        <span className="text-[10px] font-mono text-slate-500 font-bold">{bar.val}</span>
-                        <div
-                          style={{ height: `${(bar.val / 10) * 100}%` }}
-                          className={`w-full rounded-t-md transition-all duration-500 ${
-                            idx >= 5
-                              ? 'bg-linear-to-t from-[#006FFF] to-indigo-500 shadow-xs'
-                              : 'bg-blue-200'
-                          }`}
-                        />
-                        <span className="text-[10px] text-slate-600 font-bold">
-                          {language === 'en' ? bar.dayEn : bar.dayVi}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
+      {/* ─── 6. DEMO TÍNH NĂNG THEO CUỘN (khách cuộn tới đâu, demo tính năng tới đó) ─── */}
+      <FeatureScrollShowcase language={language} />
 
       {/* ─── 7. GIẢI PHÁP THEO NGÀNH HÀNG (4 CARDS WITH SVGS & GRADIENT OVERLAYS) ─── */}
       <section id="industries" className="py-16 lg:py-20 bg-[#F8FAFC] border-y border-slate-200 scroll-mt-20">
@@ -1961,46 +1320,31 @@ export function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((review, idx) => (
-              <figure
-                key={idx}
-                className="relative bg-white rounded-3xl p-7 border border-slate-200 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/5 transition-all flex flex-col justify-between"
-              >
-                <Quote className="absolute top-6 right-6 w-10 h-10 text-blue-100/80" />
-                
-                <div>
-                  <div className="flex items-center gap-0.5 text-amber-400">
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-current" />
-                    ))}
+            {USE_CASES.map((useCase) => {
+              const UseCaseIcon = useCase.icon;
+              return (
+                <article
+                  key={useCase.industryVi}
+                  className="bg-white rounded-3xl p-7 border border-slate-200 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/5 transition-all flex flex-col"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 text-[#006FFF] flex items-center justify-center">
+                      <UseCaseIcon className="w-5 h-5" aria-hidden />
+                    </span>
+                    <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-400">{t.testimonials.note}</span>
                   </div>
-                  <blockquote className="mt-4 text-sm text-slate-700 leading-relaxed">
-                    "{language === 'en' ? review.quoteEn : review.quoteVi}"
-                  </blockquote>
-                </div>
-
-                <div>
-                  <span className="mt-5 inline-block text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
-                    {language === 'en' ? review.metricEn : review.metricVi}
+                  <h3 className="mt-5 text-base font-black text-slate-900">
+                    {language === 'en' ? useCase.industryEn : useCase.industryVi}
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-600 leading-relaxed flex-1">
+                    {language === 'en' ? useCase.scenarioEn : useCase.scenarioVi}
+                  </p>
+                  <span className="mt-5 self-start text-[11px] font-bold text-[#006FFF] bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full">
+                    {language === 'en' ? useCase.featureEn : useCase.featureVi}
                   </span>
-
-                  <figcaption className="mt-5 pt-5 border-t border-slate-200 flex items-center gap-3">
-                    <img
-                      src={review.avatar}
-                      alt={review.name}
-                      className="w-11 h-11 rounded-full object-cover ring-2 ring-white shadow-xs"
-                      loading="lazy"
-                    />
-                    <div>
-                      <p className="font-bold text-sm text-slate-900">{review.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {language === 'en' ? review.storeEn : review.storeVi}
-                      </p>
-                    </div>
-                  </figcaption>
-                </div>
-              </figure>
-            ))}
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -2442,7 +1786,7 @@ export function LandingPage() {
           to="/register"
           className="flex-1 py-2.5 bg-[#006FFF] hover:bg-blue-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 transition-all text-center"
         >
-          <span>{language === 'en' ? 'Start 14-Day Free' : 'Dùng thử 14 ngày'}</span>
+          <span>{language === 'en' ? 'Try It Now' : 'Dùng thử ngay'}</span>
           <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>

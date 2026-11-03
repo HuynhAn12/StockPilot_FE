@@ -12,7 +12,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   Send,
-  Calendar,
   ExternalLink,
   PlusCircle,
   Copy,
@@ -52,41 +51,42 @@ import {
   Avatar,
   RowMenu,
   Modal,
-  Drawer,
   DetailList,
   Section,
   StatCard,
   useDebounced,
 } from './components/AdminUI';
+import { useAdminText } from './useAdminText';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const STATUS = {
-  NEW: { label: 'Mới đăng ký', tone: 'info' },
-  CONTACTED: { label: 'Đã liên hệ', tone: 'warning' },
-  CONVERTED: { label: 'Đã chuyển đổi', tone: 'success' },
-  REJECTED: { label: 'Không phù hợp', tone: 'neutral' },
+  NEW: { label: 'Mới đăng ký', en: 'New', tone: 'info' },
+  CONTACTED: { label: 'Đã liên hệ', en: 'Contacted', tone: 'warning' },
+  CONVERTED: { label: 'Đã chuyển đổi', en: 'Converted', tone: 'success' },
+  REJECTED: { label: 'Không phù hợp', en: 'Not a fit', tone: 'neutral' },
 };
 
 const NOTE_TYPES = {
-  CALL: { label: 'Cuộc gọi điện', tone: 'info' },
-  EMAIL: { label: 'Email tư vấn', tone: 'info' },
-  MEETING: { label: 'Gặp mặt / Demo', tone: 'purple' },
-  NOTE: { label: 'Ghi chú nội bộ', tone: 'neutral' },
-  STATUS: { label: 'Cập nhật hệ thống', tone: 'neutral' },
-  RESUBMIT: { label: 'Gửi lại form', tone: 'warning' },
+  CALL: { label: 'Cuộc gọi', en: 'Call', tone: 'info' },
+  EMAIL: { label: 'Email', en: 'Email', tone: 'info' },
+  MEETING: { label: 'Gặp mặt / Demo', en: 'Meeting / demo', tone: 'purple' },
+  NOTE: { label: 'Ghi chú nội bộ', en: 'Internal note', tone: 'neutral' },
+  STATUS: { label: 'Cập nhật hệ thống', en: 'System update', tone: 'neutral' },
+  RESUBMIT: { label: 'Gửi lại form', en: 'Form resubmitted', tone: 'warning' },
 };
 
 const NOTE_PLACEHOLDER = {
-  CALL: 'Ghi chép kết quả cuộc gọi: Khách quan tâm tính năng gì, hẹn khi nào gọi lại…',
-  EMAIL: 'Ghi chép nội dung email: Đã gửi bảng giá, tài liệu hướng dẫn…',
-  MEETING: 'Ghi chép buổi demo: Khách cần thử máy in hóa đơn, quét mã vạch…',
-  NOTE: 'Ghi chú nội bộ về khách hàng này…',
+  CALL: ['Kết quả cuộc gọi: khách quan tâm tính năng gì, hẹn gọi lại khi nào…', 'Call outcome: which features they care about, when to call back…'],
+  EMAIL: ['Nội dung email: đã gửi bảng giá, tài liệu hướng dẫn…', 'Email summary: pricing sent, guides shared…'],
+  MEETING: ['Buổi demo: khách cần thử máy in hóa đơn, quét mã vạch…', 'Demo notes: they want to try the receipt printer, barcode scanning…'],
+  NOTE: ['Ghi chú nội bộ về khách hàng này…', 'Internal note about this lead…'],
 };
 
 function StatusBadge({ status }) {
-  const s = STATUS[status] || { label: status, tone: 'neutral' };
-  return <Badge tone={s.tone}>{s.label}</Badge>;
+  const { t } = useAdminText();
+  const s = STATUS[status] || { label: status, en: status, tone: 'neutral' };
+  return <Badge tone={s.tone}>{t(s.label, s.en)}</Badge>;
 }
 
 function overdueDays(lead) {
@@ -108,6 +108,7 @@ function registerLink(lead) {
 
 // ─── Modals ──────────────────────────────────────────────────────────────────
 function ChangeStatusModal({ lead, onClose, onSaved }) {
+  const { t } = useAdminText();
   const { toast } = useToast();
   const [status, setStatus] = useState(lead.status);
   const [busy, setBusy] = useState(false);
@@ -116,10 +117,11 @@ function ChangeStatusModal({ lead, onClose, onSaved }) {
     setBusy(true);
     try {
       await apiUpdateAdminLead(lead.id, { status });
-      toast({ type: 'success', title: `Đã đổi trạng thái sang "${STATUS[status]?.label || status}"` });
+      const label = STATUS[status] ? t(STATUS[status].label, STATUS[status].en) : status;
+      toast({ type: 'success', title: t(`Đã đổi trạng thái sang "${label}"`, `Status changed to "${label}"`) });
       onSaved();
     } catch (err) {
-      toast({ type: 'error', title: 'Không đổi được trạng thái', description: apiErrorMessage(err) });
+      toast({ type: 'error', title: t('Không đổi được trạng thái', 'Could not change the status'), description: apiErrorMessage(err) });
     } finally {
       setBusy(false);
     }
@@ -127,14 +129,17 @@ function ChangeStatusModal({ lead, onClose, onSaved }) {
 
   return (
     <Modal
-      title="Cập nhật trạng thái Khách hàng"
-      description={`Khách hàng: ${lead.fullName}. Lịch sử thay đổi được ghi nhận tự động vào dòng sự kiện.`}
+      title={t('Cập nhật trạng thái Khách hàng', 'Update lead status')}
+      description={t(
+        `Khách hàng: ${lead.fullName}. Thay đổi được tự ghi vào lịch sử chăm sóc.`,
+        `Lead: ${lead.fullName}. The change is logged in the activity history.`
+      )}
       onClose={onClose}
       busy={busy}
       footer={
         <>
           <button type="button" onClick={onClose} disabled={busy} className={ui.btnSecondary}>
-            Hủy
+            {t('Hủy', 'Cancel')}
           </button>
           <button
             type="button"
@@ -142,21 +147,21 @@ function ChangeStatusModal({ lead, onClose, onSaved }) {
             disabled={busy || status === lead.status}
             className={ui.btnPrimary}
           >
-            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Lưu trạng thái
+            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
+            {t('Lưu trạng thái', 'Save status')}
           </button>
         </>
       }
     >
       <fieldset className="space-y-2.5">
-        <legend className="sr-only">Trạng thái xử lý</legend>
+        <legend className="sr-only">{t('Trạng thái xử lý', 'Status')}</legend>
         {Object.entries(STATUS).map(([value, s]) => (
           <label
             key={value}
-            className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer text-[13px] transition-all ${
+            className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg border cursor-pointer text-[13px] transition-colors ${
               status === value
-                ? 'border-[#2563EB] bg-[#EFF4FF] text-[#0F172A] font-semibold shadow-2xs'
-                : 'border-[#E2E8F0] text-[#475569] hover:bg-slate-50'
+                ? 'border-blue-600 bg-blue-50 text-slate-900 font-medium ring-1 ring-blue-600'
+                : 'border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
             <input
@@ -165,9 +170,9 @@ function ChangeStatusModal({ lead, onClose, onSaved }) {
               value={value}
               checked={status === value}
               onChange={() => setStatus(value)}
-              className="accent-[#2563EB] w-4 h-4 cursor-pointer"
+              className="accent-blue-600 w-4 h-4 cursor-pointer"
             />
-            <span>{s.label}</span>
+            <span>{t(s.label, s.en)}</span>
           </label>
         ))}
       </fieldset>
@@ -176,6 +181,7 @@ function ChangeStatusModal({ lead, onClose, onSaved }) {
 }
 
 function CreateStoreModal({ lead, onClose, onConverted }) {
+  const { t } = useAdminText();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -187,12 +193,12 @@ function CreateStoreModal({ lead, onClose, onConverted }) {
       setCopied(true);
       toast({
         type: 'success',
-        title: 'Đã sao chép liên kết đăng ký',
-        description: 'Gửi link này cho khách qua Zalo hoặc Email để hoàn tất đăng ký.',
+        title: t('Đã sao chép liên kết đăng ký', 'Sign-up link copied'),
+        description: t('Gửi link này cho khách qua Zalo hoặc Email để hoàn tất đăng ký.', 'Send it to the lead via Zalo or email to finish signing up.'),
       });
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast({ type: 'warning', title: 'Hãy sao chép liên kết trong ô bên dưới' });
+      toast({ type: 'warning', title: t('Hãy sao chép liên kết trong ô bên dưới', 'Copy the link from the box below') });
     }
   };
 
@@ -207,8 +213,8 @@ function CreateStoreModal({ lead, onClose, onConverted }) {
 
   return (
     <Modal
-      title="Tạo Cửa hàng cho Khách hàng"
-      description="Gửi khách hàng liên kết đăng ký đã điền sẵn đầy đủ thông tin. Khách chỉ cần tự đặt mật khẩu để kích hoạt cửa hàng."
+      title={t('Tạo Cửa hàng cho Khách hàng', 'Create a store for this lead')}
+      description={t('Gửi khách hàng liên kết đăng ký đã điền sẵn đầy đủ thông tin. Khách chỉ cần tự đặt mật khẩu để kích hoạt cửa hàng.', 'Send the lead a prefilled sign-up link. They only need to set a password to activate the store.')}
       onClose={onClose}
       busy={busy}
       width="max-w-lg"
@@ -216,13 +222,13 @@ function CreateStoreModal({ lead, onClose, onConverted }) {
         <>
           {lead.status !== 'CONVERTED' && (
             <button type="button" onClick={markConverted} disabled={busy} className={ui.btnSecondary}>
-              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              Đánh dấu đã chuyển đổi
+              {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />}
+              {t('Đánh dấu đã chuyển đổi', 'Mark as converted')}
             </button>
           )}
           <button type="button" onClick={copyLink} className={ui.btnPrimary}>
-            {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? 'Đã sao chép' : 'Sao chép liên kết'}
+            {copied ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+            {copied ? t('Đã sao chép', 'Copied') : t('Sao chép liên kết', 'Copy link')}
           </button>
         </>
       }
@@ -230,28 +236,37 @@ function CreateStoreModal({ lead, onClose, onConverted }) {
       <div className="space-y-4">
         <DetailList
           rows={[
-            ['Họ tên', lead.fullName],
-            ['Số điện thoại', lead.phone],
-            ['Email', lead.email || 'Chưa cung cấp'],
-            ['Tên cửa hàng dự kiến', lead.storeName || 'Chưa đặt tên'],
+            [t('Họ tên', 'Name'), lead.fullName],
+            [t('Số điện thoại', 'Phone'), lead.phone],
+            ['Email', lead.email || t('Chưa cung cấp', 'Not provided')],
+            [t('Tên cửa hàng dự kiến', 'Planned store name'), lead.storeName || t('Chưa đặt tên', 'Not named')],
           ]}
         />
 
         <div>
-          <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Liên kết kích hoạt sẵn</label>
+          <label htmlFor="register-link" className="block text-[13px] font-medium text-slate-700 mb-1.5">
+            {t('Liên kết đăng ký đã điền sẵn', 'Prefilled sign-up link')}
+          </label>
           <div className="flex items-center gap-2">
             <input
+              id="register-link"
               readOnly
               value={link}
               onFocus={(e) => e.target.select()}
               className={`${ui.input} font-mono text-[12px] bg-slate-50`}
             />
-            <button type="button" onClick={copyLink} className={`${ui.btnSecondary} shrink-0 px-3`} title="Sao chép">
-              {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+            <button
+              type="button"
+              onClick={copyLink}
+              className={`${ui.btnSecondary} shrink-0 px-3`}
+              title={t('Sao chép', 'Copy')}
+              aria-label={t('Sao chép liên kết', 'Copy link')}
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-600" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
             </button>
           </div>
-          <span className="block text-[12px] text-[#64748B] mt-1.5">
-            Mở trên trình duyệt của khách hàng. Khách tự quản lý thông tin bảo mật của mình.
+          <span className="block text-[12px] text-slate-500 mt-1.5">
+            {t('Mở trên trình duyệt của khách hàng. Khách tự quản lý thông tin bảo mật của mình.', 'Open it in the lead\'s browser. They keep control of their own credentials.')}
           </span>
         </div>
       </div>
@@ -261,6 +276,11 @@ function CreateStoreModal({ lead, onClose, onConverted }) {
 
 // ─── Lead Detail Drawer ──────────────────────────────────────────────────────
 function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreateStore }) {
+  const { t, isEn } = useAdminText();
+  const noteLabel = (type) => {
+    const n = NOTE_TYPES[type] || NOTE_TYPES.NOTE;
+    return t(n.label, n.en);
+  };
   const { toast } = useToast();
   const [lead, setLead] = useState(null);
   const [drawerTab, setDrawerTab] = useState('overview');
@@ -273,7 +293,7 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
     try {
       setLead(await apiGetAdminLead(leadId));
     } catch (err) {
-      toast({ type: 'error', title: 'Không mở được thông tin khách hàng', description: apiErrorMessage(err) });
+      toast({ type: 'error', title: t('Không mở được thông tin khách hàng', 'Could not open the lead'), description: apiErrorMessage(err) });
       onClose();
     }
   }, [leadId, toast, onClose]);
@@ -296,7 +316,7 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
       toast({ type: 'success', title });
       onChanged();
     } catch (err) {
-      toast({ type: 'error', title: 'Không cập nhật được', description: apiErrorMessage(err) });
+      toast({ type: 'error', title: t('Không cập nhật được', 'Could not update'), description: apiErrorMessage(err) });
     } finally {
       setBusy('');
     }
@@ -309,10 +329,10 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
     try {
       setLead(await apiAddAdminLeadNote(leadId, { type: noteType, body: noteBody.trim() }));
       setNoteBody('');
-      toast({ type: 'success', title: 'Đã lưu vào lịch sử chăm sóc' });
+      toast({ type: 'success', title: t('Đã lưu vào lịch sử chăm sóc', 'Added to the history') });
       onChanged();
     } catch (err) {
-      toast({ type: 'error', title: 'Không lưu được ghi chú', description: apiErrorMessage(err) });
+      toast({ type: 'error', title: t('Không lưu được ghi chú', 'Could not save the note'), description: apiErrorMessage(err) });
     } finally {
       setBusy('');
     }
@@ -331,66 +351,67 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
     <div className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 md:p-8 flex items-center justify-center">
       {/* Backdrop mờ nền */}
       <div
-        className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-150"
+        className="fixed inset-0 bg-slate-900/40"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Modal Dialog Card đặt ở chính giữa màn hình */}
       <div
-        className="relative w-full max-w-3xl max-h-[92vh] bg-white rounded-2xl border border-[#E2E8F0] shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-10"
+        className="relative w-full max-w-3xl max-h-[92vh] bg-white rounded-xl border border-slate-200 shadow-xl flex flex-col overflow-hidden z-10"
         role="dialog"
         aria-modal="true"
-        aria-label={lead?.fullName || 'Chi tiết khách hàng'}
+        aria-label={lead?.fullName || t('Chi tiết khách hàng', 'Lead details')}
       >
         {/* Header Modal */}
-        <div className="px-6 py-4.5 border-b border-[#F1F5F9] bg-[#FAFBFC] shrink-0">
+        <div className="px-5 pt-4 border-b border-slate-200 shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2.5 flex-wrap">
-                <h3 className="text-[20px] font-bold text-[#0F172A] tracking-tight">
-                  {lead?.fullName || 'Khách hàng tiềm năng'}
+                <h3 className="text-[16px] font-semibold text-slate-900">
+                  {lead?.fullName || t('Khách hàng tiềm năng', 'Lead')}
                 </h3>
                 {lead && <StatusBadge status={lead.status} />}
               </div>
               {lead && (
-                <p className="mt-1 text-[13px] text-[#64748B]">
-                  Đăng ký {formatVNDateTime(lead.createdAt)}
-                  {lead.submissionCount > 1 && ` · Gửi lại form ${lead.submissionCount} lần`}
+                <p className="mt-1 text-[13px] text-slate-500">
+                  {t('Đăng ký ', 'Signed up ')}
+                  <span className="tabular-nums">{formatVNDateTime(lead.createdAt)}</span>
+                  {lead.submissionCount > 1 && t(` · Gửi lại form ${lead.submissionCount} lần`, ` · Submitted ${lead.submissionCount} times`)}
                 </p>
               )}
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
-              aria-label="Đóng"
+              className="p-1.5 rounded-md text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+              aria-label={t('Đóng', 'Close')}
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5" aria-hidden="true" />
             </button>
           </div>
 
           {/* Sub-tabs chuyển đổi chế độ xem */}
-          <div className="flex gap-6 mt-3.5 border-t border-slate-200/60 pt-2.5">
+          <div className="flex gap-5 mt-3" role="tablist">
             {[
-              { key: 'overview', label: 'Tư vấn & Thao tác' },
-              { key: 'timeline', label: 'Lịch sử chăm sóc', count: lead?.notes?.length },
+              { key: 'overview', label: t('Tư vấn & thao tác', 'Follow-up') },
+              { key: 'timeline', label: t('Lịch sử chăm sóc', 'Activity history'), count: lead?.notes?.length },
             ].map((tab) => (
               <button
                 key={tab.key}
                 type="button"
+                role="tab"
+                aria-selected={drawerTab === tab.key}
                 onClick={() => setDrawerTab(tab.key)}
-                className={`pb-1 text-[14px] font-semibold border-b-2 cursor-pointer transition-colors ${
-                  drawerTab === tab.key
-                    ? 'border-[#2563EB] text-[#2563EB]'
-                    : 'border-transparent text-[#64748B] hover:text-[#0F172A]'
+                className={`pb-2.5 -mb-px text-[13px] font-medium border-b-2 cursor-pointer transition-colors ${
+                  drawerTab === tab.key ? 'border-blue-600 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-900'
                 }`}
               >
                 {tab.label}
                 {tab.count != null && (
                   <span
-                    className={`ml-2 px-1.5 py-0.2 rounded-full text-[11px] font-bold tabular-nums ${
-                      drawerTab === tab.key ? 'bg-blue-100 text-[#2563EB]' : 'bg-slate-100 text-[#64748B]'
+                    className={`ml-1.5 px-1.5 rounded text-[11px] font-medium tabular-nums ${
+                      drawerTab === tab.key ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
                     }`}
                   >
                     {tab.count}
@@ -402,7 +423,7 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
         </div>
 
         {/* Scrollable Content Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-5 overflow-y-auto space-y-6 flex-1">
           {!lead ? (
             <div className="space-y-4">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -412,10 +433,13 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
           ) : drawerTab === 'overview' ? (
             <div className="space-y-6">
               {waiting && (
-                <div className="flex items-center gap-3 p-3.5 rounded-xl border border-amber-300 bg-amber-50 text-[13px] text-amber-900 shadow-2xs">
-                  <Clock className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-amber-300 bg-amber-50 text-[13px] text-amber-900" role="status">
+                  <Clock className="w-4 h-4 text-amber-600 shrink-0" aria-hidden="true" />
                   <span>
-                    <strong>Quá hạn 24 giờ:</strong> Khách đã gửi yêu cầu được {waiting} ngày nhưng chưa có nhân viên liên hệ lại.
+                    {t(
+                      `Quá 24 giờ: khách đã chờ ${waiting} ngày mà chưa được liên hệ.`,
+                      `Over 24 hours: this lead has waited ${waiting} days without contact.`
+                    )}
                   </span>
                 </div>
               )}
@@ -424,100 +448,102 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 <a
                   href={`tel:${lead.phone}`}
-                  className={`${ui.btnSecondary} p-2.5 justify-center text-center`}
-                  title="Gọi điện thoại"
+                  className={`${ui.btnSecondary} justify-center`}
                 >
-                  <Phone className="w-4 h-4 text-emerald-600" />
-                  <span>Gọi điện</span>
+                  <Phone className="w-4 h-4 text-slate-500" aria-hidden="true" />
+                  <span>{t('Gọi điện', 'Call')}</span>
                 </a>
                 <a
                   href={zaloLink(lead.phone)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`${ui.btnSecondary} p-2.5 justify-center text-center`}
-                  title="Mở Zalo chat"
+                  className={`${ui.btnSecondary} justify-center`}
                 >
-                  <MessageCircle className="w-4 h-4 text-blue-600" />
+                  <MessageCircle className="w-4 h-4 text-slate-500" aria-hidden="true" />
                   <span>Zalo</span>
                 </a>
                 {lead.email ? (
                   <a
                     href={`mailto:${lead.email}?subject=${encodeURIComponent('StockPilot - Tư vấn mở cửa hàng')}`}
-                    className={`${ui.btnSecondary} p-2.5 justify-center text-center`}
-                    title="Gửi email"
+                    className={`${ui.btnSecondary} justify-center`}
                   >
-                    <Mail className="w-4 h-4 text-purple-600" />
+                    <Mail className="w-4 h-4 text-slate-500" aria-hidden="true" />
                     <span>Email</span>
                   </a>
                 ) : (
                   <button
                     type="button"
                     disabled
-                    className={`${ui.btnSecondary} p-2.5 justify-center opacity-40`}
-                    title="Không có email"
+                    className={`${ui.btnSecondary} justify-center`}
+                    title={t('Khách chưa cung cấp email', 'No email provided')}
                   >
-                    <Mail className="w-4 h-4" />
+                    <Mail className="w-4 h-4" aria-hidden="true" />
                     <span>Email</span>
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => onOpenCreateStore(lead)}
-                  className={`${ui.btnSecondary} p-2.5 justify-center text-center`}
-                  title="Tạo link đăng ký"
+                  className={`${ui.btnSecondary} justify-center`}
                 >
-                  <Store className="w-4 h-4 text-amber-600" />
-                  <span>Tạo shop</span>
+                  <Store className="w-4 h-4 text-slate-500" aria-hidden="true" />
+                  <span>{t('Tạo cửa hàng', 'Create store')}</span>
                 </button>
               </div>
 
               <DetailList
                 rows={[
-                  ['Số điện thoại', <span className="font-semibold text-[#0F172A]">{lead.phone}</span>],
-                  ['Email', lead.email || 'Chưa cung cấp'],
-                  ['Tên cửa hàng dự kiến', lead.storeName || 'Chưa xác định'],
-                  ['Ngành hàng kinh doanh', lead.industry || 'Chưa xác định'],
+                  [t('Số điện thoại', 'Phone'), <span key="phone" className="tabular-nums">{lead.phone}</span>],
+                  ['Email', lead.email || t('Chưa cung cấp', 'Not provided')],
+                  [t('Tên cửa hàng dự kiến', 'Planned store name'), lead.storeName || t('Chưa xác định', 'Not set')],
+                  [t('Ngành hàng', 'Industry'), lead.industry || t('Chưa xác định', 'Not set')],
                   [
-                    'Liên hệ gần nhất',
-                    lead.lastContactedAt ? formatVNDateTime(lead.lastContactedAt) : 'Chưa từng liên hệ',
+                    t('Liên hệ gần nhất', 'Last contact'),
+                    lead.lastContactedAt ? formatVNDateTime(lead.lastContactedAt) : t('Chưa từng liên hệ', 'Never contacted'),
                   ],
                 ]}
               />
 
-              <Section title="Lời nhắn từ khách hàng">
-                <p className="whitespace-pre-wrap rounded-xl border border-[#E2E8F0] bg-slate-50/70 p-4 text-[13px] text-[#334155] leading-relaxed shadow-2xs">
-                  {lead.note || 'Khách không để lại lời nhắn thêm.'}
+              <Section title={t('Lời nhắn từ khách hàng', 'Message from the lead')}>
+                <p className="whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[13px] text-slate-700 leading-relaxed">
+                  {lead.note || t('Khách không để lại lời nhắn thêm.', 'The lead left no message.')}
                 </p>
               </Section>
 
               {/* Phụ trách & Trạng thái */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl border border-[#E2E8F0] bg-white shadow-2xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Trạng thái xử lý</label>
+                  <label htmlFor="lead-status" className="block text-[13px] font-medium text-slate-700 mb-1.5">
+                    {t('Trạng thái xử lý', 'Status')}
+                  </label>
                   <select
+                    id="lead-status"
                     value={lead.status}
                     disabled={busy === 'update'}
-                    onChange={(e) => update({ status: e.target.value }, 'Đã cập nhật trạng thái')}
+                    onChange={(e) => update({ status: e.target.value }, t('Đã cập nhật trạng thái', 'Status updated'))}
                     className={ui.select}
                   >
                     {Object.entries(STATUS).map(([value, s]) => (
                       <option key={value} value={value}>
-                        {s.label}
+                        {t(s.label, s.en)}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[13px] font-semibold text-[#334155] mb-1.5">Người phụ trách</label>
+                  <label htmlFor="lead-assignee" className="block text-[13px] font-medium text-slate-700 mb-1.5">
+                    {t('Người phụ trách', 'Assignee')}
+                  </label>
                   <select
+                    id="lead-assignee"
                     value={lead.assignee?.id ?? ''}
                     disabled={busy === 'update'}
                     onChange={(e) =>
-                      update({ assigneeId: e.target.value ? Number(e.target.value) : null }, 'Đã chuyển người phụ trách')
+                      update({ assigneeId: e.target.value ? Number(e.target.value) : null }, t('Đã chuyển người phụ trách', 'Assignee changed'))
                     }
                     className={ui.select}
                   >
-                    <option value="">Chưa giao việc</option>
+                    <option value="">{t('Chưa giao việc', 'Unassigned')}</option>
                     {admins.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.fullName}
@@ -528,9 +554,9 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
               </div>
 
               {/* Form Ghi Chú Nhanh */}
-              <Section title="Ghi nhận hoạt động chăm sóc">
+              <Section title={t('Ghi nhận hoạt động chăm sóc', 'Log an activity')}>
                 <form onSubmit={addNote} className="space-y-3">
-                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Hình thức tương tác">
+                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t('Hình thức tương tác', 'Activity type')}>
                     {['CALL', 'EMAIL', 'MEETING', 'NOTE'].map((type) => (
                       <button
                         key={type}
@@ -538,13 +564,13 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
                         role="radio"
                         aria-checked={noteType === type}
                         onClick={() => setNoteType(type)}
-                        className={`px-3 py-1.5 rounded-lg text-[12px] font-semibold border cursor-pointer transition-all ${
+                        className={`h-7 px-2.5 rounded-md text-[12px] font-medium border cursor-pointer transition-colors ${
                           noteType === type
-                            ? 'border-[#2563EB] bg-[#EFF4FF] text-[#2563EB] shadow-2xs'
-                            : 'border-[#CBD5E1] text-[#475569] hover:bg-slate-50'
+                            ? 'border-blue-600 bg-blue-50 text-blue-700'
+                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
                       >
-                        {NOTE_TYPES[type]?.label || type}
+                        {noteLabel(type)}
                       </button>
                     ))}
                   </div>
@@ -555,24 +581,24 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
                     value={noteBody}
                     onChange={(e) => setNoteBody(e.target.value)}
                     maxLength={2000}
-                    placeholder={NOTE_PLACEHOLDER[noteType]}
+                    placeholder={NOTE_PLACEHOLDER[noteType]?.[isEn ? 1 : 0]}
+                    aria-label={t('Nội dung ghi chú', 'Note')}
                     className={ui.input}
                   />
 
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-[12px] text-[#64748B]">
+                    <span className="text-[12px] text-slate-500">
                       {lead.status === 'NEW' && noteType !== 'NOTE'
-                        ? 'Khách sẽ tự động chuyển sang trạng thái "Đã liên hệ".'
-                        : 'Nhấn Lưu để ghi vào lịch sử'}
+                        ? t('Khách sẽ tự chuyển sang "Đã liên hệ".', 'The lead will move to "Contacted" automatically.')
+                        : t('Nhấn Lưu để ghi vào lịch sử.', 'Save to add it to the history.')}
                     </span>
                     <button
                       type="submit"
                       disabled={busy === 'note' || noteBody.trim().length < 2}
                       className={ui.btnPrimary}
                     >
-                      {busy === 'note' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      <Send className="w-3.5 h-3.5" />
-                      Lưu hoạt động
+                      {busy === 'note' ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" /> : <Send className="w-3.5 h-3.5" aria-hidden="true" />}
+                      {t('Lưu hoạt động', 'Save activity')}
                     </button>
                   </div>
                 </form>
@@ -583,13 +609,13 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
                 <Section
                   title={
                     <div className="flex items-center justify-between">
-                      <span className="text-[14px] font-semibold text-[#0F172A]">Hoạt động & ghi chú gần nhất</span>
+                      <span className="text-[13px] font-semibold text-slate-900">{t('Hoạt động gần nhất', 'Latest activity')}</span>
                       <button
                         type="button"
                         onClick={() => setDrawerTab('timeline')}
-                        className="text-[12px] font-semibold text-[#2563EB] hover:text-[#1D4ED8] cursor-pointer flex items-center gap-1"
+                        className="text-[12px] font-medium text-blue-700 hover:underline underline-offset-2 cursor-pointer"
                       >
-                        Xem toàn bộ ({lead.notes.length}) →
+                        {t(`Xem toàn bộ (${lead.notes.length})`, `View all (${lead.notes.length})`)} →
                       </button>
                     </div>
                   }
@@ -600,26 +626,24 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
                       return (
                         <div
                           key={n.id}
-                          className={`p-3.5 rounded-xl border text-[13px] transition-all ${
-                            n.type === 'NOTE'
-                              ? 'bg-amber-50/50 border-amber-200/80'
-                              : 'bg-slate-50/70 border-slate-200/80'
+                          className={`px-4 py-3 rounded-lg border text-[13px] ${
+                            n.type === 'NOTE' ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'
                           }`}
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                             <div className="flex items-center gap-2">
                               <Badge tone={T.tone} dot={false}>
-                                {T.label}
+                                {t(T.label, T.en)}
                               </Badge>
-                              <span className="font-semibold text-[#0F172A] text-[12px]">
-                                {n.author?.fullName || 'Hệ thống'}
+                              <span className="font-semibold text-slate-900 text-[12px]">
+                                {n.author?.fullName || t('Hệ thống', 'System')}
                               </span>
                             </div>
-                            <span className="text-[11px] text-[#94A3B8]">
+                            <span className="text-[12px] text-slate-500 tabular-nums">
                               {formatRelativeTime(n.createdAt) || formatVNDateTime(n.createdAt)}
                             </span>
                           </div>
-                          <p className="whitespace-pre-wrap text-[#334155] leading-relaxed">
+                          <p className="whitespace-pre-wrap text-slate-700 leading-relaxed">
                             {n.body}
                           </p>
                         </div>
@@ -631,10 +655,10 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
             </div>
           ) : (
             <div className="space-y-4">
-              <h4 className="text-[14px] font-bold text-[#0F172A]">Dòng thời gian tương tác</h4>
+              <h4 className="text-[13px] font-semibold text-slate-900">{t('Dòng thời gian', 'Timeline')}</h4>
               {!lead.notes?.length ? (
-                <p className="p-8 text-center text-[#64748B] text-[13px] bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  Chưa có hoạt động nào được ghi lại. Hãy thực hiện cuộc gọi hoặc gửi email đầu tiên!
+                <p className="p-8 text-center text-slate-500 text-[13px] bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                  {t('Chưa có hoạt động nào được ghi lại. Hãy thực hiện cuộc gọi hoặc gửi email đầu tiên!', 'No activity yet. Log the first call or email.')}
                 </p>
               ) : (
                 <ol className="relative border-l border-slate-200 ml-3 space-y-5">
@@ -643,22 +667,22 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
                     return (
                       <li key={n.id} className="pl-5 relative">
                         <span
-                          className="absolute -left-1.75 top-1.5 w-3.5 h-3.5 rounded-full bg-white border-2 border-[#2563EB]"
+                          className="absolute -left-1.5 top-2 w-3 h-3 rounded-full bg-white border-2 border-blue-600"
                           aria-hidden="true"
                         />
-                        <div className="p-4 rounded-xl border border-[#E2E8F0] bg-white shadow-2xs space-y-1.5">
+                        <div className="px-4 py-3 rounded-lg border border-slate-200 bg-white space-y-1.5">
                           <div className="flex flex-wrap items-center justify-between gap-2 text-[12px]">
                             <div className="flex items-center gap-2">
                               <Badge tone={T.tone} dot={false}>
-                                {T.label}
+                                {t(T.label, T.en)}
                               </Badge>
-                              <span className="font-semibold text-[#0F172A]">{n.author?.fullName || 'Hệ thống'}</span>
+                              <span className="font-semibold text-slate-900">{n.author?.fullName || t('Hệ thống', 'System')}</span>
                             </div>
-                            <span className="text-[#94A3B8]" title={formatVNDateTime(n.createdAt)}>
+                            <span className="text-slate-500 tabular-nums" title={formatVNDateTime(n.createdAt)}>
                               {formatRelativeTime(n.createdAt) || formatVNDateTime(n.createdAt)}
                             </span>
                           </div>
-                          <p className="whitespace-pre-wrap text-[13px] text-[#334155] leading-relaxed pt-1">{n.body}</p>
+                          <p className="whitespace-pre-wrap text-[13px] text-slate-700 leading-relaxed pt-1">{n.body}</p>
                         </div>
                       </li>
                     );
@@ -675,6 +699,8 @@ function LeadDrawer({ leadId, admins, onClose, onChanged, focusNote, onOpenCreat
 
 // ─── Trang Chính ─────────────────────────────────────────────────────────────
 export function AdminLeadsPage() {
+  const { t, isEn } = useAdminText();
+  const locale = isEn ? 'en-US' : 'vi-VN';
   const { toast } = useToast();
   const { user: me } = useAuthStore();
   const [params, setParams] = useSearchParams();
@@ -762,21 +788,21 @@ export function AdminLeadsPage() {
   const markConverted = async (lead) => {
     try {
       await apiUpdateAdminLead(lead.id, { status: 'CONVERTED' });
-      toast({ type: 'success', title: 'Đã đánh dấu đã chuyển đổi thành công' });
+      toast({ type: 'success', title: t('Đã đánh dấu đã chuyển đổi thành công', 'Marked as converted') });
       setDialog(null);
       load({ silent: true });
     } catch (err) {
-      toast({ type: 'error', title: 'Không cập nhật được', description: apiErrorMessage(err) });
+      toast({ type: 'error', title: t('Không cập nhật được', 'Could not update'), description: apiErrorMessage(err) });
     }
   };
 
   const assignToMe = async (lead) => {
     try {
       await apiUpdateAdminLead(lead.id, { assigneeId: me.id });
-      toast({ type: 'success', title: `Bạn đã nhận phụ trách ${lead.fullName}` });
+      toast({ type: 'success', title: t(`Bạn đã nhận phụ trách ${lead.fullName}`, `You now own ${lead.fullName}`) });
       load({ silent: true });
     } catch (err) {
-      toast({ type: 'error', title: 'Không nhận được khách', description: apiErrorMessage(err) });
+      toast({ type: 'error', title: t('Không nhận được khách', 'Could not assign the lead'), description: apiErrorMessage(err) });
     }
   };
 
@@ -797,7 +823,7 @@ export function AdminLeadsPage() {
       if (sortKey === 'fullName') {
         const nA = a.fullName || '';
         const nB = b.fullName || '';
-        return sortDirection === 'asc' ? nA.localeCompare(nB, 'vi') : nB.localeCompare(nA, 'vi');
+        return sortDirection === 'asc' ? nA.localeCompare(nB, locale) : nB.localeCompare(nA, locale);
       }
       if (sortKey === 'lastSubmittedAt') {
         const tA = a.lastSubmittedAt ? new Date(a.lastSubmittedAt).getTime() : 0;
@@ -812,7 +838,7 @@ export function AdminLeadsPage() {
       return 0;
     });
     return sorted;
-  }, [leads, sortKey, sortDirection]);
+  }, [leads, sortKey, sortDirection, locale]);
 
   // Bulk Actions
   const isAllSelected = sortedLeads.length > 0 && selectedIds.length === sortedLeads.length;
@@ -835,39 +861,44 @@ export function AdminLeadsPage() {
   };
 
   const actionsFor = (lead) => [
-    { label: 'Xem chi tiết & tư vấn', icon: ExternalLink, onClick: () => openLead(lead.id) },
-    { label: 'Ghi lại cuộc gọi / hẹn gặp', icon: PlusCircle, onClick: () => openLead(lead.id, true) },
+    { label: t('Xem chi tiết', 'View details'), icon: ExternalLink, onClick: () => openLead(lead.id) },
+    { label: t('Ghi lại cuộc gọi / hẹn gặp', 'Log a call / meeting'), icon: PlusCircle, onClick: () => openLead(lead.id, true) },
     {
-      label: 'Nhận phụ trách khách này',
+      label: t('Nhận phụ trách', 'Assign to me'),
       icon: UserPlus,
       onClick: () => assignToMe(lead),
       hidden: lead.assignee?.id === me?.id,
     },
-    { label: 'Đổi trạng thái xử lý', icon: RefreshCw, onClick: () => setDialog({ type: 'status', lead }) },
+    { label: t('Đổi trạng thái', 'Change status'), icon: RefreshCw, onClick: () => setDialog({ type: 'status', lead }) },
     {
-      label: 'Nhắn qua Zalo',
+      label: t('Nhắn qua Zalo', 'Message on Zalo'),
       icon: MessageCircle,
       onClick: () => window.open(zaloLink(lead.phone), '_blank', 'noopener,noreferrer'),
     },
     {
-      label: 'Tạo cửa hàng cho khách',
+      label: t('Tạo cửa hàng cho khách', 'Create store for lead'),
       icon: Store,
       onClick: () => setDialog({ type: 'store', lead }),
       hidden: lead.status === 'REJECTED',
     },
   ];
 
+  const noteTypeLabel = (type) => {
+    const n = NOTE_TYPES[type];
+    return n ? t(n.label, n.en) : t('Ghi chú', 'Note');
+  };
+
   const assigneeOptions = [
-    { value: '', label: 'Mọi người phụ trách' },
-    { value: 'none', label: 'Chưa giao việc' },
-    ...admins.map((a) => ({ value: String(a.id), label: a.id === me?.id ? `${a.fullName} (bạn)` : a.fullName })),
+    { value: '', label: t('Mọi người phụ trách', 'All assignees') },
+    { value: 'none', label: t('Chưa giao việc', 'Unassigned') },
+    ...admins.map((a) => ({ value: String(a.id), label: a.id === me?.id ? `${a.fullName} ${t('(bạn)', '(you)')}` : a.fullName })),
   ];
 
   const chips = [
-    overdue && { key: 'overdue', label: 'Chờ quá 24 giờ', onRemove: () => updateParams({ overdue: '' }) },
+    overdue && { key: 'overdue', label: t('Chờ quá 24 giờ', 'Waiting over 24h'), onRemove: () => updateParams({ overdue: '' }) },
     assignee && {
       key: 'assignee',
-      label: assigneeOptions.find((o) => o.value === assignee)?.label || 'Người phụ trách',
+      label: assigneeOptions.find((o) => o.value === assignee)?.label || t('Người phụ trách', 'Assignee'),
       onRemove: () => updateParams({ assignee: '' }),
     },
   ].filter(Boolean);
@@ -880,13 +911,17 @@ export function AdminLeadsPage() {
   return (
     <div className={ui.pageContainer}>
       <PageHeader
-        title="Khách hàng tiềm năng (Leads CRM)"
-        description="Quản lý khách để lại thông tin tư vấn mở cửa hàng từ Landing Page. Hãy liên hệ trong 24 giờ đầu để đạt tỷ lệ chốt cao nhất."
-        badge={<Badge tone="neutral">{summary?.total ?? 0} khách</Badge>}
+        title={t('Khách hàng tiềm năng (Leads CRM)', 'Leads')}
+        description={t('Quản lý khách để lại thông tin tư vấn mở cửa hàng từ Landing Page. Hãy liên hệ trong 24 giờ đầu để đạt tỷ lệ chốt cao nhất.', 'People who asked for a consultation on the home page. Contact them within 24 hours for the best conversion.')}
+        badge={
+          <Badge tone="neutral" dot={false}>
+            {t(`${summary?.total ?? 0} khách`, `${summary?.total ?? 0} leads`)}
+          </Badge>
+        }
         actions={
           <button type="button" onClick={() => load()} disabled={isLoading} className={ui.btnSecondary}>
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-            Làm mới
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
+            {t('Làm mới', 'Refresh')}
           </button>
         }
       >
@@ -897,10 +932,10 @@ export function AdminLeadsPage() {
             updateParams({ status: v, overdue: '' });
           }}
           tabs={[
-            { value: '', label: 'Tất cả khách', count: summary?.total },
+            { value: '', label: t('Tất cả', 'All'), count: summary?.total },
             ...Object.entries(STATUS).map(([value, s]) => ({
               value,
-              label: s.label,
+              label: t(s.label, s.en),
               count: summary?.[value],
             })),
           ]}
@@ -910,56 +945,63 @@ export function AdminLeadsPage() {
       {/* 4 Thẻ KPI CRM */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Tổng khách tư vấn"
+          title={t('Tổng khách tư vấn', 'Total leads')}
           value={summary?.total ?? 0}
-          subtitle="Tất cả lead từ Landing Page"
+          subtitle={t('Từ form trên trang chủ', 'From the home page form')}
           icon={UserCheck}
-          iconBg="bg-blue-50 text-[#2563EB] border-blue-100"
+          iconBg="bg-slate-100 text-slate-600"
           loading={isLoading}
         />
         <StatCard
-          title="Khách mới cần gọi"
+          title={t('Khách mới cần gọi', 'New, to call')}
           value={summary?.NEW ?? 0}
-          subtitle="Chưa được liên hệ lần nào"
+          subtitle={t('Chưa được liên hệ lần nào', 'Not contacted yet')}
           icon={Phone}
-          iconBg="bg-amber-50 text-amber-700 border-amber-100"
+          iconBg="bg-slate-100 text-slate-600"
           alert={(summary?.NEW ?? 0) > 0}
           loading={isLoading}
         />
         <StatCard
-          title="Chờ quá 24 giờ (SLA)"
+          title={t('Chờ quá 24 giờ', 'Waiting over 24h')}
           value={summary?.waitingOver24h ?? 0}
-          subtitle="Nguy cơ mất khách hàng"
+          subtitle={t('Nên liên hệ ngay', 'Contact soon')}
           icon={Clock}
-          iconBg="bg-red-50 text-red-600 border-red-100"
+          iconBg={(summary?.waitingOver24h ?? 0) > 0 ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}
           alert={(summary?.waitingOver24h ?? 0) > 0}
           loading={isLoading}
         />
         <StatCard
-          title="Đã chuyển đổi thành shop"
+          title={t('Đã thành cửa hàng', 'Converted')}
           value={summary?.CONVERTED ?? 0}
-          subtitle={`Tỷ lệ chuyển đổi ${summary?.total ? Math.round((summary.CONVERTED / summary.total) * 100) : 0}%`}
+          subtitle={
+            summary?.total
+              ? t(`Tỷ lệ chuyển đổi ${Math.round((summary.CONVERTED / summary.total) * 100)}%`, `${Math.round((summary.CONVERTED / summary.total) * 100)}% conversion`)
+              : '–'
+          }
           icon={CheckCircle2}
-          iconBg="bg-emerald-50 text-emerald-600 border-emerald-100"
+          iconBg="bg-slate-100 text-slate-600"
           loading={isLoading}
         />
       </div>
 
       {/* SLA Alert Box */}
       {summary?.waitingOver24h > 0 && !overdue && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-red-200 bg-red-50/50 text-[13px] text-red-900 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-[13px] text-red-900" role="status">
           <div className="flex items-center gap-2.5">
-            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" aria-hidden="true" />
             <span>
-              <strong>Cảnh báo thời gian phản hồi:</strong> Đang có <span className="font-bold underline">{summary.waitingOver24h}</span> khách hàng đã chờ hơn 24 giờ mà chưa được nhân viên gọi tư vấn.
+              {t(
+                `${summary.waitingOver24h} khách đã chờ hơn 24 giờ mà chưa được gọi tư vấn.`,
+                `${summary.waitingOver24h} leads have waited over 24 hours without a call.`
+              )}
             </span>
           </div>
           <button
             type="button"
             onClick={() => updateParams({ overdue: 'true', status: '' })}
-            className={`${ui.btnDanger} px-3 py-1.5 text-[12px] self-start sm:self-center`}
+            className={`${ui.btnSecondary} h-8 self-start sm:self-center`}
           >
-            Lọc danh sách quá hạn ngay
+            {t('Xem các khách quá hạn', 'Show overdue leads')}
           </button>
         </div>
       )}
@@ -970,25 +1012,25 @@ export function AdminLeadsPage() {
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder="Tìm theo họ tên, số điện thoại, email, tên shop…"
+            placeholder={t('Tìm theo họ tên, số điện thoại, email, tên shop…', 'Search by name, phone, email or store name…')}
             className="w-full lg:w-80"
           />
           <div className="flex flex-wrap items-center gap-2">
             <FilterSelect
-              label="Người phụ trách"
+              label={t('Người phụ trách', 'Assignee')}
               value={assignee}
               onChange={(v) => updateParams({ assignee: v })}
               options={assigneeOptions}
               className="max-w-55"
             />
-            <label className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-[#CBD5E1] bg-white text-[13px] font-medium text-[#334155] cursor-pointer shadow-2xs hover:border-[#94A3B8]">
+            <label className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 cursor-pointer hover:border-slate-300">
               <input
                 type="checkbox"
                 checked={overdue}
                 onChange={(e) => updateParams({ overdue: e.target.checked ? 'true' : '', status: '' })}
-                className="accent-[#2563EB] w-4 h-4 cursor-pointer"
+                className="accent-blue-600 w-4 h-4 cursor-pointer"
               />
-              Chờ quá 24 giờ
+              {t('Chờ quá 24 giờ', 'Waiting over 24h')}
             </label>
           </div>
         </Toolbar>
@@ -1005,37 +1047,37 @@ export function AdminLeadsPage() {
               onPage={(p) => updateParams({ page: String(p) }, false)}
               onLimitChange={(l) => updateParams({ limit: String(l) }, true)}
               disabled={isLoading}
-              unit="khách"
+              unit={t('khách', 'leads')}
             />
           )
         }
       >
-        <table className="w-full min-w-237.5">
+        <table className={`${ui.table} min-w-237.5`}>
           <thead>
             <tr>
-              <th className="w-10 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] text-center">
+              <th className="w-10 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-center">
                 <Checkbox
                   checked={isAllSelected}
                   indeterminate={isSomeSelected}
                   onChange={handleSelectAll}
-                  aria-label="Chọn tất cả khách"
+                  aria-label={t('Chọn tất cả khách', 'Select all leads')}
                 />
               </th>
               <Th sortKey="fullName" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
-                Khách hàng
+                {t('Khách hàng', 'Lead')}
               </Th>
-              <Th>Cửa hàng dự kiến</Th>
-              <Th>Lời nhắn của khách</Th>
+              <Th>{t('Cửa hàng dự kiến', 'Planned store')}</Th>
+              <Th>{t('Lời nhắn của khách', 'Message')}</Th>
               <Th sortKey="lastSubmittedAt" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
-                Thời điểm đăng ký
+                {t('Thời điểm đăng ký', 'Submitted')}
               </Th>
               <Th sortKey="lastContactedAt" currentSortKey={sortKey} sortDirection={sortDirection} onSort={handleSort}>
-                Liên hệ gần nhất
+                {t('Liên hệ gần nhất', 'Last contact')}
               </Th>
-              <Th>Phụ trách</Th>
-              <Th>Trạng thái</Th>
-              <th className="w-12 px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                <span className="sr-only">Thao tác</span>
+              <Th>{t('Phụ trách', 'Assignee')}</Th>
+              <Th>{t('Trạng thái', 'Status')}</Th>
+              <th className="w-12 px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                <span className="sr-only">{t('Thao tác', 'Actions')}</span>
               </th>
             </tr>
           </thead>
@@ -1047,16 +1089,16 @@ export function AdminLeadsPage() {
             empty={
               sortedLeads.length === 0 && (
                 <EmptyState
-                  title={chips.length || query || status ? 'Không có khách phù hợp bộ lọc' : 'Chưa có khách hàng tiềm năng'}
+                  title={chips.length || query || status ? t('Không có khách phù hợp bộ lọc', 'No leads match the filters') : t('Chưa có khách hàng tiềm năng', 'No leads yet')}
                   description={
                     chips.length || query || status
-                      ? 'Hãy thử thay đổi từ khóa hoặc bỏ bớt các điều kiện lọc.'
-                      : 'Khi người dùng điền form tư vấn trên trang chủ, thông tin sẽ tự động xuất hiện tại đây.'
+                      ? t('Hãy thử thay đổi từ khóa hoặc bỏ bớt các điều kiện lọc.', 'Try another keyword or remove some filters.')
+                      : t('Khi người dùng điền form tư vấn trên trang chủ, thông tin sẽ tự động xuất hiện tại đây.', 'Leads appear here when someone fills in the home page form.')
                   }
                   action={
                     chips.length || query ? (
                       <button type="button" onClick={clearFilters} className={ui.btnSecondary}>
-                        Xóa bộ lọc
+                        {t('Xóa bộ lọc', 'Clear filters')}
                       </button>
                     ) : null
                   }
@@ -1072,97 +1114,94 @@ export function AdminLeadsPage() {
                 <tr
                   key={lead.id}
                   onClick={() => openLead(lead.id)}
-                  className={`hover:bg-slate-50/80 cursor-pointer transition-colors ${isSelected ? 'bg-blue-50/30' : ''}`}
+                  onKeyDown={(e) => e.key === 'Enter' && openLead(lead.id)}
+                  tabIndex={0}
+                  className={`hover:bg-slate-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:bg-slate-50 ${isSelected ? 'bg-blue-50/60' : ''}`}
                 >
-                  <td className="px-4 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                     <Checkbox
                       checked={isSelected}
                       onChange={(checked) => handleSelectRow(lead.id, checked)}
-                      aria-label={`Chọn ${lead.fullName}`}
+                      aria-label={t(`Chọn ${lead.fullName}`, `Select ${lead.fullName}`)}
                     />
                   </td>
                   <Td>
                     <div>
-                      <p className="font-bold text-[#0F172A] flex items-center gap-1.5 flex-wrap">
+                      <p className="font-semibold text-slate-900 flex items-center gap-1.5 flex-wrap">
                         {lead.fullName}
                         {lead.submissionCount > 1 && (
-                          <span
-                            className="text-[11px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200"
-                            title="Số lần gửi lại form"
-                          >
-                            ×{lead.submissionCount} lần
-                          </span>
+                          <Badge tone="warning" dot={false}>
+                            ×{lead.submissionCount}
+                          </Badge>
                         )}
                       </p>
-                      <p className="text-[12px] text-[#2563EB] font-mono font-medium mt-0.5">{lead.phone}</p>
+                      <p className="text-[12px] text-slate-500 tabular-nums mt-0.5">{lead.phone}</p>
                     </div>
                   </Td>
                   <Td>
-                    <p className="font-semibold text-[#1E293B] truncate max-w-45">
-                      {lead.storeName || <span className="text-[#94A3B8]">—</span>}
+                    <p className="font-semibold text-slate-800 truncate max-w-45">
+                      {lead.storeName || <span className="text-slate-400">–</span>}
                     </p>
                     {lead.industry && (
-                      <p className="text-[11px] text-[#64748B] truncate max-w-45 mt-0.5">{lead.industry}</p>
+                      <p className="text-[12px] text-slate-500 truncate max-w-45 mt-0.5">{lead.industry}</p>
                     )}
                   </Td>
                   <Td className="max-w-55">
-                    <span className="line-clamp-2 text-[#475569] text-[12px] leading-relaxed" title={lead.note || ''}>
-                      {lead.note || <span className="text-[#94A3B8] italic">Không có lời nhắn</span>}
+                    <span className="line-clamp-2 text-slate-600 text-[12px] leading-relaxed" title={lead.note || ''}>
+                      {lead.note || <span className="text-slate-400">{t('Không có lời nhắn', 'No message')}</span>}
                     </span>
                   </Td>
                   <Td className="whitespace-nowrap">
                     <p
-                      className={`font-semibold ${waiting ? 'text-red-700' : 'text-[#0F172A]'}`}
+                      className={`font-semibold ${waiting ? 'text-red-700' : 'text-slate-900'}`}
                       title={formatVNDateTime(lead.lastSubmittedAt)}
                     >
                       {formatRelativeTime(lead.lastSubmittedAt) || formatVNDateTime(lead.lastSubmittedAt)}
                     </p>
                     {waiting && (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 bg-red-50 px-1.5 py-0.2 rounded border border-red-200 mt-0.5">
-                        <Clock className="w-2.5 h-2.5" /> Chờ {waiting} ngày
-                      </span>
+                      <Badge tone="danger" dot={false} className="mt-0.5">
+                        {t(`Chờ ${waiting} ngày`, `Waiting ${waiting}d`)}
+                      </Badge>
                     )}
                   </Td>
                   <Td className="whitespace-nowrap">
                     {lead.lastContactedAt ? (
                       <div>
-                        <p className="font-medium text-[#0F172A]">
+                        <p className="font-medium text-slate-900">
                           {formatRelativeTime(lead.lastContactedAt) || formatVNDateTime(lead.lastContactedAt)}
                         </p>
                         {lead._count?.notes > 0 && (
-                          <p className="text-[11px] text-[#64748B]">{lead._count.notes} lần tương tác</p>
+                          <p className="text-[12px] text-slate-500">{t(`${lead._count.notes} lần tương tác`, `${lead._count.notes} interactions`)}</p>
                         )}
                         {lead.notes?.[0] && (
                           <div
-                            className="mt-1 max-w-50 truncate text-[11px] text-[#475569] bg-slate-50 px-2 py-0.5 rounded border border-slate-200/80"
-                            title={`${NOTE_TYPES[lead.notes[0].type]?.label || 'Ghi chú'}: ${lead.notes[0].body}`}
+                            className="mt-1 max-w-50 truncate text-[12px] text-slate-600"
+                            title={`${noteTypeLabel(lead.notes[0].type)}: ${lead.notes[0].body}`}
                           >
-                            <span className="font-semibold text-[#0F172A] mr-1">
-                              {NOTE_TYPES[lead.notes[0].type]?.label || 'Ghi chú'}:
-                            </span>
+                            <span className="font-medium text-slate-900 mr-1">{noteTypeLabel(lead.notes[0].type)}:</span>
                             <span>{lead.notes[0].body}</span>
                           </div>
                         )}
                       </div>
                     ) : (
-                      <span className="text-[#94A3B8] italic">Chưa liên hệ</span>
+                      <span className="text-slate-400">{t('Chưa liên hệ', 'Not contacted')}</span>
                     )}
                   </Td>
                   <Td className="whitespace-nowrap">
                     {lead.assignee ? (
-                      <span className="inline-flex items-center gap-2 font-medium text-[#334155]">
-                        <Avatar name={lead.assignee.fullName} size={26} tone="brand" />
+                      <span className="inline-flex items-center gap-2 font-medium text-slate-700">
+                        <Avatar name={lead.assignee.fullName} size={24} tone="brand" />
                         {lead.assignee.fullName}
                       </span>
                     ) : (
-                      <span className="text-[#94A3B8] italic">Chưa giao việc</span>
+                      <span className="text-slate-400">{t('Chưa giao việc', 'Unassigned')}</span>
                     )}
                   </Td>
                   <Td>
                     <StatusBadge status={lead.status} />
                   </Td>
                   <Td align="right">
-                    <RowMenu items={actionsFor(lead)} label={`Thao tác với ${lead.fullName}`} />
+                    <RowMenu items={actionsFor(lead)} label={t(`Thao tác với ${lead.fullName}`, `Actions for ${lead.fullName}`)} />
                   </Td>
                 </tr>
               );
@@ -1177,7 +1216,7 @@ export function AdminLeadsPage() {
         onClear={() => setSelectedIds([])}
         actions={[
           {
-            label: 'Nhận phụ trách các lead này',
+            label: t(`Nhận phụ trách ${selectedIds.length} khách`, `Assign ${selectedIds.length} leads to me`),
             icon: UserPlus,
             variant: 'primary',
             onClick: async () => {
@@ -1185,13 +1224,13 @@ export function AdminLeadsPage() {
                 await Promise.all(selectedIds.map((id) => apiUpdateAdminLead(id, { assigneeId: me.id })));
                 toast({
                   type: 'success',
-                  title: 'Đã nhận phụ trách',
-                  description: `Bạn đã nhận phụ trách ${selectedIds.length} khách hàng được chọn.`,
+                  title: t('Đã nhận phụ trách', 'Assigned to you'),
+                  description: t(`Bạn đã nhận phụ trách ${selectedIds.length} khách.`, `You now own ${selectedIds.length} leads.`),
                 });
                 setSelectedIds([]);
                 load({ silent: true });
               } catch (err) {
-                toast({ type: 'error', title: 'Không hoàn tất được thao tác', description: apiErrorMessage(err) });
+                toast({ type: 'error', title: t('Không hoàn tất được thao tác', 'Could not complete the action'), description: apiErrorMessage(err) });
               }
             },
           },

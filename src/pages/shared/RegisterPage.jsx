@@ -773,8 +773,8 @@ export function RegisterPage() {
             <h1 className="text-3xl font-black tracking-tight text-slate-950 mb-2">StockPilot</h1>
             <p className="text-xs font-bold text-slate-900 max-w-[260px] leading-relaxed">
               {isEn
-                ? 'Start 30-day free trial – No credit card required'
-                : 'Bắt đầu 30 ngày dùng thử miễn phí – Không cần thẻ tín dụng'}
+                ? 'Try it now – No credit card required'
+                : 'Dùng thử ngay – Không cần thẻ tín dụng'}
             </p>
           </div>
 

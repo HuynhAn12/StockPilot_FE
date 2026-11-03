@@ -54,6 +54,12 @@ export async function apiGetAdminDashboard() {
   return data.data;
 }
 
+// GET /admin/activity-trend?days=14
+export async function apiGetAdminActivityTrend(params = { days: 14 }) {
+  const { data } = await apiClient.get('/admin/activity-trend', { params: cleanParams(params) });
+  return data.data;
+}
+
 // ─── 2.2 Quản lý Người dùng ───────────────────────────────────────────────
 // GET /admin/users?page&limit&search&role&isActive&storeId&order
 export async function apiListAdminUsers(params = {}) {
