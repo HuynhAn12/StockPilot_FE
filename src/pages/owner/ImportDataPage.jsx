@@ -90,9 +90,9 @@ async function readSheets(file) {
 }
 
 function convertSheet(sheet, kind, detection = detectSheet(sheet.data, kind)) {
-  if (!detection.kind) return { detection, payload: [], skipped: [] };
+  if (!detection.kind) return { detection, payload: [], skipped: [], warnings: [] };
   const converted = kind === IMPORT_KINDS.PRODUCTS ? toProductItems(sheet.data, detection) : toSalesRows(sheet.data, detection);
-  return { detection, payload: converted.items || converted.rows, skipped: converted.skipped };
+  return { detection, payload: converted.items || converted.rows, skipped: converted.skipped, warnings: converted.warnings || [] };
 }
 
 export function ImportDataPage() {
@@ -214,6 +214,10 @@ export function ImportDataPage() {
   const source = SOURCES.find((s) => s.id === sourceId);
   const detection = parsed?.detection;
   const step2Done = Boolean(parsed && detection?.kind && detection.missing.length === 0 && parsed.payload.length > 0);
+  // "Cập nhật tên, giá, nhóm hàng" không ghi tồn kho, nên cảnh báo về tồn kho không còn liên quan.
+  const fileWarnings = (parsed?.warnings || []).filter(
+    (w) => !(productMode === 'UPSERT_METADATA' && w.field === 'initialQuantity')
+  );
 
   return (
     <div className={ui.pageContainer}>
@@ -335,8 +339,26 @@ export function ImportDataPage() {
                         , bỏ qua <b>{parsed.skipped.length}</b> dòng
                       </>
                     )}
+                    {fileWarnings.length > 0 && (
+                      <>
+                        , <b className="text-[#D97706]">{fileWarnings.length}</b> dòng bị điều chỉnh giá trị
+                      </>
+                    )}
                     .
                   </p>
+                )}
+                {fileWarnings.length > 0 && (
+                  <details className="text-[12px] text-[#64748B]">
+                    <summary className="cursor-pointer">Xem các giá trị bị điều chỉnh (nên sửa trong file nếu sai)</summary>
+                    <ul className="mt-1.5 max-h-40 overflow-y-auto space-y-0.5">
+                      {fileWarnings.slice(0, 200).map((w, i) => (
+                        <li key={`${w.row}-${i}`}>
+                          Dòng {w.row} · {w.sku}: {w.message}
+                        </li>
+                      ))}
+                    </ul>
+                    {fileWarnings.length > 200 && <p className="mt-1">… và {fileWarnings.length - 200} dòng khác.</p>}
+                  </details>
                 )}
                 {parsed.skipped.length > 0 && (
                   <details className="text-[12px] text-[#64748B]">
