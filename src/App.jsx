@@ -227,7 +227,7 @@ export default function App() {
             <Route
               path="/ai-assistant"
               element={
-                <RequireRole roles={['store_owner', 'warehouse_staff']}>
+                <RequireRole roles={['store_owner']}>
                   <ErrorBoundary><AIAssistantPage /></ErrorBoundary>
                 </RequireRole>
               }

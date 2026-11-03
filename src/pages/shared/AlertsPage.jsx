@@ -9,6 +9,8 @@ import {
 import { useAlertsStore } from '../../components/store/alertsStore';
 import { useToast } from '../../components/common/Toast';
 import { useTranslation } from '../../i18n/useTranslation';
+import { useAuthStore } from '../../components/store/authStore';
+import { canResolveAlerts, canRunDecisionEngine, canUseAiAssistant } from '../../config/permissions.config';
 
 /* ═══ HELPERS ════════════════════════════════════════════════════ */
 const TYPE_META = {
@@ -270,13 +272,15 @@ function AlertCard({ alert, onAcknowledge, onResolve, onView, isEn }) {
               <Bell style={{ width: 13, height: 13 }} /> {isEn ? 'Acknowledge' : 'Tiếp nhận'}
             </button>
           )}
-          <button
-            onClick={e => { e.stopPropagation(); onResolve(alert.id); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-colors hover:opacity-90"
-            style={{ background: '#16a34a', color: '#fff' }}
-          >
-            <Check style={{ width: 13, height: 13 }} /> {isEn ? 'Resolved' : 'Đã xử lý'}
-          </button>
+          {onResolve && (
+            <button
+              onClick={e => { e.stopPropagation(); onResolve(alert.id); }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl transition-colors hover:opacity-90"
+              style={{ background: '#16a34a', color: '#fff' }}
+            >
+              <Check style={{ width: 13, height: 13 }} /> {isEn ? 'Resolved' : 'Đã xử lý'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -297,7 +301,7 @@ function AlertDetailModal({ alert, onClose, onAcknowledge, onResolve, onAskAI, i
   const displayMsg = cleanAlertText(alert.message, isEn);
 
   let reason = {};
-  try { reason = typeof alert.reasonJson === 'string' ? JSON.parse(alert.reasonJson) : (alert.reasonJson || {}); } catch (_) {}
+  try { reason = typeof alert.reasonJson === 'string' ? JSON.parse(alert.reasonJson) : (alert.reasonJson || {}); } catch {}
   const entries = Object.entries(reason).filter(([, v]) => v != null);
 
   return (
@@ -415,6 +419,7 @@ function AlertDetailModal({ alert, onClose, onAcknowledge, onResolve, onAskAI, i
 
         {/* footer */}
         <div style={{ padding: '14px 20px', borderTop: '1px solid #e2e8f0', background: '#f8fafc', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          {onAskAI ? (
           <button
             onClick={() => onAskAI(alert)}
             className="flex items-center gap-2 transition-colors hover:bg-violet-100"
@@ -422,6 +427,11 @@ function AlertDetailModal({ alert, onClose, onAcknowledge, onResolve, onAskAI, i
           >
             <Bot style={{ width: 16, height: 16 }} /> {isEn ? 'Ask AI Pilot about this alert' : 'Hỏi AI Pilot về cảnh báo này'}
           </button>
+          ) : (
+            <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
+              {isEn ? 'Acknowledge to notify the store owner, who closes the alert.' : 'Bấm "Tiếp nhận" để báo chủ cửa hàng; chủ cửa hàng sẽ đóng cảnh báo.'}
+            </p>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {status === 'OPEN' && (
               <button
@@ -432,6 +442,7 @@ function AlertDetailModal({ alert, onClose, onAcknowledge, onResolve, onAskAI, i
                 <Bell style={{ width: 13, height: 13 }} /> {isEn ? 'Acknowledge' : 'Tiếp nhận'}
               </button>
             )}
+            {onResolve && (
             <button
               onClick={() => { onResolve(alert.id); onClose(); }}
               className="flex items-center gap-1.5 transition-colors hover:opacity-90"
@@ -439,6 +450,7 @@ function AlertDetailModal({ alert, onClose, onAcknowledge, onResolve, onAskAI, i
             >
               <Check style={{ width: 13, height: 13 }} /> {isEn ? 'Confirm Resolved' : 'Xác nhận đã xử lý'}
             </button>
+            )}
           </div>
         </div>
       </div>
@@ -454,6 +466,10 @@ export function AlertsPage() {
   const isEn = language === 'en';
 
   const { alerts, isLoading, isRecalculating, acknowledgeAlert, resolveAlert, fetchAlerts, recalculate } = useAlertsStore();
+  const role = useAuthStore((state) => state.user?.role);
+  const canResolve = canResolveAlerts(role);
+  const canAnalyze = canRunDecisionEngine(role);
+  const canAskAI = canUseAiAssistant(role);
 
   const [activeTab, setActiveTab] = useState('ALL');
   const [selType, setSelType] = useState('ALL');
@@ -492,34 +508,59 @@ export function AlertsPage() {
     });
   }, [alerts, activeTab, selType, selSev, search]);
 
+  const apiErrorMessage = (err) =>
+    err?.response?.data?.error?.message || (isEn ? 'Could not reach the server.' : 'Không kết nối được máy chủ.');
+
   const handleAck = useCallback(async id => {
-    await acknowledgeAlert(id);
-    toast({
-      title: isEn ? 'Alert Acknowledged' : 'Đã tiếp nhận cảnh báo',
-      description: isEn ? 'Alert moved to Acknowledged tracking state.' : 'Cảnh báo chuyển sang Đang theo dõi.',
-      type: 'info'
-    });
-  }, [acknowledgeAlert, toast, isEn]);
+    try {
+      await acknowledgeAlert(id);
+      toast({
+        title: isEn ? 'Alert Acknowledged' : 'Đã tiếp nhận cảnh báo',
+        description: canResolve
+          ? (isEn ? 'Alert moved to Acknowledged tracking state.' : 'Cảnh báo chuyển sang Đang theo dõi.')
+          : (isEn ? 'The store owner has been notified.' : 'Đã báo cho chủ cửa hàng.'),
+        type: 'info'
+      });
+    } catch (err) {
+      toast({ title: isEn ? 'Could not acknowledge' : 'Không tiếp nhận được cảnh báo', description: apiErrorMessage(err), type: 'error' });
+    }
+  }, [acknowledgeAlert, toast, isEn, canResolve]);
 
   const handleResolve = useCallback(async id => {
-    await resolveAlert(id);
-    toast({
-      title: isEn ? '✓ Alert Resolved' : '✓ Đã xử lý xong',
-      description: isEn ? 'Alert has been closed and saved to history.' : 'Cảnh báo đã đóng và lưu lịch sử.',
-      type: 'success'
-    });
+    try {
+      await resolveAlert(id);
+      toast({
+        title: isEn ? '✓ Alert Resolved' : '✓ Đã xử lý xong',
+        description: isEn ? 'Alert has been closed and saved to history.' : 'Cảnh báo đã đóng và lưu lịch sử.',
+        type: 'success'
+      });
+    } catch (err) {
+      toast({ title: isEn ? 'Could not resolve' : 'Không đóng được cảnh báo', description: apiErrorMessage(err), type: 'error' });
+    }
   }, [resolveAlert, toast, isEn]);
 
+  // Chủ cửa hàng: chạy lại Decision Engine. Nhân viên: chỉ tải lại kết quả mới nhất.
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await recalculate();
+    if (!canAnalyze) {
+      await fetchAlerts();
+      setRefreshing(false);
+      return;
+    }
+    const analyzed = await recalculate();
     setRefreshing(false);
-    toast({
-      title: isEn ? 'Alerts Synchronized' : 'Đã đồng bộ cảnh báo',
-      description: isEn ? 'Engine has re-analyzed entire inventory catalog.' : 'Hệ thống đã phân tích lại toàn bộ kho hàng.',
-      type: 'success'
-    });
-  }, [recalculate, toast, isEn]);
+    toast(analyzed
+      ? {
+          title: isEn ? 'Alerts Synchronized' : 'Đã đồng bộ cảnh báo',
+          description: isEn ? 'Engine has re-analyzed entire inventory catalog.' : 'Hệ thống đã phân tích lại toàn bộ kho hàng.',
+          type: 'success'
+        }
+      : {
+          title: isEn ? 'Analysis failed' : 'Phân tích thất bại',
+          description: isEn ? 'Showing the last saved results. Please try again.' : 'Đang hiển thị kết quả đã lưu gần nhất. Hãy thử lại.',
+          type: 'error'
+        });
+  }, [canAnalyze, fetchAlerts, recalculate, toast, isEn]);
 
   const handleAskAI = useCallback(a => {
     navigate('/ai-assistant', {
@@ -685,7 +726,7 @@ export function AlertsPage() {
           ) : (
             <RefreshCw style={{ width: 15, height: 15 }} />
           )}
-          <span>{isRecalculating ? (isEn ? 'Analyzing...' : 'Đang phân tích...') : (isEn ? 'Sync Data' : 'Đồng bộ dữ liệu')}</span>
+          <span>{isRecalculating ? (isEn ? 'Analyzing...' : 'Đang phân tích...') : canAnalyze ? (isEn ? 'Sync Data' : 'Đồng bộ dữ liệu') : (isEn ? 'Refresh' : 'Tải lại')}</span>
         </button>
       </div>
 
@@ -844,15 +885,19 @@ export function AlertsPage() {
           </h3>
           <p style={{ fontSize: 13, color: '#64748b', maxWidth: 400, margin: '0 auto 16px', lineHeight: 1.6 }}>
             {alerts.length === 0
-              ? (isEn
-                  ? 'System has no alert data yet. Click "Run Analysis" to scan entire stock and generate automated alerts.'
-                  : 'Hệ thống chưa có dữ liệu cảnh báo. Nhấn "Chạy phân tích" để quét toàn bộ tồn kho và tạo cảnh báo tự động.')
+              ? canAnalyze
+                ? (isEn
+                    ? 'System has no alert data yet. Click "Run Analysis" to scan entire stock and generate automated alerts.'
+                    : 'Hệ thống chưa có dữ liệu cảnh báo. Nhấn "Chạy phân tích" để quét toàn bộ tồn kho và tạo cảnh báo tự động.')
+                : (isEn
+                    ? 'No risks detected in the latest analysis. New alerts appear here after the store owner runs an analysis.'
+                    : 'Lần phân tích gần nhất chưa phát hiện rủi ro nào. Cảnh báo mới sẽ hiện ở đây sau khi chủ cửa hàng chạy phân tích.')
               : (isEn
                   ? 'No alerts match the selected filters. All products are operating stably.'
                   : 'Không có cảnh báo phù hợp với bộ lọc hiện tại. Tất cả sản phẩm đang hoạt động ổn định.')}
           </p>
           {alerts.length === 0 ? (
-            <button
+            canAnalyze && <button
               onClick={handleRefresh}
               disabled={isRecalculating}
               style={{ padding: '10px 24px', fontSize: 13, fontWeight: 700, borderRadius: 12, background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}
@@ -878,7 +923,7 @@ export function AlertsPage() {
               key={a.id}
               alert={a}
               onAcknowledge={handleAck}
-              onResolve={handleResolve}
+              onResolve={canResolve ? handleResolve : undefined}
               onView={setModalAlert}
               isEn={isEn}
             />
@@ -892,8 +937,8 @@ export function AlertsPage() {
           alert={modalAlert}
           onClose={() => setModalAlert(null)}
           onAcknowledge={handleAck}
-          onResolve={handleResolve}
-          onAskAI={handleAskAI}
+          onResolve={canResolve ? handleResolve : undefined}
+          onAskAI={canAskAI ? handleAskAI : undefined}
           isEn={isEn}
         />
       )}

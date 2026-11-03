@@ -17,9 +17,12 @@ const PRODUCT_COLUMNS = {
   // Sapo: "LC_CN1_Giá vốn khởi tạo" (giá vốn theo chi nhánh) được ưu tiên hơn "PL_Giá nhập".
   costPrice: ['giavon', 'giavonkhoitao', 'gianhap', 'costprice'],
   sellingPrice: ['giaban', 'giabanle', 'dongiaban', 'sellingprice', 'gia'],
+  // Phiếu kiểm kho có cả số đếm thực tế lẫn số trên phần mềm cũ: số đếm thực tế đáng tin hơn nên đứng trước.
   initialQuantity: [
+    'tonkhothucte', 'tonthucte', 'soluongthucte', 'thucte',
     'tonkho', 'tonkhohientai', 'tonkhobandau', 'soluongton', 'soluongtonkho', 'soluonghangcotrongkho', 'soluongtrongkho',
     'ton', 'initialquantity', 'soluong',
+    'tonapp', 'tonkhotrenapp', 'tonkhohientaitrenapp',
   ],
   minStockLevel: ['tonnhonhat', 'tontoithieu', 'minstocklevel'],
   maxStockLevel: ['tonlonnhat', 'tontoida', 'maxstocklevel'],
@@ -202,14 +205,39 @@ function slugCode(name) {
   );
 }
 
+const formatQuantity = (n) => n.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+
+/**
+ * Đọc một ô số của dòng: ô trống → undefined; ô có chữ không đọc được (vd. "#VALUE!") → undefined kèm cảnh báo.
+ */
+function numberCell(row, mapping, field, onUnreadable) {
+  const raw = cell(row, mapping, field);
+  const value = parseNumber(raw);
+  if (raw !== undefined && value === undefined) onUnreadable(`${FIELD_LABELS[field]} "${text(raw)}" không đọc được, tạm để 0`, field);
+  return value;
+}
+
+/** StockPilot chỉ lưu tồn kho số nguyên ≥ 0: trả về số sẽ lưu và lý do nếu phải đổi so với file. */
+function toStockQuantity(quantity) {
+  if (quantity === undefined) return { value: 0 };
+  if (quantity < 0) return { value: 0, warning: `Tồn kho âm ${formatQuantity(quantity)} được đưa về 0` };
+  const value = Math.round(quantity);
+  if (value !== quantity) {
+    return { value, warning: `Tồn kho ${formatQuantity(quantity)} được làm tròn thành ${formatQuantity(value)} (chỉ lưu số nguyên)` };
+  }
+  return { value };
+}
+
 /**
  * Chuyển các dòng dữ liệu thành payload cho POST /import/preview (sản phẩm).
- * Trả về { items, skipped: [{ row, reason }] }. `row` là số dòng trong Excel (bắt đầu từ 1).
+ * Trả về { items, skipped: [{ row, reason }], warnings: [{ row, sku, field, message }] }.
+ * `warnings` là các dòng vẫn được nhập nhưng giá trị bị đổi so với file. `row` là số dòng trong Excel (bắt đầu từ 1).
  */
 export function toProductItems(rows, detection) {
   const { headerIndex, mapping } = detection;
   const items = [];
   const skipped = [];
+  const warnings = [];
 
   rows.slice(headerIndex + 1).forEach((row, i) => {
     const excelRow = headerIndex + i + 2;
@@ -230,7 +258,11 @@ export function toProductItems(rows, detection) {
     // KiotViet ghi nhóm nhiều cấp dạng "Đồ uống>>Trà": lấy cấp cuối làm danh mục.
     const categoryPath = text(cell(row, mapping, 'categoryName'));
     const categoryName = categoryPath ? categoryPath.split('>>').map((s) => s.trim()).filter(Boolean).pop() : 'Chưa phân loại';
-    const quantity = parseNumber(cell(row, mapping, 'initialQuantity'));
+    const warn = (message, field) => warnings.push({ row: excelRow, sku, field, message });
+    const quantity = toStockQuantity(numberCell(row, mapping, 'initialQuantity', warn));
+    if (quantity.warning) warn(quantity.warning, 'initialQuantity');
+    const costPrice = numberCell(row, mapping, 'costPrice', warn);
+    const sellingPrice = numberCell(row, mapping, 'sellingPrice', warn);
     const minStock = parseNumber(cell(row, mapping, 'minStockLevel'));
     const maxStock = parseNumber(cell(row, mapping, 'maxStockLevel'));
     const min = minStock !== undefined && minStock > 0 ? Math.round(minStock) : 0;
@@ -243,16 +275,16 @@ export function toProductItems(rows, detection) {
       productCode: sku,
       sku,
       barcode: text(cell(row, mapping, 'barcode')) || undefined,
-      costPrice: Math.max(0, parseNumber(cell(row, mapping, 'costPrice')) ?? 0),
-      sellingPrice: Math.max(0, parseNumber(cell(row, mapping, 'sellingPrice')) ?? 0),
+      costPrice: Math.max(0, costPrice ?? 0),
+      sellingPrice: Math.max(0, sellingPrice ?? 0),
       // Tồn âm trong KiotViet (bán khi chưa nhập) được đưa về 0.
-      initialQuantity: quantity !== undefined && quantity > 0 ? Math.round(quantity) : 0,
+      initialQuantity: quantity.value,
       minStockLevel: min,
       maxStockLevel: Math.max(max, min),
     });
   });
 
-  return { items, skipped };
+  return { items, skipped, warnings };
 }
 
 /** Chuyển chi tiết hóa đơn thành payload cho POST /historical-sales/preview. Hóa đơn đã hủy bị bỏ qua. */

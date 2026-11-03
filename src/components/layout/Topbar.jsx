@@ -659,10 +659,12 @@ export function Topbar() {
                 <h4 className="font-bold text-slate-800 mb-1">{isEn ? '📘 Inventory Management Guide' : '📘 Hướng dẫn quản lý tồn kho'}</h4>
                 <p className="text-[11px] text-slate-500">{isEn ? 'How to set DOI thresholds, tied-up capital alerts, and optimize cashflow.' : 'Cách thiết lập chỉ số DOI, cảnh báo đọng vốn và tối ưu dòng tiền lưu động.'}</p>
               </div>
+              {currentRole === 'store_owner' && (
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <h4 className="font-bold text-slate-800 mb-1">{isEn ? '🤖 AI Pilot Assistant' : '🤖 Trợ lý AI Pilot'}</h4>
                 <p className="text-[11px] text-slate-500">{isEn ? 'Click the floating button at bottom right or press ⌘K to query live store data.' : 'Bấm nút tròn góc dưới bên phải hoặc phím ⌘K để hỏi đáp số liệu với AI.'}</p>
               </div>
+              )}
               <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-blue-800">
                 <h4 className="font-bold mb-1">{isEn ? '📞 Technical Support Hotline' : '📞 Hotline hỗ trợ kỹ thuật'}</h4>
                 <p className="text-[11px]">{isEn ? 'Hotline: 1900 8888 (8:00 AM - 10:00 PM daily)' : 'Tổng đài: 1900 8888 (8:00 - 22:00 hàng ngày)'}</p>
