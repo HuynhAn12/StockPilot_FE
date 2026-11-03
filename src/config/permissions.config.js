@@ -33,6 +33,10 @@ export const canDeleteProduct = (role) => isOwner(role);
 export const canEditCostPrice = (role) => isOwner(role);
 export const canEditSellingPrice = (role) => isOwner(role);
 export const canApprovePricing = (role) => isOwner(role);
+// Backend: POST /alerts/:id/resolve và POST /decision-engine/recalculate chỉ cho chủ cửa hàng.
+export const canResolveAlerts = (role) => isOwner(role);
+export const canRunDecisionEngine = (role) => isOwner(role);
+export const canUseAiAssistant = (role) => isOwner(role);
 export const canCancelOrder = (role) => isOwner(role);
 export const canAccessOrders = (role) => isOwner(role) || isStaff(role);
 export const canViewOrderFinancialSummary = (role) => isOwner(role);
@@ -71,7 +75,7 @@ export const ROUTE_PERMISSIONS = {
   '/orders': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
   '/inventory': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
   '/alerts': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
-  '/ai-assistant': [ROLES.SHOP_OWNER, ROLES.WAREHOUSE_STAFF],
+  '/ai-assistant': [ROLES.SHOP_OWNER],
   '/pricing': [ROLES.SHOP_OWNER],
   '/analytics': [ROLES.SHOP_OWNER],
   '/settings': [ROLES.SHOP_OWNER],
