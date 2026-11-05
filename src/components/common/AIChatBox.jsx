@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Bot, X, Send, Sparkles, RefreshCw, ArrowUpRight, Mic, Volume2, VolumeX } from 'lucide-react';
+import { StockPilotAILogo } from './StockPilotAILogo';
 import { useVoiceAssistant } from '../../hooks/useVoiceAssistant';
 import { useTranslation } from '../../i18n/useTranslation';
 import { apiChatWithAssistant } from '../../services/analyticsService';
@@ -373,9 +374,7 @@ export function AIChatBox() {
           <div className="p-3.5 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white flex items-center justify-between shadow-xs">
             <div className="flex items-center gap-2.5">
               <div className="relative">
-                <div className="w-9 h-9 rounded-2xl bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-xs">
-                  <Bot className="w-5 h-5 text-white" />
-                </div>
+                <StockPilotAILogo size="w-9 h-9 rounded-2xl" className="border border-white/20 shadow-md" />
                 <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 border-2 border-blue-700 rounded-full animate-pulse" />
               </div>
 
@@ -424,9 +423,7 @@ export function AIChatBox() {
               >
                 <div className="flex items-end gap-2 max-w-[88%]">
                   {msg.sender === 'ai' && (
-                    <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 mb-1">
-                      <Bot className="w-3.5 h-3.5" />
-                    </div>
+                    <StockPilotAILogo size="w-6 h-6 rounded-lg" className="shrink-0 mb-1" />
                   )}
 
                   <div
@@ -508,9 +505,7 @@ export function AIChatBox() {
             {/* Typing Indicator */}
             {isTyping && (
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                  <Bot className="w-3.5 h-3.5" />
-                </div>
+                <StockPilotAILogo size="w-6 h-6 rounded-lg" className="shrink-0 animate-pulse" />
                 <div className="bg-white border border-slate-200/80 rounded-2xl rounded-bl-xs px-3 py-2 flex items-center gap-1 shadow-2xs">
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -648,7 +643,7 @@ export function AIChatBox() {
             </>
           ) : (
             <>
-              <Bot className="w-4 h-4" />
+              <StockPilotAILogo size="w-4 h-4 rounded-sm" />
               <span className="text-xs font-bold">{isEn ? 'Ask AI Assistant' : 'Hỏi Trợ lý AI'}</span>
               <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-blue-600 shadow-xs" />
             </>

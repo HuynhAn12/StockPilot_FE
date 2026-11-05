@@ -16,6 +16,7 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { AISourceBadge } from '../../components/assistant/AISourceBadge';
 import { AISuggestionsPanel } from '../../components/assistant/AISuggestionsPanel';
 import { useVoiceAssistant } from '../../hooks/useVoiceAssistant';
+import { StockPilotAILogo } from '../../components/common/StockPilotAILogo';
 
 function parseInlineMarkdown(text) {
   if (!text) return null;
@@ -724,9 +725,7 @@ export function AIAssistantPage() {
             )}
 
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-xs">
-                <Bot className="w-4 h-4" />
-              </div>
+              <StockPilotAILogo size="w-8 h-8 rounded-xl" />
               <div>
                 <h2 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight truncate max-w-xs sm:max-w-md">
                   {activeSession.title || (isEn ? 'AI Pilot Assistant' : 'Trợ lý AI Pilot')}
@@ -800,9 +799,7 @@ export function AIAssistantPage() {
             {messages.length === 0 && !isHistoryLoading && (
               <div className="py-6 sm:py-10 flex flex-col items-center text-center animate-in fade-in duration-300">
                 <div className="relative mb-4">
-                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/25">
-                    <Bot className="w-9 h-9" />
-                  </div>
+                  <StockPilotAILogo size="w-16 h-16 rounded-2xl" className="shadow-lg shadow-blue-500/25" />
                   <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 border-2 border-white rounded-full animate-ping" />
                   <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
                 </div>
@@ -855,9 +852,7 @@ export function AIAssistantPage() {
                 >
                   {/* AI Avatar */}
                   {!isUser && (
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
-                      <Bot className="w-4 h-4" />
-                    </div>
+                    <StockPilotAILogo size="w-8 h-8 rounded-xl" className="shrink-0 mt-0.5" />
                   )}
 
                   {/* Message Bubble */}
@@ -978,9 +973,7 @@ export function AIAssistantPage() {
             {/* AI Typing Indicator */}
             {isTyping && (
               <div className="flex items-center gap-3 my-4">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                  <Bot className="w-4 h-4 animate-spin" />
-                </div>
+                <StockPilotAILogo size="w-8 h-8 rounded-xl" className="shrink-0 animate-pulse" />
                 <div className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-xs px-4 py-3 flex items-center gap-1.5 shadow-2xs">
                   <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '150ms' }} />
