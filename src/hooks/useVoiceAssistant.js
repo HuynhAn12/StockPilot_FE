@@ -9,8 +9,8 @@ export function normalizeVietnameseSpeechText(text) {
   result = result.replace(/\b(cây\s*ốc\s*việt|k\s*kiốt\s*việt|ki\s*ốt\s*việt|k\s*kiot\s*viet|kiot\s*viet)\b/gi, 'KiotViet');
   // StockPilot variants
   result = result.replace(/\b(stock\s*pilot|s\s*tốc\s*pai\s*lợt|tốc\s*pai\s*lợt)\b/gi, 'StockPilot');
-  // AI Pilot variants
-  result = result.replace(/\b(ai\s*pilot|ây\s*ai\s*pai\s*lợt)\b/gi, 'AI Pilot');
+  // Pilot AI variants
+  result = result.replace(/\b(pilot\s*ai|ai\s*pilot|ây\s*ai\s*pai\s*lợt|pai\s*lợt\s*ai)\b/gi, 'Pilot AI');
   // Sapo variants
   result = result.replace(/\b(sa\s*po)\b/gi, 'Sapo');
   // POS variants

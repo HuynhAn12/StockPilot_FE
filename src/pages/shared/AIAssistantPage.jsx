@@ -703,7 +703,7 @@ export function AIAssistantPage() {
         {/* Sidebar Footer */}
         <div className="p-3 border-t border-slate-100 bg-slate-50/70 flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>AI Pilot Live Sync</span>
+          <span>Pilot AI Live Sync</span>
         </div>
       </div>
 
@@ -728,7 +728,7 @@ export function AIAssistantPage() {
               <StockPilotAILogo size="w-8 h-8 rounded-xl" />
               <div>
                 <h2 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight truncate max-w-xs sm:max-w-md">
-                  {activeSession.title || (isEn ? 'AI Pilot Assistant' : 'Trợ lý AI Pilot')}
+                  {activeSession.title || (isEn ? 'Pilot AI Assistant' : 'Trợ lý Pilot AI')}
                 </h2>
                 <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                   <span className="text-blue-600 font-bold">{isEn ? 'Real-time database' : 'Dữ liệu thời gian thực'}</span>
@@ -805,7 +805,7 @@ export function AIAssistantPage() {
                 </div>
 
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2 tracking-tight">
-                  {isEn ? 'Hello, I am AI Pilot' : 'Chào bạn, tôi là AI Pilot'}
+                  {isEn ? 'Hello, I am Pilot AI' : 'Chào bạn, tôi là Pilot AI'}
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500 max-w-lg mx-auto mb-8 leading-relaxed">
                   {isEn
@@ -979,7 +979,7 @@ export function AIAssistantPage() {
                   <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '150ms' }} />
                   <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '300ms' }} />
                   <span className="text-xs text-slate-500 font-semibold ml-2">
-                    {isEn ? 'AI Pilot loading...' : 'AI Pilot loading...'}
+                    {isEn ? 'Pilot AI loading...' : 'Pilot AI loading...'}
                   </span>
                 </div>
               </div>
@@ -1041,7 +1041,7 @@ export function AIAssistantPage() {
               <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl text-xs text-blue-800 shadow-sm">
                 <Volume2 className="w-4 h-4 text-blue-600 animate-bounce" />
                 <span className="font-semibold">
-                  {isEn ? "AI Pilot is speaking the response..." : "AI Pilot đang trả lời bằng giọng nói..."}
+                  {isEn ? "Pilot AI is speaking the response..." : "Pilot AI đang trả lời bằng giọng nói..."}
                 </span>
                 <button
                   type="button"
@@ -1063,11 +1063,11 @@ export function AIAssistantPage() {
                 placeholder={
                   staffMode
                     ? (isEn
-                        ? "Ask AI Pilot about stock levels, low items, stocktake process... (Enter to send)"
-                        : "Hỏi AI Pilot về số lượng tồn kho, mặt hàng sắp hết, quy trình kiểm kê... (Enter để gửi)")
+                        ? "Ask Pilot AI about stock levels, low items, stocktake process... (Enter to send)"
+                        : "Hỏi Pilot AI về số lượng tồn kho, mặt hàng sắp hết, quy trình kiểm kê... (Enter để gửi)")
                     : (isEn
-                        ? "Ask AI Pilot about stock, tied capital, price optimization... (Enter to send)"
-                        : "Hỏi AI Pilot về tồn kho, rủi ro đọng vốn, chiến lược giá bán... (Enter để gửi)")
+                        ? "Ask Pilot AI about stock, tied capital, price optimization... (Enter to send)"
+                        : "Hỏi Pilot AI về tồn kho, rủi ro đọng vốn, chiến lược giá bán... (Enter để gửi)")
                 }
                 className="flex-1 max-h-36 bg-transparent text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm px-3 py-1.5 resize-none focus:outline-none font-medium leading-relaxed"
               />
@@ -1142,8 +1142,8 @@ export function AIAssistantPage() {
 
             <p className="text-[10px] text-center text-slate-400 mt-2">
               {isEn
-                ? 'AI Pilot responds automatically based on store data. You can click action buttons to navigate instantly.'
-                : 'AI Pilot trả lời tự động dựa trên dữ liệu của cửa hàng. Bạn có thể bấm vào các nút điều hướng để thao tác ngay.'}
+                ? 'Pilot AI responds automatically based on store data. You can click action buttons to navigate instantly.'
+                : 'Pilot AI trả lời tự động dựa trên dữ liệu của cửa hàng. Bạn có thể bấm vào các nút điều hướng để thao tác ngay.'}
             </p>
           </div>
         </div>

@@ -239,8 +239,8 @@ export function AIChatBox() {
         id: 'welcome-1',
         sender: 'ai',
         text: isEn
-          ? "Hello! I am your StockPilot AI Assistant 🤖. I can help check low-stock items, analyze dead inventory risks, or recommend optimal pricing. What would you like to explore today?"
-          : 'Xin chào! Tôi là Trợ lý AI Pilot của StockPilot 🤖. Tôi có thể giúp bạn kiểm tra mặt hàng sắp hết kho, phân tích rủi ro đọng vốn, hoặc đề xuất giá bán tối ưu. Bạn muốn tra cứu gì hôm nay?',
+          ? "Hello! I am your Pilot AI Assistant 🤖. I can help check low-stock items, analyze dead inventory risks, or recommend optimal pricing. What would you like to explore today?"
+          : 'Xin chào! Tôi là Trợ lý Pilot AI của StockPilot 🤖. Tôi có thể giúp bạn kiểm tra mặt hàng sắp hết kho, phân tích rủi ro đọng vốn, hoặc đề xuất giá bán tối ưu. Bạn muốn tra cứu gì hôm nay?',
         timestamp: isEn ? 'Just now' : 'Vừa xong',
         suggestions: isEn
           ? [
@@ -354,8 +354,8 @@ export function AIChatBox() {
         id: `welcome-${Date.now()}`,
         sender: 'ai',
         text: isEn
-          ? 'Conversation cleared. What would you like AI Pilot to look up?'
-          : 'Cuộc trò chuyện đã được làm mới. Bạn cần AI Pilot hỗ trợ tra cứu số liệu kho hàng nào?',
+          ? 'Conversation cleared. What would you like Pilot AI to look up?'
+          : 'Cuộc trò chuyện đã được làm mới. Bạn cần Pilot AI hỗ trợ tra cứu số liệu kho hàng nào?',
         timestamp: isEn ? 'Just now' : 'Vừa xong',
         suggestions: FOLLOW_UPS[isEn ? 'en' : 'vi']
       }
@@ -381,7 +381,7 @@ export function AIChatBox() {
               <div>
                 <div className="flex items-center gap-1.5">
                   <h3 className="font-bold text-sm leading-none">
-                    {isEn ? 'AI Pilot Assistant' : 'Trợ lý AI Pilot'}
+                    {isEn ? 'Pilot AI Assistant' : 'Trợ lý Pilot AI'}
                   </h3>
                   <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full bg-white/25 text-white">
                     StockPilot

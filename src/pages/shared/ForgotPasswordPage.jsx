@@ -335,7 +335,7 @@ export function ForgotPasswordPage() {
               </svg>
             </div>
             <span className="absolute -bottom-2.5 left-1/2 -translate-x-1/2 text-[9px] font-black px-2.5 py-0.5 rounded-full bg-white/70 text-slate-950 border border-slate-900/20 whitespace-nowrap uppercase tracking-wider shadow-xs">
-              AI Pilot
+              Pilot AI
             </span>
           </div>
           <h1 className="text-3xl font-black tracking-tight text-slate-950 mb-2">StockPilot</h1>

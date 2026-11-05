@@ -424,7 +424,7 @@ function AlertDetailModal({ alert, onClose, onAcknowledge, onResolve, onAskAI, i
             className="flex items-center gap-2 transition-colors hover:bg-violet-100"
             style={{ padding: '8px 16px', fontSize: 12, fontWeight: 700, borderRadius: 12, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}
           >
-            <Bot style={{ width: 16, height: 16 }} /> {isEn ? 'Ask AI Pilot about this alert' : 'Hỏi AI Pilot về cảnh báo này'}
+            <Bot style={{ width: 16, height: 16 }} /> {isEn ? 'Ask Pilot AI about this alert' : 'Hỏi Pilot AI về cảnh báo này'}
           </button>
           ) : (
             <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>

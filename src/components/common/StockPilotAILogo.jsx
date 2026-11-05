@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * StockPilot AI Glowing "S" Logo Component.
+ * Pilot AI Glowing "S" Logo Component.
  * Supports various preset sizes and custom styling.
  */
 export function StockPilotAILogo({
@@ -9,7 +9,7 @@ export function StockPilotAILogo({
   variant = 'square',
   className = '',
   style = {},
-  alt = 'StockPilot AI Logo',
+  alt = 'Pilot AI Logo',
 }) {
   const sizeMap = {
     xs: 'w-4 h-4 rounded-sm',

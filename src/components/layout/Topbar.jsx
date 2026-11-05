@@ -520,7 +520,7 @@ export function Topbar() {
                       {isEn ? 'Help & Documentation' : 'Trợ giúp & Hướng dẫn'}
                     </span>
                     <span className="block text-[10px] text-slate-400 truncate">
-                      {isEn ? 'User guides & StockPilot AI assistant' : 'Tài liệu HDSD & trợ lý AI StockPilot'}
+                      {isEn ? 'User guides & Pilot AI assistant' : 'Tài liệu HDSD & trợ lý Pilot AI'}
                     </span>
                   </div>
                 </button>
@@ -646,7 +646,7 @@ export function Topbar() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900">{isEn ? 'Help & Documentation' : 'Trợ giúp & Hướng dẫn'}</h3>
-                  <p className="text-xs text-slate-400">{isEn ? 'StockPilot AI operations support' : 'Hỗ trợ vận hành StockPilot AI'}</p>
+                  <p className="text-xs text-slate-400">{isEn ? 'Pilot AI operations support' : 'Hỗ trợ vận hành Pilot AI'}</p>
                 </div>
               </div>
               <button onClick={() => setHelpModalOpen(false)} className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100">
@@ -661,7 +661,7 @@ export function Topbar() {
               </div>
               {currentRole === 'store_owner' && (
               <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <h4 className="font-bold text-slate-800 mb-1">{isEn ? '🤖 AI Pilot Assistant' : '🤖 Trợ lý AI Pilot'}</h4>
+                <h4 className="font-bold text-slate-800 mb-1">{isEn ? '🤖 Pilot AI Assistant' : '🤖 Trợ lý Pilot AI'}</h4>
                 <p className="text-[11px] text-slate-500">{isEn ? 'Click the floating button at bottom right or press ⌘K to query live store data.' : 'Bấm nút tròn góc dưới bên phải hoặc phím ⌘K để hỏi đáp số liệu với AI.'}</p>
               </div>
               )}
