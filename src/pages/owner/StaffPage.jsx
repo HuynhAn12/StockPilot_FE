@@ -431,17 +431,6 @@ export function StaffPage() {
             </p>
           </div>
         </div>
-
-        {/* Primary Action Button: StockPilot Blue Button đồng bộ */}
-        <div className="relative z-10 shrink-0">
-          <button
-            onClick={handleOpenAddMode}
-            className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>+ {isEn ? 'Add New Staff' : 'Thêm nhân viên mới'}</span>
-          </button>
-        </div>
       </div>
 
       {/* ==================================================================== */}
@@ -572,7 +561,7 @@ export function StaffPage() {
                 className="px-3.5 py-1.5 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>+ {isEn ? 'Add Staff' : 'Thêm nhân viên mới'}</span>
+                <span>{isEn ? 'Add Staff' : 'Thêm nhân viên mới'}</span>
               </button>
               <button
                 onClick={handleExportExcel}
