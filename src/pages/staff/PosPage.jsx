@@ -195,10 +195,10 @@ export function PosPage() {
   // ── MoMo Real Account Config State ─────────────────────────────
   const [momoConfigModalOpen, setMomoConfigModalOpen] = useState(false);
   const [momoConfig, setMomoConfig] = useState(null);
-  const [momoPartnerCodeInput, setMomoPartnerCodeInput] = useState('');
-  const [momoAccessKeyInput, setMomoAccessKeyInput] = useState('');
+  const [momoPartnerCodeInput, setMomoPartnerCodeInput] = useState('MOMOVA0I20261015');
+  const [momoAccessKeyInput, setMomoAccessKeyInput] = useState('sjqZwImFcjxZBhHF');
   const [momoSecretKeyInput, setMomoSecretKeyInput] = useState('');
-  const [momoBusinessNameInput, setMomoBusinessNameInput] = useState('');
+  const [momoBusinessNameInput, setMomoBusinessNameInput] = useState('STOCKPILOT');
   const [isSavingMomoConfig, setIsSavingMomoConfig] = useState(false);
 
   const loadMomoConfig = useCallback(async () => {
@@ -206,10 +206,10 @@ export function PosPage() {
       const cfg = await apiGetMomoConfig();
       if (cfg) {
         setMomoConfig(cfg);
-        setMomoPartnerCodeInput(cfg.partnerCode || '');
-        setMomoAccessKeyInput(cfg.accessKey || '');
+        setMomoPartnerCodeInput(cfg.partnerCode || 'MOMOVA0I20261015');
+        setMomoAccessKeyInput(cfg.accessKey || 'sjqZwImFcjxZBhHF');
         setMomoSecretKeyInput(''); // Không tải khóa bí mật ra client
-        setMomoBusinessNameInput(cfg.businessName || '');
+        setMomoBusinessNameInput(cfg.businessName || 'STOCKPILOT');
       }
     } catch (e) {
       console.warn('Lỗi tải cấu hình MoMo:', e);
@@ -2673,93 +2673,101 @@ export function PosPage() {
           <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
             <div
               className="px-6 py-4 flex items-center justify-between text-white"
-              style={{ background: 'linear-gradient(135deg, #a50064 0%, #d82d8b 100%)' }}
+              style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}
             >
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
                   <Smartphone className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="font-extrabold text-white text-base">Cấu hình Cổng MoMo Doanh Nghiệp</h3>
-                  <p className="text-xs text-pink-100">Kết nối trực tiếp MoMo Gateway Production</p>
+                  <p className="text-xs text-slate-300">Kết nối trực tiếp MoMo Gateway Production</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setMomoConfigModalOpen(false)}
-                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-all cursor-pointer"
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveMomoConfig} className="p-6 space-y-3.5">
+            <form onSubmit={handleSaveMomoConfig} autoComplete="off" className="p-6 space-y-3.5">
               {!momoConfig?.isConfigured && (
                 <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
                   ⚠️ <strong>Chưa cấu hình MoMo:</strong> Cửa hàng chưa lưu thông tin kết nối. Vui lòng nhập Partner Code, Access Key và Secret Key từ hợp đồng MoMo Doanh Nghiệp để bật tính năng này.
                 </div>
               )}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Mã đối tác (Partner Code) <span className="text-pink-600">*</span>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Mã đối tác (Partner Code) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  name="momoPartnerCode"
+                  autoComplete="off"
                   value={momoPartnerCodeInput}
                   onChange={(e) => setMomoPartnerCodeInput(e.target.value)}
-                  placeholder="VD: MOMOVA0I20261015"
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                  placeholder="MOMOVA0I20261015"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 bg-white placeholder:text-slate-900 focus:outline-none focus:border-slate-800 focus:ring-2 focus:ring-slate-900/10"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Access Key <span className="text-pink-600">*</span>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Access Key <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  name="momoAccessKey"
+                  autoComplete="new-password"
                   value={momoAccessKeyInput}
                   onChange={(e) => setMomoAccessKeyInput(e.target.value)}
-                  placeholder="VD: sjqZwImFcjxZBhHF"
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                  placeholder="sjqZwImFcjxZBhHF"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 bg-white placeholder:text-slate-900 focus:outline-none focus:border-slate-800 focus:ring-2 focus:ring-slate-900/10"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Secret Key {!momoConfig?.hasSecretKey && <span className="text-pink-600">*</span>}
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Secret Key {!momoConfig?.hasSecretKey && <span className="text-red-500">*</span>}
                   {momoConfig?.hasSecretKey && (
                     <span className="text-[10px] text-emerald-600 font-normal ml-1.5">(Đã lưu khóa bí mật an toàn)</span>
                   )}
                 </label>
                 <input
                   type="password"
+                  name="momoSecretKey"
+                  autoComplete="new-password"
                   value={momoSecretKeyInput}
                   onChange={(e) => setMomoSecretKeyInput(e.target.value)}
-                  placeholder={momoConfig?.hasSecretKey ? '•••••••••••••••• (Để trống để giữ nguyên khóa cũ)' : 'Nhập Secret Key MoMo'}
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                  placeholder={momoConfig?.hasSecretKey ? '•••••••••••••••• (Để trống để giữ nguyên khóa cũ)' : '••••••••••••••••'}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 bg-white placeholder:text-slate-900 focus:outline-none focus:border-slate-800 focus:ring-2 focus:ring-slate-900/10"
                   required={!momoConfig?.hasSecretKey}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-slate-800 mb-1">
                   Tên Doanh nghiệp / Cửa hàng
                 </label>
                 <input
                   type="text"
+                  name="momoBusinessName"
+                  autoComplete="off"
                   value={momoBusinessNameInput}
                   onChange={(e) => setMomoBusinessNameInput(e.target.value.toUpperCase())}
-                  placeholder="VD: STOCKPILOT"
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold uppercase focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                  placeholder="STOCKPILOT"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold uppercase text-slate-900 bg-white placeholder:text-slate-900 focus:outline-none focus:border-slate-800 focus:ring-2 focus:ring-slate-900/10"
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-pink-50/80 border border-pink-200/80 text-[11px] text-pink-900 space-y-1">
-                <p className="font-bold flex items-center gap-1.5 text-pink-700">
-                  <Sparkles className="w-3.5 h-3.5 text-pink-600" /> Cổng MoMo Doanh Nghiệp Thật:
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-700 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-slate-900">
+                  <Sparkles className="w-3.5 h-3.5 text-slate-900" /> Cổng MoMo Doanh Nghiệp Thật:
                 </p>
                 <p className="leading-relaxed">
                   Đã kết nối với Cổng thanh toán <strong>payment.momo.vn</strong> theo hợp đồng doanh nghiệp đã duyệt. Toàn bộ tiền thanh toán sẽ chuyển trực tiếp vào tài khoản ngân hàng của doanh nghiệp.
@@ -2777,7 +2785,7 @@ export function PosPage() {
                 <button
                   type="submit"
                   disabled={isSavingMomoConfig}
-                  className="flex-1 py-2 rounded-xl bg-linear-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-bold text-xs shadow-md shadow-pink-500/25 transition-all cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs shadow-md shadow-slate-900/25 transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isSavingMomoConfig ? 'Đang lưu...' : 'Lưu cấu hình Doanh Nghiệp'}
                 </button>
