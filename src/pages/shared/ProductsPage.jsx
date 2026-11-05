@@ -1049,9 +1049,8 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
           </div>
         ) : null}
 
-        {/* Status stock pill with dot indicator */}
+        {/* Status stock pill */}
         <div className={`pp-tag-stock${isOut ? " out" : isLow ? " low" : ""}`}>
-          <span className="pp-stock-dot" />
           <span>
             {isOut
               ? t('outOfStock', 'Hết hàng')
@@ -1690,7 +1689,7 @@ export function ProductsPage() {
                             cursor: "pointer",
                           }}
                         >
-                          {prod.status === "active" && prod.isActive !== false ? t('statusSelling', '● Đang bán') : '● Ngưng bán'}
+                          {prod.status === "active" && prod.isActive !== false ? t('statusSelling', 'Đang bán') : 'Ngưng bán'}
                         </button>
                       </td>
                       <td style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
@@ -1787,11 +1786,11 @@ export function ProductsPage() {
                   <span>Tồn kho: <strong>{zoomImageProduct.stock} {zoomImageProduct.unit || "cái"}</strong></span>
                   {zoomImageProduct.isActive === false || zoomImageProduct.status === "inactive" ? (
                     <span style={{ padding: "2px 8px", borderRadius: 6, background: "#fee2e2", color: "#b91c1c", fontSize: 11, fontWeight: 800 }}>
-                      ● Ngưng bán
+                      Ngưng bán
                     </span>
                   ) : (
                     <span style={{ padding: "2px 8px", borderRadius: 6, background: "#dcfce7", color: "#166534", fontSize: 11, fontWeight: 800 }}>
-                      ● Đang bán
+                      Đang bán
                     </span>
                   )}
                 </div>
