@@ -1,5 +1,17 @@
 // API Service module for StockPilot
-const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:5000/api';
+function normalizeApiUrl(raw) {
+  let url = (raw || 'http://localhost:5000/api/v1').trim().replace(/\/+$/, '');
+  if (!url.endsWith('/api/v1')) {
+    if (url.endsWith('/api')) {
+      url = ${url}/v1;
+    } else {
+      url = ${url}/api/v1;
+    }
+  }
+  return url;
+}
+
+const API_BASE_URL = normalizeApiUrl(import.meta.env?.VITE_API_URL);
 
 /**
  * Common request helper with authorization header
