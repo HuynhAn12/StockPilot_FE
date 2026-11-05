@@ -9,6 +9,11 @@ import { useAuthStore } from '../../components/store/authStore';
 import { useToast } from '../../components/common/Toast';
 import { useTranslation } from '../../i18n/useTranslation';
 
+
+// Nút điền nhanh tài khoản demo (kèm mật khẩu) chỉ bật khi chạy dev hoặc khi build với VITE_SHOW_DEMO_ACCOUNTS=true
+// (vd. máy chủ dùng cho buổi demo). Bản production bình thường không lộ mật khẩu demo.
+const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === 'true';
+
 export function LoginPage() {
   const navigate = useNavigate();
   const { login, user, token, isHydrated } = useAuthStore();
@@ -320,13 +325,14 @@ export function LoginPage() {
               <button
                 key={label}
                 type="button"
-                onClick={() => {
+                onClick={SHOW_DEMO_ACCOUNTS ? () => {
                   setEmail(demoEmail);
                   setPassword(demoPass);
                   setLoginError('');
-                }}
-                title={isEn ? `Click to auto-fill ${label}` : `Bấm để điền nhanh tài khoản ${label}`}
-                className={`p-2.5 rounded-xl border ${border} ${bg} text-left select-none cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] group`}
+                } : undefined}
+                disabled={!SHOW_DEMO_ACCOUNTS}
+                title={SHOW_DEMO_ACCOUNTS ? (isEn ? `Click to auto-fill ${label}` : `Bấm để điền nhanh tài khoản ${label}`) : undefined}
+                className={`p-2.5 rounded-xl border ${border} ${bg} text-left select-none transition-all group ${SHOW_DEMO_ACCOUNTS ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.98]' : 'cursor-default'}`}
               >
                 <div className="flex items-center gap-1.5 mb-0.5">
                   <Icon className={`w-3 h-3 ${color} shrink-0 group-hover:scale-110 transition-transform`} />

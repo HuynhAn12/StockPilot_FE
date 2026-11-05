@@ -4,10 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import {
   Menu, Search, Bell, Sun, Moon, Globe, Check, CheckCheck,
   Store, Warehouse, ShieldCheck, AlertTriangle, Tag, Info, ChevronDown,
-  User, Boxes, LogOut, Settings, UserPlus, HelpCircle, X, Lock, Mail, Phone, Building2, ShoppingBag, Users
+  User, Boxes, LogOut, Settings, UserPlus, HelpCircle, X, Lock, Mail, Building2, ShoppingBag, Users
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuthStore } from '../store/authStore';
+import { apiUpdateMe } from '../../services/authService';
 import { useUIStore } from '../store/uiStore';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useToast } from '../common/Toast';
@@ -87,6 +88,36 @@ export function Topbar() {
 
   // Modals triggered from User Menu
   const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  const openAccountModal = () => {
+    setProfileName(user?.name || user?.fullName || '');
+    setAccountModalOpen(true);
+  };
+
+  const saveProfile = async () => {
+    const fullName = profileName.trim();
+    if (fullName.length < 2) {
+      toast({ type: 'warning', title: isEn ? 'Name is too short' : 'Họ tên quá ngắn', message: isEn ? 'Enter at least 2 characters.' : 'Nhập ít nhất 2 ký tự.' });
+      return;
+    }
+    if (fullName === (user?.name || user?.fullName || '')) {
+      setAccountModalOpen(false);
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const updated = await apiUpdateMe({ fullName });
+      useAuthStore.setState((state) => ({ user: { ...state.user, fullName: updated.fullName, name: updated.fullName } }));
+      setAccountModalOpen(false);
+      toast({ type: 'success', title: isEn ? 'Profile updated' : 'Đã cập nhật hồ sơ', message: isEn ? 'Your name has been saved.' : 'Đã lưu họ tên mới.' });
+    } catch (err) {
+      toast({ type: 'error', title: isEn ? 'Could not save' : 'Không lưu được', message: err?.response?.data?.error?.message || (isEn ? 'Could not reach the server.' : 'Không kết nối được máy chủ.') });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
   const [helpModalOpen, setHelpModalOpen] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -419,7 +450,7 @@ export function Topbar() {
                       {user?.fullName || user?.name || 'Administrator'}
                     </p>
                     <p className="text-xs truncate text-slate-500">
-                      {user?.email || 'admin@stockpilot.vn'}
+                      {user?.email || ''}
                     </p>
                     <div className="mt-1 flex items-center gap-1.5">
                       <span
@@ -450,7 +481,7 @@ export function Topbar() {
                 {/* THÔNG TIN TÀI KHOẢN */}
                 <button
                   onClick={() => {
-                    setAccountModalOpen(true);
+                    openAccountModal();
                     setUserMenuOpen(false);
                   }}
                   className={cn(
@@ -572,7 +603,7 @@ export function Topbar() {
                 <label className="block text-xs font-semibold text-slate-600 mb-1">{isEn ? 'Full name' : 'Họ và tên'}</label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input type="text" defaultValue={user?.name || 'Trần Minh Hiếu'} className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500" />
+                  <input type="text" value={profileName} onChange={(e) => setProfileName(e.target.value)} maxLength={255} className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500" />
                 </div>
               </div>
 
@@ -580,16 +611,9 @@ export function Topbar() {
                 <label className="block text-xs font-semibold text-slate-600 mb-1">{isEn ? 'Login email' : 'Email đăng nhập'}</label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input type="email" defaultValue={user?.email || 'hieunu999@gmail.com'} className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500" />
+                  <input type="email" value={user?.email || ''} readOnly className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-100 font-semibold text-slate-500 cursor-not-allowed focus:outline-none" />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1">{isEn ? 'Contact phone number' : 'Số điện thoại liên hệ'}</label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input type="text" defaultValue="0909324543" className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 font-semibold text-slate-800 focus:bg-white focus:outline-none focus:border-blue-500" />
-                </div>
+                <p className="mt-1 text-[11px] text-slate-400">{isEn ? 'The login email cannot be changed here.' : 'Email đăng nhập không đổi được tại đây.'}</p>
               </div>
 
               <div>
@@ -602,7 +626,6 @@ export function Topbar() {
                       ? (isEn ? 'Warehouse Staff & POS' : 'Nhân viên kho & POS')
                       : (isEn ? 'System Administrator' : 'Quản trị viên hệ thống')}
                   </span>
-                  <span className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded-full font-bold">Admin Level</span>
                 </div>
               </div>
             </div>
@@ -612,17 +635,11 @@ export function Topbar() {
                 {isEn ? 'Close' : 'Đóng'}
               </button>
               <button
-                onClick={() => {
-                  setAccountModalOpen(false);
-                  toast({
-                    type: 'success',
-                    title: isEn ? 'Updated successfully' : 'Cập nhật thành công',
-                    message: isEn ? 'Account information has been securely updated!' : 'Thông tin tài khoản đã được lưu an toàn!'
-                  });
-                }}
-                className="flex-1 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm"
+                onClick={saveProfile}
+                disabled={savingProfile}
+                className="flex-1 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-xl shadow-sm"
               >
-                {isEn ? 'Save changes' : 'Lưu thay đổi'}
+                {savingProfile ? (isEn ? 'Saving...' : 'Đang lưu...') : (isEn ? 'Save changes' : 'Lưu thay đổi')}
               </button>
             </div>
           </div>
@@ -666,8 +683,8 @@ export function Topbar() {
               </div>
               )}
               <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-blue-800">
-                <h4 className="font-bold mb-1">{isEn ? '📞 Technical Support Hotline' : '📞 Hotline hỗ trợ kỹ thuật'}</h4>
-                <p className="text-[11px]">{isEn ? 'Hotline: 1900 8888 (8:00 AM - 10:00 PM daily)' : 'Tổng đài: 1900 8888 (8:00 - 22:00 hàng ngày)'}</p>
+                <h4 className="font-bold mb-1">{isEn ? '💬 Technical Support' : '💬 Hỗ trợ kỹ thuật'}</h4>
+                <p className="text-[11px]">{isEn ? 'Open a ticket on the Support page; the StockPilot team replies there.' : 'Gửi yêu cầu ở trang Hỗ trợ; đội StockPilot sẽ trả lời ngay trong phiếu.'}</p>
               </div>
             </div>
 

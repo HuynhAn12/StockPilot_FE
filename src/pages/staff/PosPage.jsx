@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
 import { useAuthStore } from '../../components/store/authStore';
+import { isOwner } from '../../config/permissions.config';
 import { useTranslation } from '../../i18n/useTranslation';
 import { formatCategoryName } from '../../components/store/productStore';
 import {
@@ -216,9 +217,10 @@ export function PosPage() {
     }
   }, []);
 
+  const canManageMomoConfig = isOwner(user?.role);
   useEffect(() => {
-    loadMomoConfig();
-  }, [loadMomoConfig]);
+    if (canManageMomoConfig) loadMomoConfig();
+  }, [canManageMomoConfig, loadMomoConfig]);
 
   const handleSaveMomoConfig = async (e) => {
     e?.preventDefault();
@@ -2402,10 +2404,10 @@ export function PosPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500 font-medium">Mã đối tác MoMo:</span>
                       <div className="flex items-center gap-1.5">
-                        <strong className="text-slate-900 font-bold font-mono">{momoData.partnerCode || 'MOMOVA0I20261015'}</strong>
+                        <strong className="text-slate-900 font-bold font-mono">{momoData.partnerCode || ''}</strong>
                         <button
                           type="button"
-                          onClick={() => handleCopyText('momo_partner', momoData.partnerCode || 'MOMOVA0I20261015')}
+                          onClick={() => handleCopyText('momo_partner', momoData.partnerCode || '')}
                           className="p-1 hover:bg-pink-100 rounded text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
                           title="Sao chép Mã đối tác"
                         >

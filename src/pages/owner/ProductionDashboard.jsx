@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Boxes, DollarSign, TrendingUp, AlertTriangle,
-  BarChart3, Zap, Printer, FileText,
+  BarChart3, Zap, FileText, Upload,
   PackagePlus, ArrowDownUp, ArrowUpRight,
-  X, Download, RefreshCw,
+  RefreshCw,
   ShoppingCart, Tag,
   ChevronRight,
   Clock,
@@ -54,16 +53,16 @@ const formatKPIValue = (n, isEn = false) => {
   return { val: val.toLocaleString('vi-VN'), unit: '₫' };
 };
 
-const STANDARD_CATEGORIES = [
-  { name: 'Thực phẩm', nameEn: 'Food', lines: ['Thực phẩm'], linesEn: ['Food'], match: ['thực phẩm', 'thuc pham', 'tpcn', 'thuc-pham', 'do-an'] },
-  { name: 'Đồ uống', nameEn: 'Beverages', lines: ['Đồ uống'], linesEn: ['Beverages'], match: ['đồ uống', 'do uong', 'drink', 'do-uong'] },
-  { name: 'Gia vị & Đồ khô', nameEn: 'Spices & Dry', lines: ['Gia vị &', 'Đồ khô'], linesEn: ['Spices &', 'Dry Food'], match: ['gia vị', 'gia vi', 'đồ khô', 'do kho', 'spice', 'gia-vi'] },
-  { name: 'Đồ dùng gia đình', nameEn: 'Household', lines: ['Đồ dùng', 'gia đình'], linesEn: ['Household', 'Goods'], match: ['gia đình', 'gia dinh', 'đồ dùng gia đình', 'house', 'gia-dinh', 'gia-dung'] },
-  { name: 'Chăm sóc cá nhân', nameEn: 'Personal Care', lines: ['Chăm sóc', 'cá nhân'], linesEn: ['Personal', 'Care'], match: ['cá nhân', 'ca nhan', 'chăm sóc cá nhân', 'care', 'ca-nhan'] },
-  { name: 'Đồ dùng văn phòng', nameEn: 'Office Supplies', lines: ['Đồ dùng', 'văn phòng'], linesEn: ['Office', 'Supplies'], match: ['văn phòng', 'van phong', 'đồ dùng văn phòng', 'office', 'van-phong'] },
-  { name: 'Tiêu dùng khác', nameEn: 'Other Goods', lines: ['Tiêu dùng', 'khác'], linesEn: ['Other', 'Goods'], match: ['khác', 'khac', 'tiêu dùng khác', 'chưa phân loại', 'misc', 'tieu-dung'] },
-];
+// Biểu đồ doanh thu theo nhóm: các nhóm thật của cửa hàng (API đã sắp theo doanh thu), tối đa 7 cột.
+const MAX_CATEGORY_BARS = 7;
 
+/** Tách tên nhóm thành tối đa 2 dòng cho nhãn trục X. */
+function splitLabel(name) {
+  const words = String(name).split(/\s+/).filter(Boolean);
+  if (words.length <= 2 || name.length <= 12) return [name];
+  const half = Math.ceil(words.length / 2);
+  return [words.slice(0, half).join(' '), words.slice(half).join(' ')];
+}
 export function ProductionDashboard() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -88,23 +87,6 @@ export function ProductionDashboard() {
   const [c3Tab, setC3Tab] = useState('best');
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [hoveredCatBar, setHoveredCatBar] = useState(null);
-
-  // Modals state
-  const [activeQuickAction, setActiveQuickAction] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  // Modal đang mở: Esc để đóng, khóa cuộn trang phía sau.
-  useEffect(() => {
-    if (!activeQuickAction) return undefined;
-    const onKeyDown = (e) => { if (e.key === 'Escape' && !isProcessing) setActiveQuickAction(null); };
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [activeQuickAction, isProcessing]);
 
   // Live timestamp & refresh
   const [lastUpdated, setLastUpdated] = useState(() => {
@@ -226,13 +208,19 @@ export function ProductionDashboard() {
   };
 
   // Derived data from API — C1 bar chart with 7 requested categories
-  const revenueByCat = STANDARD_CATEGORIES.map((std) => {
-    const found = (metrics?.categoryStats ?? []).find((c) => {
-      const cName = String(c.name || '').toLowerCase();
-      return std.match.some(m => cName.includes(m)) || cName === std.name.toLowerCase();
-    });
-    const revRaw = found ? (found.revenue ?? 0) : 0;
-    const margin = found ? (found.margin ?? 0) : 0;
+  const allCategories = metrics?.categoryStats ?? [];
+  const shownCategories = allCategories.length > MAX_CATEGORY_BARS
+    ? [
+        ...allCategories.slice(0, MAX_CATEGORY_BARS - 1),
+        allCategories.slice(MAX_CATEGORY_BARS - 1).reduce(
+          (acc, c) => ({ name: isEn ? 'Other' : 'Khác', revenue: acc.revenue + (c.revenue ?? 0), profit: acc.profit + (c.profit ?? 0) }),
+          { revenue: 0, profit: 0 }
+        ),
+      ].map((c) => ({ ...c, margin: c.margin ?? (c.revenue > 0 ? Number(((c.profit / c.revenue) * 100).toFixed(1)) : 0) }))
+    : allCategories;
+  const revenueByCat = shownCategories.map((found) => {
+    const revRaw = found.revenue ?? 0;
+    const margin = found.margin ?? 0;
     const rev = revRaw >= 1_000_000_000
       ? `${(revRaw / 1_000_000_000).toFixed(3)}${isEn ? 'B' : 'tỷ'}`
       : revRaw >= 1_000_000
@@ -241,8 +229,8 @@ export function ProductionDashboard() {
           ? `${(revRaw / 1000).toFixed(0)}k`
           : '0₫';
     return {
-      name: isEn ? (std.nameEn || std.name) : std.name,
-      lines: isEn ? (std.linesEn || std.lines) : std.lines,
+      name: found.name,
+      lines: splitLabel(found.name),
       revRaw,
       rev,
       pct: margin > 0 ? `+${margin}%` : `${margin}%`,
@@ -258,7 +246,7 @@ export function ProductionDashboard() {
   const C1_CHART_TOP = 20;
   const C1_CHART_BTM = 295;
   const C1_USABLE_W = C1_CHART_RIGHT - C1_CHART_LEFT;
-  const C1_SLOT_W = C1_USABLE_W / 7;
+  const C1_SLOT_W = C1_USABLE_W / MAX_CATEGORY_BARS;
   const C1_BAR_W = 42;
 
   const maxCatRev = Math.max(...revenueByCat.map(c => c.revRaw), 0);
@@ -290,7 +278,8 @@ export function ProductionDashboard() {
   ];
 
   const catBars = revenueByCat.map((cat, idx) => {
-    const centerX = Math.round(C1_CHART_LEFT + (idx + 0.5) * C1_SLOT_W);
+    // Ít nhóm hơn số cột: dồn các cột vào giữa biểu đồ.
+    const centerX = Math.round(C1_CHART_LEFT + (idx + 0.5 + (MAX_CATEGORY_BARS - revenueByCat.length) / 2) * C1_SLOT_W);
     const barX = Math.round(centerX - C1_BAR_W / 2);
     const barH = cat.revRaw > 0
       ? Math.max(6, Math.round((cat.revRaw / c1Ceiling) * (C1_CHART_BTM - C1_CHART_TOP)))
@@ -315,6 +304,7 @@ export function ProductionDashboard() {
   const slowMovers = (metrics?.slowMovers ?? []).slice(0, 5).map((s) => ({
     name: s.name,
     days: s.daysNoSale,
+    neverSold: s.neverSold,
     pct: Math.min(100, Math.round((s.daysNoSale / 90) * 100)),
   }));
 
@@ -322,6 +312,7 @@ export function ProductionDashboard() {
     rank: i + 1,
     name: s.name,
     daysNoSale: s.daysNoSale,
+    neverSold: s.neverSold,
     stock: s.stock,
     tiedCapital: formatVND(s.capital),
     suggestion: s.suggestion,
@@ -400,17 +391,6 @@ export function ProductionDashboard() {
     ...m,
     cy: toChartY(m.revenue),
   }));
-
-  // Quick Action Handler
-  const handleQuickActionSubmit = (e) => {
-    e.preventDefault();
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setActiveQuickAction(null);
-      toast({ type: 'success', title: 'Thành công', message: 'Thao tác kho đã được StockPilot ghi nhận!' });
-    }, 550);
-  };
 
   if (loadingMetrics) {
     return (
@@ -1074,7 +1054,13 @@ export function ProductionDashboard() {
                   );
                 })}
 
-                {/* 7 Vertical Columns */}
+                {catBars.length === 0 && (
+                  <text x={(C1_CHART_LEFT + C1_CHART_RIGHT) / 2} y={(C1_CHART_TOP + C1_CHART_BTM) / 2} textAnchor="middle" fontSize="13" fill="#64748b">
+                    {isEn ? 'No sales in this period yet' : 'Chưa có doanh thu trong kỳ này'}
+                  </text>
+                )}
+
+                {/* Cột doanh thu theo nhóm hàng thật của cửa hàng */}
                 {catBars.map((b) => {
                   const isHovered = hoveredCatBar?.name === b.name;
                   return (
@@ -1460,7 +1446,7 @@ export function ProductionDashboard() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-semibold text-slate-700 truncate max-w-[240px]">{item.name}</span>
                       <span className="font-bold text-blue-600">
-                        {c3Tab === 'best' ? `${item.qty} SP` : `${item.days} ${isEn ? 'days' : 'ngày'}`}
+                        {c3Tab === 'best' ? `${item.qty} SP` : item.neverSold ? (isEn ? 'Never sold' : 'Chưa bán') : `${item.days} ${isEn ? 'days' : 'ngày'}`}
                       </span>
                     </div>
                     <div className="h-2 rounded-full bg-blue-50 overflow-hidden">
@@ -1518,7 +1504,7 @@ export function ProductionDashboard() {
           {/* 4 Large Action Cards matching Blue Theme */}
           <div className="grid grid-cols-2 gap-3.5">
             <button
-              onClick={() => setActiveQuickAction('add_product')}
+              onClick={() => navigate('/products?new=1')}
               className="flex flex-col items-center justify-center p-6 rounded-2xl bg-blue-50/30 border border-blue-100/80 hover:bg-white hover:shadow-md hover:border-blue-300 transition-all group cursor-pointer"
             >
               <div className="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xs">
@@ -1530,7 +1516,7 @@ export function ProductionDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveQuickAction('stock_trans')}
+              onClick={() => navigate('/inventory')}
               className="flex flex-col items-center justify-center p-6 rounded-2xl bg-blue-50/30 border border-blue-100/80 hover:bg-white hover:shadow-md hover:border-blue-300 transition-all group cursor-pointer"
             >
               <div className="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xs">
@@ -1542,26 +1528,26 @@ export function ProductionDashboard() {
             </button>
 
             <button
-              onClick={() => setActiveQuickAction('report')}
+              onClick={() => navigate('/analytics')}
               className="flex flex-col items-center justify-center p-6 rounded-2xl bg-blue-50/30 border border-blue-100/80 hover:bg-white hover:shadow-md hover:border-blue-300 transition-all group cursor-pointer"
             >
               <div className="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xs">
                 <FileText className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600">
-                {isEn ? 'Inventory Report' : 'Tạo báo cáo tồn'}
+                {isEn ? 'Reports & Export' : 'Báo cáo & xuất file'}
               </span>
             </button>
 
             <button
-              onClick={() => setActiveQuickAction('print_barcode')}
+              onClick={() => navigate('/import')}
               className="flex flex-col items-center justify-center p-6 rounded-2xl bg-blue-50/30 border border-blue-100/80 hover:bg-white hover:shadow-md hover:border-blue-300 transition-all group cursor-pointer"
             >
               <div className="w-14 h-14 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xs">
-                <Printer className="w-6 h-6" />
+                <Upload className="w-6 h-6" />
               </div>
               <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600">
-                {isEn ? 'Print Barcode' : 'In tem mã vạch'}
+                {isEn ? 'Import Data' : 'Nhập dữ liệu'}
               </span>
             </button>
           </div>
@@ -1617,7 +1603,7 @@ export function ProductionDashboard() {
                         <p className="text-xs font-bold text-slate-800 truncate group-hover:text-blue-600 transition-colors">{p.name}</p>
                         <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
                           <span className="inline-flex items-center gap-1 text-blue-700 font-semibold bg-blue-50 px-1.5 py-0.5 rounded text-[10px]">
-                            <Clock className="w-3 h-3" /> {p.daysNoSale} {isEn ? 'days no sale' : 'ngày không bán'}
+                            <Clock className="w-3 h-3" /> {p.neverSold ? (isEn ? `Never sold · added ${p.daysNoSale} days ago` : `Chưa bán lần nào · tạo ${p.daysNoSale} ngày trước`) : (isEn ? `${p.daysNoSale} days since last sale` : `${p.daysNoSale} ngày không bán`)}
                           </span>
                           <span>•</span>
                           <span>{isEn ? 'Stock:' : 'Tồn:'} <strong className="text-slate-700">{p.stock}</strong></span>
@@ -1652,144 +1638,6 @@ export function ProductionDashboard() {
       {/* ============================================================== */}
       {/* 6. MODALS: QUICK ACTIONS                                       */}
       {/* ============================================================== */}
-      {activeQuickAction && createPortal(
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto p-4 bg-slate-900/50 backdrop-blur-xs animate-in fade-in"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setActiveQuickAction(null); }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="quick-action-title"
-            className="bg-white rounded-3xl max-w-lg w-full max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 sm:p-8 shadow-2xl border border-slate-200 animate-in zoom-in-95"
-          >
-            <div className="flex items-center justify-between mb-5">
-              <h3 id="quick-action-title" className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                {activeQuickAction === 'add_product' && <PackagePlus className="w-5 h-5 text-blue-600" />}
-                {activeQuickAction === 'stock_trans' && <ArrowDownUp className="w-5 h-5 text-emerald-600" />}
-                {activeQuickAction === 'report' && <FileText className="w-5 h-5 text-amber-600" />}
-                {activeQuickAction === 'print_barcode' && <Printer className="w-5 h-5 text-indigo-600" />}
-
-                {activeQuickAction === 'add_product' && (isEn ? 'Add new product to warehouse' : 'Thêm sản phẩm mới vào kho')}
-                {activeQuickAction === 'stock_trans' && (isEn ? 'Create Stock In / Out receipt' : 'Tạo phiếu Nhập / Xuất kho')}
-                {activeQuickAction === 'report' && (isEn ? 'Export inventory & sales report' : 'Xuất báo cáo tồn kho & doanh số')}
-                {activeQuickAction === 'print_barcode' && (isEn ? 'Print barcode & price tag' : 'In tem mã vạch & bảng giá')}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setActiveQuickAction(null)}
-                aria-label={isEn ? 'Close' : 'Đóng'}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleQuickActionSubmit} className="space-y-4">
-              {activeQuickAction === 'add_product' && (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      {isEn ? 'Product Name' : 'Tên sản phẩm'}
-                    </label>
-                    <input
-                      required
-                      placeholder={isEn ? 'Example: Robusta Coffee Dak Lak 500g' : 'Ví dụ: Cà phê Robusta Đắk Lắk 500g'}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        {isEn ? 'Category' : 'Danh mục'}
-                      </label>
-                      <select className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:outline-none">
-                        {revenueByCat.map((c, i) => (
-                          <option key={i}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        {isEn ? 'Initial Stock' : 'Số lượng ban đầu'}
-                      </label>
-                      <input
-                        type="number"
-                        defaultValue="50"
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-slate-50 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {activeQuickAction === 'stock_trans' && (
-                <div className="space-y-3">
-                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 space-y-1">
-                    <p className="font-semibold">{isEn ? 'Automated inventory balance tracking:' : 'Hệ thống hỗ trợ cân bằng tồn kho tự động:'}</p>
-                    <p>{isEn ? '• Real-time stock level updates upon submission.' : '• Phiếu sẽ cập nhật số lượng tồn khả dụng ngay lập tức.'}</p>
-                    <p>{isEn ? '• Automated low stock & tied-capital alerts.' : '• Tự động kiểm tra cảnh báo thiếu hàng hoặc đọng vốn.'}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button type="button" className="p-2.5 rounded-xl bg-blue-600 text-white text-xs font-bold">
-                      {isEn ? 'Stock In' : 'Nhập kho hàng'}
-                    </button>
-                    <button type="button" className="p-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-bold">
-                      {isEn ? 'Stock Out' : 'Xuất bán / Điều chuyển'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {activeQuickAction === 'report' && (
-                <div className="space-y-3">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    {isEn ? 'Select report type to export' : 'Chọn loại báo cáo cần kết xuất'}
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button type="button" className="p-3 rounded-xl border-2 border-blue-500 bg-blue-50/50 text-blue-700 text-xs font-bold flex items-center justify-center gap-2">
-                      <Download className="w-4 h-4" /> {isEn ? 'Sales Report (.xlsx)' : 'Báo cáo Doanh số (.xlsx)'}
-                    </button>
-                    <button type="button" className="p-3 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center gap-2">
-                      <Download className="w-4 h-4" /> {isEn ? 'Inventory Report (.pdf)' : 'Báo cáo Tồn kho (.pdf)'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {activeQuickAction === 'print_barcode' && (
-                <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-xs text-indigo-800 space-y-1">
-                  <p className="font-semibold">{isEn ? 'Standard Label Format:' : 'Định dạng tem in chuẩn:'}</p>
-                  <p>{isEn ? '• 3 labels per row (Thermal decal 35x22mm)' : '• Khổ tem: 3 tem / hàng (chuẩn Decal nhiệt 35x22mm)'}</p>
-                  <p>{isEn ? '• Auto-generate Code128 with item name and retail price.' : '• Tự động sinh mã Code128 cùng tên sản phẩm và giá niêm yết.'}</p>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setActiveQuickAction(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:bg-slate-100 cursor-pointer"
-                >
-                  {isEn ? 'Cancel' : 'Hủy'}
-                </button>
-                <button
-                  type="submit"
-                  disabled={isProcessing}
-                  className="px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-md shadow-blue-500/20 cursor-pointer flex items-center gap-2"
-                >
-                  {isProcessing ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <span>{isEn ? 'Confirm Action' : 'Xác nhận thực hiện'}</span>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>,
-        document.body
-      )}
 
     </div>
   );
