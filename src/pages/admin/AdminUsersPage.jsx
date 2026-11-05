@@ -36,6 +36,8 @@ import {
   canViewCostPrice,
   canApprovePricing,
   canCancelOrder,
+  canAddProduct,
+  canEditProduct,
   canDeleteProduct,
 } from '../../config/permissions.config';
 import { actionLabel, apiErrorMessage, formatRelativeTime, roleLabel } from './adminLabels';
@@ -100,6 +102,7 @@ const PERMISSION_GROUPS = [
     descriptionEn: 'Stock counts, stock in/out and product catalog',
     rules: [
       { name: 'Xem & quản lý sản phẩm', en: 'View & manage products', route: '/products' },
+      { name: 'Thêm & cập nhật sản phẩm', en: 'Add & update products', check: (role) => canAddProduct(role) },
       { name: 'Nhập / xuất kho & kiểm kê', en: 'Stock in/out & counts', route: '/inventory' },
       { name: 'Nhận cảnh báo tồn kho thấp', en: 'Low-stock alerts', route: '/alerts' },
       { name: 'Xóa sản phẩm khỏi hệ thống', en: 'Delete products', check: (role) => canDeleteProduct(role) },
