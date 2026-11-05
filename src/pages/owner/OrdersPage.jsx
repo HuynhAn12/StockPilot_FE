@@ -3287,9 +3287,25 @@ export function OrdersPage() {
 
                           {staffMode ? (
 
-                            /* Role Nhân viên: CHỈ IN HÓA ĐƠN (hủy đơn chỉ dành cho Chủ shop — backend chặn) */
+                            /* Role Nhân viên: Xem chi tiết đơn, in hóa đơn và đổi trả/hủy đơn trong ca */
 
                             <>
+
+                              {/* Xem chi tiết đơn */}
+
+                              <button
+
+                                onClick={() => setViewOrderDetail(ord)}
+
+                                className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+
+                                title="Xem chi tiết đơn"
+
+                              >
+
+                                <Eye className="w-3.5 h-3.5" />
+
+                              </button>
 
                               {/* In hóa đơn */}
 

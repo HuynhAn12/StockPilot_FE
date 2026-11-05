@@ -37,7 +37,7 @@ export const canApprovePricing = (role) => isOwner(role);
 export const canResolveAlerts = (role) => isOwner(role);
 export const canRunDecisionEngine = (role) => isOwner(role);
 export const canUseAiAssistant = (role) => isOwner(role);
-export const canCancelOrder = (role) => isOwner(role);
+export const canCancelOrder = (role) => isOwner(role) || isStaff(role);
 export const canAccessOrders = (role) => isOwner(role) || isStaff(role);
 export const canViewOrderFinancialSummary = (role) => isOwner(role);
 export const canAccessPricing = (role) => isOwner(role);
