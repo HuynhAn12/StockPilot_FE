@@ -3,7 +3,7 @@ import {
   Users, UserPlus, Search, Edit2, Trash2, CheckCircle2, XCircle,
   X, Shield, KeyRound, Mail, Phone, User, AlertTriangle, Loader2,
   ShoppingBag, DollarSign, Eye, EyeOff, FileSpreadsheet, Download,
-  Trophy, Award, Filter, ChevronLeft, ChevronRight, Check, TrendingUp, Sparkles
+  Trophy, Award, Filter, ChevronLeft, ChevronRight, Check, TrendingUp
 } from 'lucide-react';
 import { apiGetStaffList, apiCreateStaff, apiUpdateStaff, apiDeleteStaff } from '../../services/staffService';
 import { useAuthStore } from '../../components/store/authStore';
@@ -37,7 +37,6 @@ export function StaffPage() {
   // Edit form state
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
-  const [editPhone, setEditPhone] = useState('0909324543');
   const [editPassword, setEditPassword] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
   const [showEditPassword, setShowEditPassword] = useState(false);
@@ -45,7 +44,6 @@ export function StaffPage() {
   // Add form state
   const [addName, setAddName] = useState('');
   const [addEmail, setAddEmail] = useState('');
-  const [addPhone, setAddPhone] = useState('');
   const [addPassword, setAddPassword] = useState('12345678');
   const [addIsActive, setAddIsActive] = useState(true);
   const [showAddPassword, setShowAddPassword] = useState(false);
@@ -96,7 +94,6 @@ export function StaffPage() {
     if (selectedStaff) {
       setEditName(selectedStaff.fullName || '');
       setEditEmail(selectedStaff.email || '');
-      setEditPhone(selectedStaff.phone || '0909324543');
       setEditPassword('');
       setEditIsActive(Boolean(selectedStaff.isActive));
       setShowEditPassword(false);
@@ -114,7 +111,6 @@ export function StaffPage() {
   const handleOpenAddMode = () => {
     setAddName('');
     setAddEmail('');
-    setAddPhone('');
     setAddPassword('12345678');
     setAddIsActive(true);
     setShowAddPassword(false);
@@ -606,7 +602,7 @@ export function StaffPage() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                  placeholder={isEn ? 'Search name, email, phone...' : 'Tìm theo tên, email, SĐT...'}
+                  placeholder={isEn ? 'Search name or email...' : 'Tìm theo tên hoặc email...'}
                   className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-normal"
                 />
                 {searchQuery && (
@@ -1008,23 +1004,8 @@ export function StaffPage() {
                     />
                   </div>
 
-                  {/* Row: Phone & Staff Code */}
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        {isEn ? 'Phone Number' : 'Số điện thoại'}
-                      </label>
-                      <div className="relative">
-                        <Phone className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        <input
-                          type="text"
-                          value={editPhone}
-                          onChange={(e) => setEditPhone(e.target.value)}
-                          placeholder="0909324543"
-                          className="w-full pl-8 pr-2.5 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-normal"
-                        />
-                      </div>
-                    </div>
+                  {/* Row: Staff Code */}
+                  <div className="grid grid-cols-1 gap-2.5">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
                         {isEn ? 'Staff ID' : 'Mã NV'}
@@ -1170,23 +1151,7 @@ export function StaffPage() {
                           : '0 đ'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between py-1">
-                      <span className="text-slate-500">{isEn ? 'Order Completion Rate' : 'Tỷ lệ đơn thành công'}</span>
-                      <span className="font-bold text-emerald-600">100%</span>
-                    </div>
                   </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 text-xs text-blue-900 space-y-1">
-                  <div className="flex items-center gap-1.5 font-bold text-blue-800">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                    <span>{isEn ? 'AI Performance Insight' : 'Đánh giá AI Decision Engine'}</span>
-                  </div>
-                  <p className="text-xs text-blue-700 leading-relaxed font-normal">
-                    {selectedStaff.completedOrdersCount > 0
-                      ? `Nhân viên ${selectedStaff.fullName} đang xử lý tốt các đơn hàng tại kho và quầy thu ngân với độ chính xác cao.`
-                      : `Nhân viên mới tham gia hệ thống, chưa phát sinh đơn hàng trực tiếp.`}
-                  </p>
                 </div>
 
                 <button
@@ -1238,33 +1203,6 @@ export function StaffPage() {
                     placeholder="maitran@stockpilot.vn"
                     className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 font-normal focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                   />
-                </div>
-
-                {/* Row: Phone & Code */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      {isEn ? 'Phone Number' : 'Số điện thoại'}
-                    </label>
-                    <input
-                      type="text"
-                      value={addPhone}
-                      onChange={(e) => setAddPhone(e.target.value)}
-                      placeholder="0912345678"
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-normal"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 mb-1">
-                      {isEn ? 'Projected ID' : 'Mã NV'}
-                    </label>
-                    <input
-                      type="text"
-                      disabled
-                      value={formatStaffId(staffList.length + 1)}
-                      className="w-full px-3 py-2 text-xs rounded-xl bg-slate-100 border border-slate-200 text-slate-700 font-bold cursor-not-allowed"
-                    />
-                  </div>
                 </div>
 
                 {/* Row: Role & Initial Password */}

@@ -53,6 +53,19 @@ export function PricingPage() {
   const modifiedItems = useMemo(() => recommendations.filter((r) => r.status === 'modified'), [recommendations]);
   const rejectedItems = useMemo(() => recommendations.filter((r) => r.status === 'rejected'), [recommendations]);
 
+  // Tính từ chính các đề xuất đang chờ (không có dự báo doanh thu nên không hiển thị số tiền ước tính).
+  const pendingSummary = useMemo(() => {
+    const priced = pendingItems.filter((r) => r.currentPrice > 0 && r.suggestedPrice > 0);
+    const avgMarginChange = priced.length
+      ? Number((priced.reduce((sum, r) => sum + (r.marginAfter - r.marginBefore), 0) / priced.length).toFixed(1))
+      : 0;
+    return {
+      avgMarginChange,
+      increases: pendingItems.filter((r) => r.action === 'INCREASE').length,
+      decreases: pendingItems.filter((r) => r.action === 'DECREASE').length,
+    };
+  }, [pendingItems]);
+
   // Filtered items
   const filteredRecommendations = useMemo(() => {
     return recommendations.filter((item) => {
@@ -258,12 +271,14 @@ export function PricingPage() {
               <TrendingUp className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground font-medium">{isEn ? 'Estimated Margin Uplift' : 'Tỷ lệ lợi nhuận ước tính tăng'}</p>
-              <h3 className="text-2xl font-bold text-emerald-600">+18.4%</h3>
+              <p className="text-xs text-muted-foreground font-medium">{isEn ? 'Average Margin Change' : 'Biên lãi trung bình thay đổi'}</p>
+              <h3 className={`text-2xl font-bold ${pendingSummary.avgMarginChange < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                {pendingSummary.avgMarginChange > 0 ? '+' : ''}{pendingSummary.avgMarginChange.toLocaleString('vi-VN')} {isEn ? 'pts' : 'điểm %'}
+              </h3>
             </div>
           </div>
           <span className="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2 py-1 rounded">
-            {isEn ? 'If fully applied' : 'Nếu áp dụng hết'}
+            {isEn ? 'If all pending are applied' : 'Nếu duyệt hết đề xuất chờ'}
           </span>
         </div>
 
@@ -273,12 +288,16 @@ export function PricingPage() {
               <DollarSign className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground font-medium">{isEn ? 'Projected Revenue Gain' : 'Doanh thu dự kiến tăng thêm'}</p>
-              <h3 className="text-2xl font-bold text-violet-600">+12.500.000 đ</h3>
+              <p className="text-xs text-muted-foreground font-medium">{isEn ? 'Suggested Direction' : 'Hướng điều chỉnh giá'}</p>
+              <h3 className="text-2xl font-bold text-violet-600">
+                <span className="inline-flex items-center gap-1"><TrendingUp className="w-5 h-5" />{pendingSummary.increases}</span>
+                <span className="text-muted-foreground font-normal mx-2">·</span>
+                <span className="inline-flex items-center gap-1"><TrendingDown className="w-5 h-5" />{pendingSummary.decreases}</span>
+              </h3>
             </div>
           </div>
           <span className="text-xs bg-violet-50 text-violet-700 font-semibold px-2 py-1 rounded">
-            {isEn ? '30-day forecast' : 'Dự báo 30 ngày'}
+            {isEn ? 'Raise · Lower' : 'Tăng · Giảm giá'}
           </span>
         </div>
       </div>

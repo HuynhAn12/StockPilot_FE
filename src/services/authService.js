@@ -67,6 +67,12 @@ export async function apiGetMe() {
   return normalizeUser(data.data);
 }
 
+// PATCH /auth/me — hiện chỉ đổi được họ tên (email là định danh đăng nhập, không đổi ở đây).
+export async function apiUpdateMe({ fullName }) {
+  const { data } = await apiClient.patch('/auth/me', { fullName });
+  return data.data;
+}
+
 // POST /auth/forgot-password
 export async function apiForgotPassword({ email, phone }) {
   const payload = {};

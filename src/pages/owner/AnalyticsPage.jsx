@@ -764,7 +764,9 @@ export function AnalyticsPage() {
                           {item.sku && <span className="analytics-code">{item.sku}</span>}
                         </div>
                         <span className="text-[11px] text-slate-500">
-                          <strong className="text-rose-600">{item.daysNoSale} {isEn ? 'days' : 'ngày'}</strong> {isEn ? 'without sales' : 'chưa bán'} • {isEn ? 'Stock: ' : 'Tồn: '}<strong>{item.stock} SP</strong> ({formatVND(item.capital)})
+                          {item.neverSold
+                            ? <><strong className="text-rose-600">{isEn ? 'Never sold' : 'Chưa bán lần nào'}</strong> ({isEn ? `added ${item.daysNoSale} days ago` : `tạo ${item.daysNoSale} ngày trước`}) •</>
+                            : <><strong className="text-rose-600">{item.daysNoSale} {isEn ? 'days' : 'ngày'}</strong> {isEn ? 'since last sale' : 'từ lần bán cuối'} •</>} {isEn ? 'Stock: ' : 'Tồn: '}<strong>{item.stock} SP</strong> ({formatVND(item.capital)})
                         </span>
                       </div>
                       <div className="text-right shrink-0">

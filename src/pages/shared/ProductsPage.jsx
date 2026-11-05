@@ -3,13 +3,13 @@ import {
   Package, Plus, Search, Layers, AlertTriangle,
   Trash2, Eye, RefreshCw,
   DollarSign, LayoutGrid, List,
-  Calendar, Zap, ShoppingBag, X, ZoomIn, Check, Info,
+  Calendar, ShoppingBag, X, ZoomIn, Check, Info,
   Store, ChevronRight, Pencil, Upload, Camera, FileUp
 } from "lucide-react";
 import { useProductStore, CATEGORIES } from "../../components/store/productStore";
 import { useAuthStore } from "../../store/authStore";
 import { canViewCostPrice, canDeleteProduct, normalizeRole } from "../../config/permissions.config";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AddProduct } from "../../components/AddProduct";
 import { useToast } from "../../components/common/Toast";
 import { useTranslation } from "../../i18n/useTranslation";
@@ -52,14 +52,6 @@ function getCategoryBadge(category) {
     "ca-nhan": { label: "Chăm sóc", icon: "🧴", color: "#db2777", bg: "#fdf2f8", border: "#fbcfe8", gradient: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)" },
   };
   return map[catKey] || { label: "Hàng hóa", icon: "📦", color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe", gradient: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)" };
-}
-
-function getProductSocialStats(id) {
-  const hash = String(id ?? "").split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  return {
-    soldCount: 15 + (hash % 285),
-    discountPct: 15 + (hash % 16),
-  };
 }
 
 function getProductImage(prod) {
@@ -1168,7 +1160,17 @@ export function ProductsPage() {
     };
   }, []);
 
-  const [viewMode, setViewMode] = useState("list");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [viewMode, setViewModeState] = useState(() => (searchParams.get("new") ? "add" : "list"));
+  // Bỏ ?new=1 khỏi URL khi rời form thêm, để tải lại trang không mở lại form.
+  const setViewMode = (mode) => {
+    setViewModeState(mode);
+    if (mode !== "add" && searchParams.has("new")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("new");
+      setSearchParams(next, { replace: true });
+    }
+  };
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [statusTab, setStatusTab] = useState("all");
@@ -1250,25 +1252,12 @@ export function ProductsPage() {
           (item.barcode && item.barcode.toLowerCase().includes(q)) ||
           (item.supplier && item.supplier.toLowerCase().includes(q));
 
-        let matchCategory = selectedCategory === "all";
-        if (!matchCategory) {
-          const cat = item.category?.toLowerCase() || "";
-          matchCategory =
-            cat === selectedCategory ||
-            (selectedCategory === "tpcn" && (cat.includes("thuc-pham") || cat.includes("do-an"))) ||
-            (selectedCategory === "drink" && cat.includes("do-uong")) ||
-            (selectedCategory === "spice" && cat.includes("gia-vi")) ||
-            (selectedCategory === "house" && cat.includes("gia-dinh")) ||
-            (selectedCategory === "care" && cat.includes("ca-nhan")) ||
-            (selectedCategory === "office" && (cat.includes("office") || cat.includes("van-phong"))) ||
-            (selectedCategory === "misc" && (cat.includes("misc") || cat.includes("tieu-dung")));
-        }
+        const matchCategory = selectedCategory === "all" || (item.categoryName || "Khác") === selectedCategory;
 
         let matchStatus = true;
         if (statusTab === "active") matchStatus = item.status === "active";
         else if (statusTab === "low_stock") matchStatus = item.stock > 0 && item.stock <= (item.alertThreshold || 5);
         else if (statusTab === "out_of_stock") matchStatus = item.stock === 0;
-        else if (statusTab === "flash_sale") matchStatus = item.stock > 20;
 
         return matchSearch && matchCategory && matchStatus;
       })
@@ -1278,7 +1267,6 @@ export function ProductsPage() {
           const numB = parseInt(String(b.code || b.id).replace(/\D/g, ''), 10) || Number(b.id) || 0;
           return numA - numB;
         }
-        if (sortBy === "popular") return getProductSocialStats(b.id).soldCount - getProductSocialStats(a.id).soldCount;
         if (sortBy === "newest") return (Number(b.id) || 0) - (Number(a.id) || 0);
         if (sortBy === "price_asc") return (a.salePrice || 0) - (b.salePrice || 0);
         if (sortBy === "price_desc") return (b.salePrice || 0) - (a.salePrice || 0);
@@ -1293,28 +1281,31 @@ export function ProductsPage() {
     const lowStock = products.filter((p) => p.stock > 0 && p.stock <= (p.alertThreshold || 5)).length;
     const totalInventoryValue = products.reduce((acc, p) => acc + ((p.costPrice || 0) * (p.stock || 0)), 0);
     const activeCount = products.filter((p) => p.status === "active").length;
-    const flashSaleCount = products.filter((p) => p.stock > 20).length;
+    const outOfStock = products.filter((p) => (p.stock || 0) <= 0).length;
 
     return {
       total,
       lowStock,
       totalInventoryValue,
       activeCount,
-      flashSaleCount,
+      outOfStock,
     };
   }, [products]);
 
-  // Categories list matching Screenshot 1 (1 hàng duy nhất)
-  const categoryPills = [
-    { key: "all", label: t('catAll', 'Tất cả'), icon: "🌟", count: products.length },
-    { key: "tpcn", label: t('catTpcn', 'Thực phẩm'), icon: "📦", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("tpcn") || c.includes("thuc-pham") || c.includes("do-an"); }).length },
-    { key: "drink", label: t('catDrink', 'Đồ uống'), icon: "☕", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("drink") || c.includes("do-uong"); }).length },
-    { key: "spice", label: t('catSpice', 'Gia vị & Đồ khô'), icon: "🧂", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("spice") || c.includes("gia-vi"); }).length },
-    { key: "house", label: t('catHouse', 'Đồ dùng gia đình'), icon: "🧹", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("house") || c.includes("gia-dinh"); }).length },
-    { key: "care", label: t('catCare', 'Chăm sóc cá nhân'), icon: "🧴", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("care") || c.includes("ca-nhan"); }).length },
-    { key: "office", label: t('catOffice', 'Đồ dùng văn phòng'), icon: "📎", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("office") || c.includes("van-phong"); }).length },
-    { key: "misc", label: t('catMisc', 'Tiêu dùng khác'), icon: "🔌", count: products.filter(p => { const c = (p.category || "").toLowerCase(); return c.includes("misc") || c.includes("tieu-dung"); }).length },
-  ];
+  // Nhóm hàng thật của cửa hàng, nhiều sản phẩm nhất trước.
+  const categoryPills = useMemo(() => {
+    const counts = new Map();
+    products.forEach((p) => {
+      const name = p.categoryName || "Khác";
+      counts.set(name, (counts.get(name) || 0) + 1);
+    });
+    return [
+      { key: "all", label: t('catAll', 'Tất cả'), count: products.length },
+      ...[...counts.entries()]
+        .sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0], "vi"))
+        .map(([name, count]) => ({ key: name, label: name, count })),
+    ];
+  }, [products, t]);
 
   if (viewMode === "add") {
     return (
@@ -1374,14 +1365,14 @@ export function ProductsPage() {
           </div>
         </div>
 
-        {/* Card 2: Khuyến mãi */}
+        {/* Card 2: Hết hàng */}
         <div className="pp-stat-card">
-          <div className="pp-stat-icon-wrap" style={{ background: "#fff7ed", color: "#ea580c" }}>
-            <Zap style={{ width: 26, height: 26, fill: "#ea580c" }} />
+          <div className="pp-stat-icon-wrap" style={{ background: "#fef2f2", color: "#dc2626" }}>
+            <Package style={{ width: 26, height: 26 }} />
           </div>
           <div>
-            <div className="pp-stat-label">{t('productsFlashSale', 'KHUYẾN MÃI')}</div>
-            <div className="pp-stat-value">{stats.flashSaleCount} {t('itemsCount', 'SP')}</div>
+            <div className="pp-stat-label">{t('productsOutOfStock', 'HẾT HÀNG')}</div>
+            <div className="pp-stat-value">{stats.outOfStock} {t('itemsCount', 'SP')}</div>
           </div>
         </div>
 
@@ -1444,7 +1435,6 @@ export function ProductsPage() {
           {[
             { key: "all", label: t('tabAll', 'Tất cả') },
             { key: "active", label: t('tabActive', 'Đang bán') },
-            { key: "flash_sale", label: t('tabFlashSale', 'Khuyến mãi') },
             { key: "low_stock", label: t('tabLowStock', 'Sắp hết') },
             { key: "out_of_stock", label: t('tabOutOfStock', 'Hết hàng') },
           ].map((tab) => (
@@ -1480,7 +1470,6 @@ export function ProductsPage() {
           onChange={(e) => setSortBy(e.target.value)}
         >
           <option value="code_asc">Mã sản phẩm (từ 1 trở đi)</option>
-          <option value="popular">{t('sortPopular', 'Bán chạy nhất')}</option>
           <option value="newest">{t('sortNewest', 'Mới nhất')}</option>
           <option value="price_asc">{t('sortPriceAsc', 'Giá thấp → cao')}</option>
           <option value="price_desc">{t('sortPriceDesc', 'Giá cao → thấp')}</option>
