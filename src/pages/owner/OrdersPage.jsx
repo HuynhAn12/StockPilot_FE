@@ -1708,7 +1708,7 @@ export function OrdersPage() {
 
   return (
 
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 w-full max-w-[1600px] mx-auto pb-12">
 
       {/* Header — Framed Hero Gradient matching Inventory & Products pages */}
 
@@ -3042,21 +3042,21 @@ export function OrdersPage() {
 
               <tr className="whitespace-nowrap">
 
-                <th className="py-3.5 px-4 whitespace-nowrap">{isEn ? 'Order Code' : 'Mã đơn hàng'}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap">{isEn ? 'Order Code' : 'Mã đơn hàng'}</th>
 
-                <th className="py-3.5 px-4 whitespace-nowrap">{isEn ? 'Time' : 'Thời gian'}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap">{isEn ? 'Time' : 'Thời gian'}</th>
 
-                <th className="py-3.5 px-4 whitespace-nowrap">{isEn ? 'Handler' : 'Nhân viên xử lý'}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap">{isEn ? 'Handler' : 'Nhân viên xử lý'}</th>
 
-                <th className="py-3.5 px-4 whitespace-nowrap">{isEn ? 'Payment' : 'Thanh toán'}</th>
+                <th className="py-3 px-2.5 whitespace-nowrap">{isEn ? 'Payment' : 'Thanh toán'}</th>
 
-                <th className="py-3.5 px-4 text-center whitespace-nowrap">{isEn ? 'Quantity' : 'Số lượng'}</th>
+                <th className="py-3 px-2.5 text-center whitespace-nowrap">{isEn ? 'Quantity' : 'Số lượng'}</th>
 
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">{isEn ? 'Total' : 'Tổng tiền'}</th>
+                <th className="py-3 px-2.5 text-right whitespace-nowrap">{isEn ? 'Total' : 'Tổng tiền'}</th>
 
-                <th className="py-3.5 px-4 text-center whitespace-nowrap">{isEn ? 'Status' : 'Trạng thái'}</th>
+                <th className="py-3 px-2.5 text-center whitespace-nowrap">{isEn ? 'Status' : 'Trạng thái'}</th>
 
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">{isEn ? 'Actions' : 'Thao tác'}</th>
+                <th className="py-3 pr-3.5 pl-1.5 text-right whitespace-nowrap">{isEn ? 'Actions' : 'Thao tác'}</th>
 
               </tr>
 
@@ -3128,7 +3128,7 @@ export function OrdersPage() {
 
                       {/* Mã đơn hàng */}
 
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-2.5 px-2.5 whitespace-nowrap">
 
                         <div
 
@@ -3144,7 +3144,7 @@ export function OrdersPage() {
 
                           }}
 
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200/70 text-slate-800 font-mono text-xs font-bold cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200/70 text-slate-800 font-mono text-[11px] font-bold cursor-pointer transition-colors whitespace-nowrap shrink-0"
 
                           title={isEn ? "Click to copy order code" : "Click để sao chép mã đơn"}
 
@@ -3162,7 +3162,7 @@ export function OrdersPage() {
 
                       {/* Thời gian */}
 
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-2.5 px-2.5 whitespace-nowrap">
 
                         <div className="flex flex-col">
 
@@ -3188,7 +3188,7 @@ export function OrdersPage() {
 
                       {/* Nhân viên xử lý */}
 
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-2.5 px-2.5 whitespace-nowrap">
 
                         <span className="font-semibold text-slate-800 text-xs">
 
@@ -3202,9 +3202,9 @@ export function OrdersPage() {
 
                       {/* Payment Method */}
 
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-2.5 px-2.5 whitespace-nowrap">
 
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold shadow-sm whitespace-nowrap shrink-0 ${payBadge.className}`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[11px] font-bold shadow-xs whitespace-nowrap shrink-0 ${payBadge.className}`}>
 
                           <PayIcon className="w-3.5 h-3.5 shrink-0" />
 
@@ -3218,7 +3218,7 @@ export function OrdersPage() {
 
                       {/* Số lượng */}
 
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <td className="py-2.5 px-2.5 text-center whitespace-nowrap">
 
                         <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs whitespace-nowrap">
 
@@ -3228,7 +3228,7 @@ export function OrdersPage() {
 
                         {Number(ord.returnedQuantity || 0) > 0 && (
 
-                          <span className="block text-[10px] font-semibold text-amber-600 mt-0.5 whitespace-nowrap">
+                          <span className="block text-[9.5px] font-semibold text-amber-600 mt-0.5 whitespace-nowrap">
 
                             (Gốc {ord.grossItemsCount || (ord.netItemsCount + ord.returnedQuantity)} SP · Đã trả {ord.returnedQuantity} SP)
 
@@ -3242,7 +3242,7 @@ export function OrdersPage() {
 
                       {/* Tổng tiền */}
 
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      <td className="py-2.5 px-2.5 text-right whitespace-nowrap">
 
                         <span className="font-black text-slate-900 text-sm tracking-tight font-sans whitespace-nowrap">
 
@@ -3252,7 +3252,7 @@ export function OrdersPage() {
 
                         {Number(ord.refundedAmount || 0) > 0 && (
 
-                          <span className="block text-[10px] font-semibold text-amber-600 mt-0.5 whitespace-nowrap">
+                          <span className="block text-[9.5px] font-semibold text-amber-600 mt-0.5 whitespace-nowrap">
 
                             (Gốc {formatVND(ord.grossAmount)} · Hoàn {formatVND(ord.refundedAmount)})
 
@@ -3266,7 +3266,7 @@ export function OrdersPage() {
 
                       {/* Status */}
 
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <td className="py-2.5 px-2.5 text-center whitespace-nowrap">
 
                         <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center justify-center border shadow-sm whitespace-nowrap ${statusBadge.className}`}>
 
@@ -3281,9 +3281,9 @@ export function OrdersPage() {
 
                       {/* Actions */}
 
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                      <td className="py-2.5 pr-3.5 pl-1.5 text-right whitespace-nowrap">
 
-                        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
 
                           {staffMode ? (
 
@@ -3297,7 +3297,7 @@ export function OrdersPage() {
 
                                 onClick={() => handlePrintReceipt(ord)}
 
-                                className="w-8 h-8 rounded-lg border border-slate-200/80 bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
 
                                 title="In hóa đơn bán hàng"
 
@@ -3315,7 +3315,7 @@ export function OrdersPage() {
 
                                 <span
 
-                                  className="w-8 h-8 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                  className="w-7 h-7 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
 
                                   title="Đơn hàng này đã bị hủy hoàn toàn"
 
@@ -3333,7 +3333,7 @@ export function OrdersPage() {
 
                                   disabled={actionLoading}
 
-                                  className="w-8 h-8 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                  className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
 
                                   title="Đổi trả hàng & Hoàn tiền (Trả 1 số món hoặc hủy toàn bộ)"
 
@@ -3407,7 +3407,7 @@ export function OrdersPage() {
 
                                 onClick={() => setViewOrderDetail(ord)}
 
-                                className="w-8 h-8 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
 
                                 title="Xem chi tiết đơn"
 
@@ -3425,7 +3425,7 @@ export function OrdersPage() {
 
                                 onClick={() => handlePrintReceipt(ord)}
 
-                                className="w-8 h-8 rounded-lg border border-slate-200/80 bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
 
                                 title="In hóa đơn bán hàng"
 
@@ -3447,7 +3447,7 @@ export function OrdersPage() {
 
                                   disabled={actionLoading}
 
-                                  className="w-8 h-8 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                  className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
 
                                   title="Đổi trả hàng & Hoàn tiền (Trả 1 số món hoặc hủy toàn bộ)"
 
@@ -3461,7 +3461,7 @@ export function OrdersPage() {
 
                                 <span
 
-                                  className="w-8 h-8 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                  className="w-7 h-7 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
 
                                   title="Đơn hàng này đã bị hủy hoàn toàn"
 
