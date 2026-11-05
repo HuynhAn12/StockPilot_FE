@@ -1,3 +1,23 @@
+/**
+ * Normalizes speech recognition output for domain-specific retail terms & brand names.
+ * Ensures consistent terminology between real-time browser preview and Groq Whisper.
+ */
+export function normalizeVietnameseSpeechText(text) {
+  if (!text) return '';
+  let result = text;
+  // KiotViet variants (e.g., "K kiốt việt", "cây ốc Việt", "ki ốt việt") -> "KiotViet"
+  result = result.replace(/\b(cây\s*ốc\s*việt|k\s*kiốt\s*việt|ki\s*ốt\s*việt|k\s*kiot\s*viet|kiot\s*viet)\b/gi, 'KiotViet');
+  // StockPilot variants
+  result = result.replace(/\b(stock\s*pilot|s\s*tốc\s*pai\s*lợt|tốc\s*pai\s*lợt)\b/gi, 'StockPilot');
+  // Pilot AI variants
+  result = result.replace(/\b(pilot\s*ai|ai\s*pilot|ây\s*ai\s*pai\s*lợt|pai\s*lợt\s*ai)\b/gi, 'Pilot AI');
+  // Sapo variants
+  result = result.replace(/\b(sa\s*po)\b/gi, 'Sapo');
+  // POS variants
+  result = result.replace(/\b(pi\s*âu\s*ét|bê\s*ô\s*ét)\b/gi, 'POS');
+  return result;
+}
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { apiTranscribeAudio } from '../services/analyticsService';
 
@@ -113,7 +133,9 @@ export function useVoiceAssistant() {
 
   // ─── 0. Đảm bảo mỗi lượt nói chỉ gửi duy nhất 1 lần (Chống duplicate Web Speech vs Groq Whisper) ───
   const submitTextOnce = useCallback((text) => {
-    const trimmed = (text || '').trim();
+    const rawTrimmed = (text || '').trim();
+    if (!rawTrimmed) return;
+    const trimmed = normalizeVietnameseSpeechText(rawTrimmed);
     if (!trimmed) return;
     if (hasSubmittedTurnRef.current) return;
     hasSubmittedTurnRef.current = true;
@@ -131,12 +153,30 @@ export function useVoiceAssistant() {
   }, []);
 
   // ─── 1. Dừng nghe và gửi kết quả duy nhất ───
-  const stopListening = useCallback(async ({ onFinal, onError } = {}) => {
+  const stopListening = useCallback(async ({ onFinal, onError, cancel = false } = {}) => {
     if (silenceTimeoutRef.current) {
       clearTimeout(silenceTimeoutRef.current);
       silenceTimeoutRef.current = null;
     }
     setIsListening(false);
+
+    if (cancel) {
+      hasSubmittedTurnRef.current = true;
+      capturedTextRef.current = '';
+      if (recognitionRef.current) {
+        try { recognitionRef.current.abort(); } catch (_) {}
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch (_) {}
+      }
+      setIsTranscribing(false);
+      isTranscribingRef.current = false;
+      return;
+    }
 
     if (onFinal) {
       onFinalCallbackRef.current = onFinal;
@@ -152,7 +192,27 @@ export function useVoiceAssistant() {
       try { recognitionRef.current.stop(); } catch (_) {}
     }
 
-    // 2. Thu thập âm thanh từ MediaRecorder và gửi Groq Whisper
+    // ⭐️ ƯU TIÊN VĂN BẢN TRỰC TIẾP TỪ WEB SPEECH (WYSIWYG) ⭐️
+    // Người dùng nhìn thấy dòng chữ màu tím hiển thị lúc nói.
+    // Lấy chính xác văn bản này gửi đi để màu xanh khớp 100% với màu tím mà người dùng vừa thấy,
+    // không để Whisper ghi đè hay làm lệch từ vựng (như K kiốt việt -> cây ốc Việt).
+    const liveCaptured = normalizeVietnameseSpeechText(capturedTextRef.current);
+    if (liveCaptured && liveCaptured.trim()) {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        mediaStreamRef.current = null;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try { mediaRecorderRef.current.stop(); } catch (_) {}
+      }
+      setIsTranscribing(false);
+      isTranscribingRef.current = false;
+      submitTextOnce(liveCaptured.trim());
+      return;
+    }
+
+    // 2. Nếu Web Speech chưa bắt được chữ (hoặc trên trình duyệt không hỗ trợ Web Speech như Firefox/Safari),
+    // chuyển sang Groq Whisper API với model whisper-large-v3
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== 'inactive') {
       isTranscribingRef.current = true;
@@ -171,8 +231,9 @@ export function useVoiceAssistant() {
           if (audioBlob.size > 2000) {
             // Gửi sang backend -> Groq Whisper API với model whisper-large-v3
             const whisperText = await apiTranscribeAudio(audioBlob);
-            if (whisperText && whisperText.trim()) {
-              submitTextOnce(whisperText.trim());
+            const normalizedWhisper = normalizeVietnameseSpeechText(whisperText);
+            if (normalizedWhisper && normalizedWhisper.trim()) {
+              submitTextOnce(normalizedWhisper.trim());
               return;
             }
           }
@@ -184,8 +245,9 @@ export function useVoiceAssistant() {
         }
 
         // Fallback sang text đã nhận diện từ Web Speech nếu Groq Whisper rỗng
-        if (capturedTextRef.current && capturedTextRef.current.trim()) {
-          submitTextOnce(capturedTextRef.current.trim());
+        const fallbackText = normalizeVietnameseSpeechText(capturedTextRef.current);
+        if (fallbackText && fallbackText.trim()) {
+          submitTextOnce(fallbackText.trim());
         }
       };
 
@@ -194,15 +256,17 @@ export function useVoiceAssistant() {
       } catch (e) {
         setIsTranscribing(false);
         isTranscribingRef.current = false;
-        if (capturedTextRef.current && capturedTextRef.current.trim()) {
-          submitTextOnce(capturedTextRef.current.trim());
+        const fallbackText = normalizeVietnameseSpeechText(capturedTextRef.current);
+        if (fallbackText && fallbackText.trim()) {
+          submitTextOnce(fallbackText.trim());
         }
       }
     } else {
       setIsTranscribing(false);
       isTranscribingRef.current = false;
-      if (capturedTextRef.current && capturedTextRef.current.trim()) {
-        submitTextOnce(capturedTextRef.current.trim());
+      const fallbackText = normalizeVietnameseSpeechText(capturedTextRef.current);
+      if (fallbackText && fallbackText.trim()) {
+        submitTextOnce(fallbackText.trim());
       }
     }
   }, [submitTextOnce]);
@@ -282,7 +346,8 @@ export function useVoiceAssistant() {
             }
           }
 
-          const fullCurrent = (capturedWebSpeech + (interimTranscript ? ` ${interimTranscript}` : '')).trim();
+          const rawFull = (capturedWebSpeech + (interimTranscript ? ` ${interimTranscript}` : '')).trim();
+          const fullCurrent = normalizeVietnameseSpeechText(rawFull);
           capturedTextRef.current = fullCurrent;
 
           if (onInterim && fullCurrent) {

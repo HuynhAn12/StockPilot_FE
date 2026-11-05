@@ -29,6 +29,8 @@ export const canViewProfit = (role) => !isStaff(role);
 export const canViewTotalInventoryValue = (role) => !isStaff(role);
 export const canViewFinancialCharts = (role) => !isStaff(role);
 
+export const canAddProduct = (role) => isOwner(role) || isStaff(role);
+export const canEditProduct = (role) => isOwner(role) || isStaff(role);
 export const canDeleteProduct = (role) => isOwner(role);
 export const canEditCostPrice = (role) => isOwner(role);
 export const canEditSellingPrice = (role) => isOwner(role);
@@ -37,7 +39,7 @@ export const canApprovePricing = (role) => isOwner(role);
 export const canResolveAlerts = (role) => isOwner(role);
 export const canRunDecisionEngine = (role) => isOwner(role);
 export const canUseAiAssistant = (role) => isOwner(role);
-export const canCancelOrder = (role) => isOwner(role);
+export const canCancelOrder = (role) => isOwner(role) || isStaff(role);
 export const canAccessOrders = (role) => isOwner(role) || isStaff(role);
 export const canViewOrderFinancialSummary = (role) => isOwner(role);
 export const canAccessPricing = (role) => isOwner(role);
@@ -53,6 +55,8 @@ export const permissions = {
   canViewProfit,
   canViewTotalInventoryValue,
   canViewFinancialCharts,
+  canAddProduct,
+  canEditProduct,
   canDeleteProduct,
   canEditCostPrice,
   canEditSellingPrice,

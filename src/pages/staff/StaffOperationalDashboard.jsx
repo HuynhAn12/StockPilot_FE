@@ -94,8 +94,7 @@ export function StaffOperationalDashboard() {
         className="relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4"
       >
         <div className="flex-1 text-center md:text-left space-y-1">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600/15 border border-emerald-600/30 text-emerald-900 text-xs font-black uppercase tracking-wider mb-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+          <div className="inline-flex items-center px-3 py-1 rounded-full bg-emerald-600/15 border border-emerald-600/30 text-emerald-900 text-xs font-black uppercase tracking-wider mb-1">
             Ca trực Vận hành & Thu ngân
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">

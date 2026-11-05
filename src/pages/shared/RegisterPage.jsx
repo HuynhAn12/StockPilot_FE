@@ -767,7 +767,7 @@ export function RegisterPage() {
                 </svg>
               </div>
               <span className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-[9px] font-black px-2.5 py-0.5 rounded-full bg-white/70 text-slate-950 border border-slate-900/20 whitespace-nowrap uppercase tracking-wider shadow-sm">
-                AI Pilot
+                Pilot AI
               </span>
             </div>
             <h1 className="text-3xl font-black tracking-tight text-slate-950 mb-2">StockPilot</h1>
@@ -795,7 +795,7 @@ export function RegisterPage() {
               },
               {
                 icon: Sparkles,
-                text: isEn ? 'AI Pilot assistant for 24/7 business analytics' : 'Trợ lý AI Pilot phân tích kinh doanh 24/7',
+                text: isEn ? 'Pilot AI assistant for 24/7 business analytics' : 'Trợ lý Pilot AI phân tích kinh doanh 24/7',
               },
             ].map((item, idx) => {
               const Icon = item.icon;

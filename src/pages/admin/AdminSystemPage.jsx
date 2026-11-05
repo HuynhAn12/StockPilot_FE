@@ -495,7 +495,7 @@ export function AdminSystemPage() {
         </div>
       )}
 
-      {/* ─── TAB: TRỢ LÝ AI (AI PILOT USAGE) ─── */}
+      {/* ─── TAB: TRỢ LÝ AI (PILOT AI USAGE) ─── */}
       {activeTab === 'ai' && (
         <div className="space-y-5">
           {/* Thanh chọn khoảng thời gian */}

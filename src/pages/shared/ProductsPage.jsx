@@ -14,6 +14,7 @@ import { AddProduct } from "../../components/AddProduct";
 import { useToast } from "../../components/common/Toast";
 import { useTranslation } from "../../i18n/useTranslation";
 import { uploadImageToCloudinary, uploadBase64ToCloudinary } from "../../services/uploadService";
+import { RedLightningLogo } from "../../components/common/RedLightningLogo";
 
 function safeNum(val) {
   if (val === null || val === undefined) return 0;
@@ -1040,9 +1041,9 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
             <Ban style={{ width: 12, height: 12 }} /> Ngưng bán
           </div>
         ) : null}
-        {/* Status stock pill with dot indicator */}
+
+        {/* Status stock pill */}
         <div className={`pp-tag-stock${isOut ? " out" : isLow ? " low" : ""}`}>
-          <span className="pp-stock-dot" />
           <span>
             {isOut
               ? t('outOfStock', 'Hết hàng')
@@ -1407,8 +1408,8 @@ export function ProductsPage() {
 
         {/* Card 2: Hết hàng */}
         <div className="pp-stat-card">
-          <div className="pp-stat-icon-wrap" style={{ background: "#fef2f2", color: "#dc2626" }}>
-            <Package style={{ width: 26, height: 26 }} />
+          <div className="pp-stat-icon-wrap" style={{ background: "#fef2f2", color: "#c31c2e" }}>
+            <RedLightningLogo style={{ width: 28, height: 29, color: "#c31c2e" }} />
           </div>
           <div>
             <div className="pp-stat-label">{t('productsOutOfStock', 'HẾT HÀNG')}</div>
@@ -1675,7 +1676,7 @@ export function ProductsPage() {
                             cursor: "pointer",
                           }}
                         >
-                          {prod.status === "active" && prod.isActive !== false ? t('statusSelling', '● Đang bán') : '● Ngưng bán'}
+                          {prod.status === "active" && prod.isActive !== false ? t('statusSelling', 'Đang bán') : 'Ngưng bán'}
                         </button>
                       </td>
                       <td style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
@@ -1772,11 +1773,11 @@ export function ProductsPage() {
                   <span>Tồn kho: <strong>{zoomImageProduct.stock} {zoomImageProduct.unit || "cái"}</strong></span>
                   {zoomImageProduct.isActive === false || zoomImageProduct.status === "inactive" ? (
                     <span style={{ padding: "2px 8px", borderRadius: 6, background: "#fee2e2", color: "#b91c1c", fontSize: 11, fontWeight: 800 }}>
-                      ● Ngưng bán
+                      Ngưng bán
                     </span>
                   ) : (
                     <span style={{ padding: "2px 8px", borderRadius: 6, background: "#dcfce7", color: "#166534", fontSize: 11, fontWeight: 800 }}>
-                      ● Đang bán
+                      Đang bán
                     </span>
                   )}
                 </div>

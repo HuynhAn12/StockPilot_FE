@@ -30,7 +30,7 @@ const NAV_ITEM_CONFIG = [
   { key: 'navAlerts', sectionKey: 'decisionSupportSection', defaultName: 'Cảnh báo rủi ro', defaultSection: 'Hỗ trợ quyết định', href: '/alerts', icon: AlertTriangle, badgeKey: 'alerts', badgeVariant: 'error', roles: ['store_owner','warehouse_staff'] },
   { key: 'navPricing', defaultName: 'Gợi ý giá bán', href: '/pricing', icon: Tag, badgeKey: 'pricing', badgeVariant: 'purple', roles: ['store_owner'] },
   { key: 'navAnalytics', defaultName: 'Phân tích & Báo cáo', href: '/analytics', icon: TrendingUp, roles: ['store_owner'] },
-  { key: 'navAiPilot', defaultName: 'Trợ lý AI Pilot', href: '/ai-assistant', icon: Bot, roles: ['store_owner'] },
+  { key: 'navAiPilot', defaultName: 'Trợ lý Pilot AI', href: '/ai-assistant', icon: AiPilotNavIcon, roles: ['store_owner'] },
   // Cấu hình (Chủ shop)
   { key: 'navSettings', sectionKey: 'configSection', defaultName: 'Cài đặt hệ thống', defaultSection: 'Cấu hình', href: '/settings', icon: Settings, roles: ['store_owner'] },
   { key: 'navImport', defaultName: 'Nhập dữ liệu', href: '/import', icon: FileUp, roles: ['store_owner'] },
@@ -46,7 +46,12 @@ const NAV_ITEM_CONFIG = [
   { key: 'navAdminSecurity', defaultName: 'Bảo mật & Kiểm soát', href: '/admin/security', icon: ShieldCheck, roles: ['admin'] },
 ];
 
+import { StockPilotAILogo } from '../common/StockPilotAILogo';
 import { normalizeRole } from '../../config/permissions.config';
+
+function AiPilotNavIcon({ className = 'w-4.5 h-4.5' }) {
+  return <StockPilotAILogo size="w-4.5 h-4.5 rounded-md" className={className} />;
+}
 
 function getRoleIcon(role) {
   if (role === 'store_owner')    return <Store className="w-3.5 h-3.5 text-blue-600" />;

@@ -322,19 +322,28 @@ export function OrdersPage() {
 
   // Custom date/month picker state
 
+  const getTodayVN = () => {
+    const vnNow = new Date(Date.now() + 7 * 3600000);
+    const y = vnNow.getUTCFullYear();
+    const m = String(vnNow.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(vnNow.getUTCDate()).padStart(2, '0');
+    return {
+      dateStr: `${y}-${m}-${d}`,
+      monthStr: `${y}-${m}`,
+      year: y,
+      monthIndex: vnNow.getUTCMonth(),
+    };
+  };
+
+  // Custom date/month picker state
   const [customFilterMode, setCustomFilterMode] = useState('day'); // 'day' | 'month'
-
-  const [selectedCustomDate, setSelectedCustomDate] = useState('2026-10-17');
-
-  const [selectedCustomMonth, setSelectedCustomMonth] = useState('2026-10');
-
+  const [selectedCustomDate, setSelectedCustomDate] = useState(() => getTodayVN().dateStr);
+  const [selectedCustomMonth, setSelectedCustomMonth] = useState(() => getTodayVN().monthStr);
+  const [selectedStaffFilter, setSelectedStaffFilter] = useState('ALL');
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-
   const [isDayPickerOpen, setIsDayPickerOpen] = useState(false);
-
-  const [pickerYear, setPickerYear] = useState(2026);
-
-  const [pickerMonthIndex, setPickerMonthIndex] = useState(9); // 0-indexed: 9 = Tháng 10
+  const [pickerYear, setPickerYear] = useState(() => getTodayVN().year);
+  const [pickerMonthIndex, setPickerMonthIndex] = useState(() => getTodayVN().monthIndex);
 
 
 
@@ -1081,25 +1090,102 @@ export function OrdersPage() {
 
 
 
-  // Filtered orders for table (filtered by client payment method pill)
+  // Unique staff list for Shop Owner filter
+  const availableStaffList = useMemo(() => {
+    const map = new Map();
+    (normalizedOrders || []).forEach((o) => {
+      const id = o.createdById || o.createdBy?.id || 0;
+      const name = o.createdBy?.fullName || (isEn ? 'Store Owner' : 'Chủ shop');
+      if (id && !map.has(id)) {
+        map.set(id, name);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [normalizedOrders, isEn]);
 
+  // Filtered orders for table (filtered by client payment method pill, staff, and keywords)
   const filteredOrders = useMemo(() => {
+    const rawSearch = (searchQuery || '').trim();
+    const lowerSearch = rawSearch.toLowerCase();
+    const noDiacritics = lowerSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+
+    // Định danh chính xác từ khóa Lọc Trả hàng & Hủy đơn
+    const isPureReturnSearch =
+      lowerSearch === 'trả' ||
+      lowerSearch === 'tra' ||
+      lowerSearch === 'đã trả' ||
+      lowerSearch === 'da tra' ||
+      lowerSearch === 'trả hàng' ||
+      lowerSearch === 'tra hang' ||
+      lowerSearch === 'đổi trả' ||
+      lowerSearch === 'doi tra';
+
+    const isPureCancelSearch =
+      lowerSearch === 'hủy' ||
+      lowerSearch === 'huỷ' ||
+      lowerSearch === 'huy' ||
+      lowerSearch === 'đã hủy' ||
+      lowerSearch === 'da huy' ||
+      lowerSearch === 'hủy đơn' ||
+      lowerSearch === 'huy don' ||
+      lowerSearch === 'cancel' ||
+      lowerSearch === 'canceled' ||
+      lowerSearch === 'cancelled';
+
+    const cleanDigits = rawSearch.replace(/[^\d]/g, '');
 
     return normalizedOrders.filter((o) => {
-
       if (selectedPaymentMethod !== 'ALL') {
-
         if (selectedPaymentMethod === 'CASH' && o.paymentMethod !== 'CASH') return false;
-
         if (selectedPaymentMethod === 'BANK_TRANSFER' && (o.paymentMethod !== 'BANK_TRANSFER' && o.paymentMethod !== 'PAYOS' && o.paymentMethod !== 'WALLET')) return false;
+      }
+      if (!staffMode && selectedStaffFilter !== 'ALL') {
+        const orderStaffId = o.createdById || o.createdBy?.id || 0;
+        if (String(orderStaffId) !== String(selectedStaffFilter)) return false;
+      }
 
+      if (rawSearch) {
+        // Khi tìm "trả": CHỈ hiện đơn có số lượng hiển thị chữ "Trả" (returnedQuantity > 0)
+        if (isPureReturnSearch) {
+          return Number(o.returnedQuantity || 0) > 0;
+        }
+
+        // Khi tìm "hủy": CHỈ hiện đơn có trạng thái ĐÃ HỦY
+        if (isPureCancelSearch) {
+          return o.status === 'CANCELED' || o.status === 'CANCELLED';
+        }
+
+        // Tìm kiếm thông thường:
+        // 1. Mã đơn hàng
+        const code = (o.orderNumber || o.orderId || '').toLowerCase();
+        if (code.includes(lowerSearch)) return true;
+
+        // 2. Nhân viên xử lý (tìm theo từ cụ thể để không bị nhầm họ Trần với chữ trả)
+        const staff = (o.createdBy?.fullName || '').toLowerCase();
+        const staffNoDia = staff.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+        const staffWords = staffNoDia.split(/\s+/);
+        if (staffWords.some((w) => w === noDiacritics || (noDiacritics.length >= 3 && w.startsWith(noDiacritics)))) return true;
+
+        // 3. Khách hàng
+        const custName = (o.customerName || '').toLowerCase();
+        const custNameNoDia = custName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+        const custPhone = (o.customerPhone || '').toLowerCase();
+        if (custName.includes(lowerSearch) || custNameNoDia.includes(noDiacritics) || (cleanDigits && custPhone.includes(cleanDigits))) return true;
+
+        // 4. Số tiền
+        if (cleanDigits && cleanDigits.length >= 3) {
+          const totalStr = String(Math.round(safeNum(o.totalAmount)));
+          const grossStr = String(Math.round(safeNum(o.grossAmount)));
+          const netStr = String(Math.round(safeNum(o.netAmount)));
+          if (totalStr.includes(cleanDigits) || grossStr.includes(cleanDigits) || netStr.includes(cleanDigits)) return true;
+        }
+
+        return false;
       }
 
       return true;
-
     });
-
-  }, [normalizedOrders, selectedPaymentMethod]);
+  }, [normalizedOrders, selectedPaymentMethod, selectedStaffFilter, staffMode, searchQuery]);
 
 
 
@@ -1691,7 +1777,7 @@ export function OrdersPage() {
 
   return (
 
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 w-full max-w-[1600px] mx-auto pb-12">
 
       {/* Header — Framed Hero Gradient matching Inventory & Products pages */}
 
@@ -2218,43 +2304,32 @@ export function OrdersPage() {
         <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-blue-500/10 border border-emerald-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
           <div className="flex items-center gap-3">
-
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-
               <ShoppingCart className="w-5 h-5" />
-
             </div>
-
             <div>
-
               <div className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-
-                {isEn ? 'Shift Operational Mode (Warehouse Staff & Cashier)' : 'Chế độ Vận hành Trong Ca Trực (Nhân viên Kho & Thu ngân)'}
-
+                {activeTab === 'TODAY'
+                  ? (isEn ? 'Shift Operational Mode (Warehouse Staff & Cashier)' : 'Chế độ Vận hành Trong Ca Trực (Nhân viên Kho & Thu ngân)')
+                  : (isEn ? 'Personal Order History (Warehouse Staff)' : 'Lịch sử Đơn Cá nhân Xử lý (Nhân viên Kho)')}
               </div>
-
               <div className="text-xs text-slate-600 mt-0.5">
-
-                {isEn
-
-                  ? 'Look up created invoices, reprint receipts for customers, and confirm Completed / Dispatched. Financial totals and order cancellation are reserved for Shop Owner.'
-
-                  : 'Tra cứu hóa đơn đã lập, in lại biên lai cho khách và xác nhận Hoàn tất / Xuất kho. Số liệu tài chính tổng & quyền hủy đơn thuộc thẩm quyền của Chủ shop.'}
-
+                {activeTab === 'TODAY'
+                  ? (isEn
+                      ? 'Viewing all shift orders created today across all staff (to lookup receipts, reprint for customers, and confirm Completed / Dispatched).'
+                      : 'Đang xem toàn bộ đơn trong ca trực hôm nay (tất cả nhân viên) để tra cứu hóa đơn, in lại biên lai cho khách và xác nhận xuất kho.')
+                  : (isEn
+                      ? 'Past order history: Only displaying orders processed directly by you. Orders of other staff in past days are restricted.'
+                      : 'Lịch sử các ngày trước: Chỉ hiển thị các đơn do chính bạn xử lý. Đơn của nhân viên khác ở các ngày trước được bảo mật theo quy định.')}
               </div>
-
             </div>
-
           </div>
-
           <div className="flex items-center gap-2 shrink-0">
-
             <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200">
-
-              {isEn ? 'Orders in Shift' : 'Đơn trong ca trực'}
-
+              {activeTab === 'TODAY'
+                ? (isEn ? 'Shift Orders Today' : 'Đơn trong ca trực hôm nay')
+                : (isEn ? 'Your Orders' : 'Đơn do bạn xử lý')}
             </span>
-
           </div>
 
         </div>
@@ -2351,7 +2426,7 @@ export function OrdersPage() {
 
               type="text"
 
-              placeholder={isEn ? "Search order code, staff, customer, total..." : "Tìm mã đơn, nhân viên, khách, tổng tiền..."}
+              placeholder={isEn ? "Search order code, staff, customer, total, cancel, return..." : "Tìm mã đơn, nhân viên, khách, tổng tiền, hủy, trả..."}
 
               value={searchQuery}
 
@@ -2666,55 +2741,42 @@ export function OrdersPage() {
                       <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 text-[11px]">
 
                         <div className="flex items-center gap-1.5">
-
-                          <button
-
-                            type="button"
-
-                            onClick={() => {
-
-                              handleCustomDateChange('2026-10-18');
-
-                              setPickerYear(2026);
-
-                              setPickerMonthIndex(9);
-
-                              setIsDayPickerOpen(false);
-
-                            }}
-
-                            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
-
-                          >
-
-                            Hôm nay (18/10)
-
-                          </button>
-
-                          <button
-
-                            type="button"
-
-                            onClick={() => {
-
-                              handleCustomDateChange('2026-10-17');
-
-                              setPickerYear(2026);
-
-                              setPickerMonthIndex(9);
-
-                              setIsDayPickerOpen(false);
-
-                            }}
-
-                            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
-
-                          >
-
-                            Hôm qua (17/10)
-
-                          </button>
-
+                          {(() => {
+                            const todayVN = getTodayVN();
+                            const yest = new Date(Date.now() + 7 * 3600000 - 86400000);
+                            const y = yest.getUTCFullYear();
+                            const m = String(yest.getUTCMonth() + 1).padStart(2, '0');
+                            const d = String(yest.getUTCDate()).padStart(2, '0');
+                            const yestStr = `${y}-${m}-${d}`;
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleCustomDateChange(todayVN.dateStr);
+                                    setPickerYear(todayVN.year);
+                                    setPickerMonthIndex(todayVN.monthIndex);
+                                    setIsDayPickerOpen(false);
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
+                                >
+                                  Hôm nay (${todayVN.dateStr.slice(8, 10)}/${todayVN.dateStr.slice(5, 7)})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleCustomDateChange(yestStr);
+                                    setPickerYear(y);
+                                    setPickerMonthIndex(yest.getUTCMonth());
+                                    setIsDayPickerOpen(false);
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
+                                >
+                                  Hôm qua (${d}/${m})
+                                </button>
+                              </>
+                            );
+                          })()}
                         </div>
 
                         <button
@@ -2991,7 +3053,7 @@ export function OrdersPage() {
 
               onClick={() => setSelectedPaymentMethod(item.key)}
 
-              className={`px-3.5 py-1.5 rounded-xl border transition-all duration-150 flex items-center gap-1.5 text-xs font-semibold ${
+              className={`px-3.5 py-1.5 rounded-xl border transition-all duration-150 flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap shrink-0 ${
 
                 isSelected
 
@@ -3003,9 +3065,9 @@ export function OrdersPage() {
 
             >
 
-              {Icon && <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-slate-500'}`} />}
+              {Icon && <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-slate-500'}`} />}
 
-              <span>{item.label}</span>
+              <span className="whitespace-nowrap">{item.label}</span>
 
             </button>
 
@@ -3013,6 +3075,26 @@ export function OrdersPage() {
 
         })}
 
+        {!staffMode && availableStaffList.length > 1 && (
+          <div className="flex items-center gap-1.5 ml-auto text-xs bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-xl shadow-xs">
+            <Users className="w-3.5 h-3.5 text-blue-600" />
+            <span className="text-slate-500 font-bold text-[11px] uppercase tracking-wider">
+              {isEn ? 'Staff:' : 'Nhân viên:'}
+            </span>
+            <select
+              value={selectedStaffFilter}
+              onChange={(e) => setSelectedStaffFilter(e.target.value)}
+              className="bg-transparent text-slate-800 font-semibold text-xs focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="ALL">{isEn ? 'All Staff' : 'Tất cả nhân viên'}</option>
+              {availableStaffList.map((st) => (
+                <option key={st.id} value={st.id}>
+                  {st.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
 
@@ -3025,25 +3107,25 @@ export function OrdersPage() {
 
           <table className="w-full text-left text-xs">
 
-            <thead className="bg-slate-50/90 border-b border-slate-200/80 text-slate-500 uppercase font-bold text-[11px] tracking-wider">
+            <thead className="bg-slate-50/90 border-b border-slate-200/80 text-slate-500 uppercase font-bold text-[11px] tracking-wider whitespace-nowrap">
 
-              <tr>
+              <tr className="whitespace-nowrap">
 
-                <th className="py-3.5 px-4">{isEn ? 'Order Code' : 'Mã đơn hàng'}</th>
+                <th className="py-3 px-3.5 whitespace-nowrap">{isEn ? 'Order Code' : 'Mã đơn hàng'}</th>
 
-                <th className="py-3.5 px-4">{isEn ? 'Time' : 'Thời gian'}</th>
+                <th className="py-3 px-3.5 whitespace-nowrap">{isEn ? 'Time' : 'Thời gian'}</th>
 
-                <th className="py-3.5 px-4">{isEn ? 'Handler' : 'Nhân viên xử lý'}</th>
+                <th className="py-3 px-3.5 whitespace-nowrap">{isEn ? 'Handler' : 'Nhân viên xử lý'}</th>
 
-                <th className="py-3.5 px-4">{isEn ? 'Payment' : 'Thanh toán'}</th>
+                <th className="py-3 px-3.5 whitespace-nowrap">{isEn ? 'Payment' : 'Thanh toán'}</th>
 
-                <th className="py-3.5 px-4 text-center">{isEn ? 'Quantity' : 'Số lượng'}</th>
+                <th className="py-3 px-3.5 text-center whitespace-nowrap">{isEn ? 'Quantity' : 'Số lượng'}</th>
 
-                <th className="py-3.5 px-4 text-right">{isEn ? 'Total' : 'Tổng tiền'}</th>
+                <th className="py-3 px-3.5 text-right whitespace-nowrap">{isEn ? 'Total' : 'Tổng tiền'}</th>
 
-                <th className="py-3.5 px-4 text-center whitespace-nowrap">{isEn ? 'Status' : 'Trạng thái'}</th>
+                <th className="py-3 px-3.5 text-center whitespace-nowrap">{isEn ? 'Status' : 'Trạng thái'}</th>
 
-                <th className="py-3.5 px-4 text-right">{isEn ? 'Actions' : 'Thao tác'}</th>
+                <th className="py-3 pr-4 pl-2 text-right whitespace-nowrap">{isEn ? 'Actions' : 'Thao tác'}</th>
 
               </tr>
 
@@ -3115,7 +3197,7 @@ export function OrdersPage() {
 
                       {/* Mã đơn hàng */}
 
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-3.5 whitespace-nowrap">
 
                         <div
 
@@ -3131,15 +3213,15 @@ export function OrdersPage() {
 
                           }}
 
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200/70 text-slate-800 font-mono text-xs font-bold cursor-pointer transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200/70 text-slate-800 font-mono text-[11px] font-bold cursor-pointer transition-colors whitespace-nowrap shrink-0"
 
                           title={isEn ? "Click to copy order code" : "Click để sao chép mã đơn"}
 
                         >
 
-                          <span>{ord.orderId}</span>
+                          <span className="whitespace-nowrap select-all">{ord.orderId}</span>
 
-                          <Copy className="w-3 h-3 text-slate-400 group-hover:text-slate-600" />
+                          <Copy className="w-3 h-3 text-slate-400 group-hover:text-slate-600 shrink-0" />
 
                         </div>
 
@@ -3149,7 +3231,7 @@ export function OrdersPage() {
 
                       {/* Thời gian */}
 
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-3 px-3.5 whitespace-nowrap">
 
                         <div className="flex flex-col">
 
@@ -3175,7 +3257,7 @@ export function OrdersPage() {
 
                       {/* Nhân viên xử lý */}
 
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-3 px-3.5 whitespace-nowrap">
 
                         <span className="font-semibold text-slate-800 text-xs">
 
@@ -3189,13 +3271,13 @@ export function OrdersPage() {
 
                       {/* Payment Method */}
 
-                      <td className="py-3.5 px-4">
+                      <td className="py-3 px-3.5 whitespace-nowrap">
 
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold shadow-sm ${payBadge.className}`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[11px] font-bold shadow-xs whitespace-nowrap shrink-0 ${payBadge.className}`}>
 
-                          <PayIcon className="w-3.5 h-3.5" />
+                          <PayIcon className="w-3.5 h-3.5 shrink-0" />
 
-                          <span>{payBadge.label}</span>
+                          <span className="whitespace-nowrap">{payBadge.label}</span>
 
                         </span>
 
@@ -3205,9 +3287,9 @@ export function OrdersPage() {
 
                       {/* Số lượng */}
 
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3 px-3.5 text-center whitespace-nowrap">
 
-                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
+                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs whitespace-nowrap">
 
                           {ord.netItemsCount ?? ord.itemsCount} SP
 
@@ -3215,9 +3297,9 @@ export function OrdersPage() {
 
                         {Number(ord.returnedQuantity || 0) > 0 && (
 
-                          <span className="block text-[10px] font-semibold text-amber-600 mt-0.5 whitespace-nowrap">
+                          <span className="block text-[9.5px] font-semibold text-amber-600 mt-0.5 whitespace-nowrap">
 
-                            (Gốc {ord.grossItemsCount || (ord.netItemsCount + ord.returnedQuantity)} SP · Đã trả {ord.returnedQuantity} SP)
+                            ({isEn ? `Returned ${ord.returnedQuantity} items` : `Trả ${ord.returnedQuantity} SP`})
 
                           </span>
 
@@ -3229,9 +3311,9 @@ export function OrdersPage() {
 
                       {/* Tổng tiền */}
 
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3 px-3.5 text-right whitespace-nowrap">
 
-                        <span className="font-black text-slate-900 text-sm tracking-tight font-sans">
+                        <span className="font-black text-slate-900 text-sm tracking-tight font-sans whitespace-nowrap">
 
                           {formatVND(ord.netAmount ?? ord.totalAmount)}
 
@@ -3239,9 +3321,9 @@ export function OrdersPage() {
 
                         {Number(ord.refundedAmount || 0) > 0 && (
 
-                          <span className="block text-[10px] font-semibold text-amber-600 mt-0.5 whitespace-nowrap">
+                          <span className="block text-[9.5px] font-semibold text-amber-600 mt-0.5 whitespace-nowrap">
 
-                            (Gốc {formatVND(ord.grossAmount)} · Hoàn {formatVND(ord.refundedAmount)})
+                            ({isEn ? `Refund ${formatVND(ord.refundedAmount)}` : `Hoàn ${formatVND(ord.refundedAmount)}`})
 
                           </span>
 
@@ -3253,7 +3335,7 @@ export function OrdersPage() {
 
                       {/* Status */}
 
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-center whitespace-nowrap">
 
                         <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center justify-center border shadow-sm whitespace-nowrap ${statusBadge.className}`}>
 
@@ -3268,15 +3350,31 @@ export function OrdersPage() {
 
                       {/* Actions */}
 
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3 pr-4 pl-2 text-right whitespace-nowrap">
 
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1 whitespace-nowrap">
 
                           {staffMode ? (
 
-                            /* Role Nhân viên: CHỈ IN HÓA ĐƠN (hủy đơn chỉ dành cho Chủ shop — backend chặn) */
+                            /* Role Nhân viên: Xem chi tiết đơn, in hóa đơn và đổi trả/hủy đơn trong ca */
 
                             <>
+
+                              {/* Xem chi tiết đơn */}
+
+                              <button
+
+                                onClick={() => setViewOrderDetail(ord)}
+
+                                className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+
+                                title="Xem chi tiết đơn"
+
+                              >
+
+                                <Eye className="w-3.5 h-3.5" />
+
+                              </button>
 
                               {/* In hóa đơn */}
 
@@ -3284,7 +3382,7 @@ export function OrdersPage() {
 
                                 onClick={() => handlePrintReceipt(ord)}
 
-                                className="w-8 h-8 rounded-lg border border-slate-200/80 bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
 
                                 title="In hóa đơn bán hàng"
 
@@ -3296,41 +3394,58 @@ export function OrdersPage() {
 
 
 
-                              {/* Đổi trả hàng & Hoàn tiền (Thay thế thùng rác) */}
+                              {/* Hủy đơn hàng (Chỉ cho phép đơn do chính nhân viên tạo trong ngày hôm nay) */}
 
-                              {ord.status === 'CANCELED' || ord.status === 'CANCELLED' ? (
+                              {(() => {
+                                if (ord.status === 'CANCELED' || ord.status === 'CANCELLED') {
+                                  return (
+                                    <span
+                                      className="w-7 h-7 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                      title="Đơn hàng này đã bị hủy hoàn toàn"
+                                    >
+                                      <ReturnOrderIcon className="w-3.5 h-3.5" />
+                                    </span>
+                                  );
+                                }
+                                const orderTime = ord.createdAt ? new Date(ord.createdAt).getTime() : 0;
+                                const now = new Date();
+                                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                                const isOrderToday = orderTime >= startOfToday;
+                                const isOrderCreator = Number(ord.createdById || ord.createdBy?.id) === Number(user?.id);
 
-                                <span
+                                if (!isOrderToday) {
+                                  return (
+                                    <span
+                                      className="w-7 h-7 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                      title="Đơn hàng ngày trước — Chỉ Chủ cửa hàng mới có quyền hủy"
+                                    >
+                                      <ReturnOrderIcon className="w-3.5 h-3.5" />
+                                    </span>
+                                  );
+                                }
 
-                                  className="w-8 h-8 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                if (!isOrderCreator) {
+                                  return (
+                                    <span
+                                      className="w-7 h-7 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                      title="Đơn do người khác tạo — Bạn chỉ có quyền hủy đơn do chính mình tạo hôm nay"
+                                    >
+                                      <ReturnOrderIcon className="w-3.5 h-3.5" />
+                                    </span>
+                                  );
+                                }
 
-                                  title="Đơn hàng này đã bị hủy hoàn toàn"
-
-                                >
-
-                                  <ReturnOrderIcon className="w-3.5 h-3.5" />
-
-                                </span>
-
-                              ) : (
-
-                                <button
-
-                                  onClick={() => handleOpenReturnModal(ord)}
-
-                                  disabled={actionLoading}
-
-                                  className="w-8 h-8 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
-
-                                  title="Đổi trả hàng & Hoàn tiền (Trả 1 số món hoặc hủy toàn bộ)"
-
-                                >
-
-                                  <ReturnOrderIcon className="w-3.5 h-3.5" />
-
-                                </button>
-
-                              )}
+                                return (
+                                  <button
+                                    onClick={() => handleOpenReturnModal(ord)}
+                                    disabled={actionLoading}
+                                    className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                    title="Hủy đơn hàng (đơn do bạn tạo hôm nay)"
+                                  >
+                                    <ReturnOrderIcon className="w-3.5 h-3.5" />
+                                  </button>
+                                );
+                              })()}
 
                             </>
 
@@ -3394,7 +3509,7 @@ export function OrdersPage() {
 
                                 onClick={() => setViewOrderDetail(ord)}
 
-                                className="w-8 h-8 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
 
                                 title="Xem chi tiết đơn"
 
@@ -3412,7 +3527,7 @@ export function OrdersPage() {
 
                                 onClick={() => handlePrintReceipt(ord)}
 
-                                className="w-8 h-8 rounded-lg border border-slate-200/80 bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
 
                                 title="In hóa đơn bán hàng"
 
@@ -3434,7 +3549,7 @@ export function OrdersPage() {
 
                                   disabled={actionLoading}
 
-                                  className="w-8 h-8 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                  className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
 
                                   title="Đổi trả hàng & Hoàn tiền (Trả 1 số món hoặc hủy toàn bộ)"
 
@@ -3448,7 +3563,7 @@ export function OrdersPage() {
 
                                 <span
 
-                                  className="w-8 h-8 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                  className="w-7 h-7 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
 
                                   title="Đơn hàng này đã bị hủy hoàn toàn"
 
@@ -3492,7 +3607,7 @@ export function OrdersPage() {
 
             <span className="text-slate-500 font-medium">
 
-              Hiển thị <span className="font-bold text-slate-800">{((pagination.page - 1) * pagination.limit) + 1}</span> - <span className="font-bold text-slate-800">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> trong tổng số <span className="font-bold text-blue-600">{pagination.total?.toLocaleString('vi-VN')}</span> {staffMode ? 'đơn trong ca' : 'đơn hàng'}
+              Hiển thị <span className="font-bold text-slate-800">{((pagination.page - 1) * pagination.limit) + 1}</span> - <span className="font-bold text-slate-800">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> trong tổng số <span className="font-bold text-blue-600">{pagination.total?.toLocaleString('vi-VN')}</span> {staffMode ? (activeTab === 'TODAY' ? 'đơn trong ca' : 'đơn bạn xử lý') : 'đơn hàng'}
 
             </span>
 
@@ -3832,48 +3947,14 @@ export function OrdersPage() {
 
 
 
-                {viewOrderDetail.status !== 'CANCELED' && viewOrderDetail.status !== 'CANCELLED' && (
-
-                  <button
-
-                    onClick={() => {
-
-                      handleOpenReturnModal(viewOrderDetail);
-
-                    }}
-
-                    disabled={actionLoading}
-
-                    className="px-3 py-2 rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold text-xs flex items-center gap-1.5 shadow-sm"
-
-                  >
-
-                    <ReturnOrderIcon className="w-3.5 h-3.5" /> Đổi trả / Hủy đơn
-
-                  </button>
-
-                )}
-
               </div>
 
-
-
               <button
-
-                onClick={() => {
-
-                  setViewOrderDetail(null);
-
-                  handlePrintReceipt(viewOrderDetail);
-
-                }}
-
-                className="px-4 py-2 rounded-xl bg-slate-800 text-white font-bold text-xs hover:bg-slate-700 flex items-center gap-1.5 shadow-sm"
-
+                type="button"
+                onClick={() => setViewOrderDetail(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors ml-auto cursor-pointer"
               >
-
-                <Printer className="w-3.5 h-3.5" /> In hóa đơn
-
+                {isEn ? 'Close' : 'Đóng'}
               </button>
 
             </div>
@@ -3953,13 +4034,9 @@ export function OrdersPage() {
                 onClick={() => setReturnTab('PARTIAL')}
 
                 className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-
                   returnTab === 'PARTIAL'
-
                     ? 'bg-white text-slate-900 shadow-sm border border-slate-300'
-
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-
                 }`}
 
               >
@@ -3977,13 +4054,9 @@ export function OrdersPage() {
                 onClick={() => setReturnTab('CANCEL_ALL')}
 
                 className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-
                   returnTab === 'CANCEL_ALL'
-
                     ? 'bg-white text-slate-900 shadow-sm border border-slate-300'
-
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-
                 }`}
 
               >

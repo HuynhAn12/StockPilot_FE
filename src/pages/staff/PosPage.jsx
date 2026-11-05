@@ -145,7 +145,7 @@ export function PosPage() {
       customer: { name: 'Khách lẻ', phone: '' },
       note: '',
       discount: 0,
-      saleMode: 'standard'
+      saleMode: 'counter'
     }
   ]);
   const [activeTabId, setActiveTabId] = useState(1);
@@ -196,8 +196,8 @@ export function PosPage() {
   // ── MoMo Real Account Config State ─────────────────────────────
   const [momoConfigModalOpen, setMomoConfigModalOpen] = useState(false);
   const [momoConfig, setMomoConfig] = useState(null);
-  const [momoPartnerCodeInput, setMomoPartnerCodeInput] = useState('');
-  const [momoAccessKeyInput, setMomoAccessKeyInput] = useState('');
+  const [momoPartnerCodeInput, setMomoPartnerCodeInput] = useState('MOMOVA0I20261015');
+  const [momoAccessKeyInput, setMomoAccessKeyInput] = useState('sjqZwImFcjxZBhHF');
   const [momoSecretKeyInput, setMomoSecretKeyInput] = useState('');
   const [momoBusinessNameInput, setMomoBusinessNameInput] = useState('STOCKPILOT');
   const [isSavingMomoConfig, setIsSavingMomoConfig] = useState(false);
@@ -207,9 +207,9 @@ export function PosPage() {
       const cfg = await apiGetMomoConfig();
       if (cfg) {
         setMomoConfig(cfg);
-        setMomoPartnerCodeInput(cfg.partnerCode || '');
-        setMomoAccessKeyInput(cfg.accessKey || '');
-        setMomoSecretKeyInput(cfg.secretKey || '');
+        setMomoPartnerCodeInput(cfg.partnerCode || 'MOMOVA0I20261015');
+        setMomoAccessKeyInput(cfg.accessKey || 'sjqZwImFcjxZBhHF');
+        setMomoSecretKeyInput(''); // Không tải khóa bí mật ra client
         setMomoBusinessNameInput(cfg.businessName || 'STOCKPILOT');
       }
     } catch (e) {
@@ -224,7 +224,7 @@ export function PosPage() {
 
   const handleSaveMomoConfig = async (e) => {
     e?.preventDefault();
-    if (!momoPartnerCodeInput.trim() || !momoAccessKeyInput.trim() || !momoSecretKeyInput.trim()) {
+    if (!momoPartnerCodeInput.trim() || !momoAccessKeyInput.trim() || (!momoSecretKeyInput.trim() && !momoConfig?.hasSecretKey)) {
       toast({ title: 'Thiếu thông tin', description: 'Vui lòng điền đủ Partner Code, Access Key và Secret Key MoMo', type: 'error' });
       return;
     }
@@ -233,10 +233,11 @@ export function PosPage() {
       const res = await apiSaveMomoConfig({
         partnerCode: momoPartnerCodeInput.trim(),
         accessKey: momoAccessKeyInput.trim(),
-        secretKey: momoSecretKeyInput.trim(),
+        secretKey: momoSecretKeyInput.trim(), // Nếu để trống thì backend tự động giữ khóa cũ
         businessName: momoBusinessNameInput.trim() || 'STOCKPILOT',
       });
       setMomoConfig(res);
+      setMomoSecretKeyInput('');
       setMomoConfigModalOpen(false);
       toast({
         title: 'Đã lưu cấu hình MoMo Doanh Nghiệp!',
@@ -607,7 +608,7 @@ export function PosPage() {
       customer: { name: 'Khách lẻ', phone: '' },
       note: '',
       discount: 0,
-      saleMode: 'standard'
+      saleMode: 'counter'
     }]);
     setActiveTabId(nextId);
   };
@@ -615,7 +616,7 @@ export function PosPage() {
   const closeTab = (tabId, e) => {
     e.stopPropagation();
     if (tabs.length === 1) {
-      setTabs([{ id: 1, name: 'Hóa đơn 1', items: [], customer: { name: 'Khách lẻ', phone: '' }, note: '', discount: 0, saleMode: 'standard' }]);
+      setTabs([{ id: 1, name: 'Hóa đơn 1', items: [], customer: { name: 'Khách lẻ', phone: '' }, note: '', discount: 0, saleMode: 'counter' }]);
       return;
     }
     const filtered = tabs.filter((t) => t.id !== tabId);
@@ -840,6 +841,15 @@ export function PosPage() {
 
     // ── XỬ LÝ THANH TOÁN VÍ ĐIỆN TỬ MOMO TỰ ĐỘNG NHẬN DIỆN ──
     if (paymentMethod === 'MOMO') {
+      if (!momoConfig?.isConfigured) {
+        toast({
+          title: 'MoMo chưa cấu hình',
+          description: 'Cửa hàng chưa cấu hình cổng thanh toán MoMo. Vui lòng thiết lập khóa kết nối trước khi thanh toán.',
+          type: 'error',
+        });
+        setMomoConfigModalOpen(true);
+        return;
+      }
       setIsProcessing(true);
       try {
         const payload = {
@@ -1192,9 +1202,9 @@ export function PosPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '44px 44px 1fr 70px 88px 100px',
+            gridTemplateColumns: '40px 38px 1fr 70px 88px 96px',
             gap: 8,
-            padding: '10px 20px',
+            padding: '10px 16px',
             borderBottom: '1px solid hsl(214 25% 89%)',
             background: 'hsl(214 30% 96%)',
             color: 'hsl(215 16% 55%)',
@@ -1233,9 +1243,9 @@ export function PosPage() {
                 key={item.stockItemId}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '44px 44px 1fr 70px 88px 100px',
+                  gridTemplateColumns: '40px 38px 1fr 70px 88px 96px',
                   gap: 8,
-                  padding: '12px 20px',
+                  padding: '10px 16px',
                   alignItems: 'center',
                   borderBottom: '1px solid hsl(214 25% 91%)',
                   transition: 'background 0.15s',
@@ -1358,15 +1368,14 @@ export function PosPage() {
             {/* Sale mode pills */}
             <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs font-semibold gap-0.5">
               {[
-                { id: 'quick', label: language === 'vi' ? 'Bán nhanh' : 'Quick Sale' },
-                { id: 'standard', label: language === 'vi' ? 'Bán thường' : 'Standard' },
+                { id: 'counter', label: language === 'vi' ? 'Bán tại quầy' : 'Counter Sale' },
                 { id: 'delivery', label: language === 'vi' ? 'Giao hàng' : 'Delivery' },
               ].map((mode) => (
                 <button
                   key={mode.id}
                   onClick={() => updateActiveTab({ saleMode: mode.id })}
                   className={`px-3 py-1.5 rounded-md transition-all ${
-                    activeTab.saleMode === mode.id
+                    (activeTab.saleMode === mode.id || (mode.id === 'counter' && (!activeTab.saleMode || activeTab.saleMode === 'standard' || activeTab.saleMode === 'quick')))
                       ? 'bg-white text-blue-600 shadow-sm'
                       : 'text-slate-500 hover:text-slate-700'
                   }`}
@@ -1391,7 +1400,7 @@ export function PosPage() {
 
       {/* ─── RIGHT COLUMN: CATALOG + CHECKOUT (45%) ─── */}
       <div
-        className="w-full lg:w-130 xl:w-150 2xl:w-165 flex flex-col overflow-hidden shrink-0 rounded-2xl border border-white/80"
+        className="w-full lg:w-[580px] xl:w-[660px] 2xl:w-[740px] flex flex-col overflow-hidden shrink-0 rounded-2xl border border-white/80"
         style={{ background: '#fff', boxShadow: '0 2px 12px rgb(0 0 0 / 0.06), 0 0 0 1px rgb(0 0 0 / 0.04)' }}
       >
         {/* Product Search */}
@@ -1564,16 +1573,19 @@ export function PosPage() {
             </button>
           </div>
 
-          {/* Big Blue THANH TOÁN Button */}
+          {/* Light Blue THANH TOÁN Button */}
           <button
             type="button"
             onClick={() => setIsCheckoutOpen(true)}
             disabled={activeTab.items.length === 0}
-            className="flex-1 py-3 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm sm:text-base tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+            className="flex-1 py-3 px-6 rounded-2xl border border-blue-200 hover:border-blue-300 active:scale-[0.99] text-blue-700 font-black text-sm sm:text-base tracking-wider uppercase flex items-center justify-center gap-2 shadow-xs hover:shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            style={{
+              background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+            }}
           >
-            <span>{t('checkoutButton', 'THANH TOÁN')}</span>
+            <span>{t('checkoutButton', 'THANH TOÁN (F9)')}</span>
             {activeTab.items.length > 0 && (
-              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold ml-1">
+              <span className="text-xs bg-blue-200/80 text-blue-800 px-2.5 py-0.5 rounded-full font-black ml-1 border border-blue-300/60">
                 {formatVND(totalPayable)}
               </span>
             )}
@@ -1585,42 +1597,42 @@ export function PosPage() {
       {isCheckoutOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-end" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)' }}>
           <div
-            className="w-full max-w-105 h-full border-l flex flex-col p-6 overflow-y-auto animate-in slide-in-from-right-full"
+            className="w-full max-w-105 h-full border-l flex flex-col justify-between p-4 sm:p-5 overflow-y-auto animate-in slide-in-from-right-full"
             style={{
               background: '#fff',
               borderColor: 'hsl(214 25% 88%)',
               boxShadow: '-8px 0 40px rgb(0 0 0 / 0.12)',
             }}
           >
-            <div className="space-y-5 flex-1">
+            <div className="space-y-2.5 sm:space-y-3 flex-1 flex flex-col justify-start">
               {/* Header */}
-              <div className="flex items-start justify-between pb-4 border-b" style={{ borderColor: 'hsl(214 25% 90%)' }}>
+              <div className="flex items-center justify-between pb-2.5 border-b" style={{ borderColor: 'hsl(214 25% 90%)' }}>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Xác nhận thanh toán</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">Xác nhận thanh toán</h3>
+                  <p className="text-[11px] text-slate-400">
                     {user?.fullName || 'Nhân viên'} · {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}
                   </p>
                 </div>
                 <button
                   onClick={() => setIsCheckoutOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Customer card */}
               <div
-                className="p-3.5 rounded-xl flex items-center justify-between"
+                className="py-2 px-3 rounded-xl flex items-center justify-between"
                 style={{ background: 'linear-gradient(135deg, hsl(213 100% 97%) 0%, hsl(221 100% 95%) 100%)', border: '1px solid hsl(217 91% 88%)' }}
               >
                 <div>
-                  <span className="text-[10px] text-blue-500 font-bold uppercase tracking-wider block">Khách hàng</span>
-                  <p className="font-bold text-sm text-slate-800 mt-0.5">{activeTab.customer.name || 'Khách lẻ'}</p>
-                  {activeTab.customer.phone && <p className="text-xs text-slate-500 mt-0.5">{activeTab.customer.phone}</p>}
+                  <span className="text-[9.5px] text-blue-500 font-bold uppercase tracking-wider block">Khách hàng</span>
+                  <p className="font-bold text-xs text-slate-800 mt-0.5">{activeTab.customer.name || 'Khách lẻ'}</p>
+                  {activeTab.customer.phone && <p className="text-[11px] text-slate-500">{activeTab.customer.phone}</p>}
                 </div>
                 <span
-                  className="text-xs font-black px-2.5 py-1.5 rounded-lg text-blue-700"
+                  className="text-[11px] font-black px-2 py-1 rounded-lg text-blue-700"
                   style={{ background: 'hsl(213 100% 91%)' }}
                 >
                   {activeTab.items.length} mặt hàng
@@ -1629,69 +1641,73 @@ export function PosPage() {
 
               {/* Order Items summary */}
               <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'hsl(214 25% 89%)' }}>
-                <div className="px-3.5 py-2 border-b" style={{ background: 'hsl(214 30% 96%)', borderColor: 'hsl(214 25% 89%)' }}>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Chi tiết đơn hàng</span>
+                <div className="px-3 py-1.5 border-b flex items-center justify-between" style={{ background: 'hsl(214 30% 96%)', borderColor: 'hsl(214 25% 89%)' }}>
+                  <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500">Chi tiết đơn hàng</span>
+                  <span className="text-[10px] text-slate-400 font-medium">({activeTab.items.reduce((s, it) => s + it.quantity, 0)} sản phẩm)</span>
                 </div>
-                <div className="divide-y max-h-36 overflow-y-auto" style={{ divideColor: 'hsl(214 25% 92%)' }}>
+                <div className="divide-y max-h-[180px] overflow-y-auto" style={{ divideColor: 'hsl(214 25% 92%)' }}>
                   {activeTab.items.map((it) => (
-                    <div key={it.stockItemId} className="flex justify-between items-center px-3.5 py-2 text-xs">
-                      <div>
-                        <span className="font-semibold text-slate-700 line-clamp-1">{it.name}</span>
-                        <span className="text-slate-400 ml-1">×{it.quantity}</span>
+                    <div key={it.stockItemId} className="flex justify-between items-center px-3 py-1.5 text-xs">
+                      <div className="min-w-0 pr-2">
+                        <span className="font-semibold text-slate-700 truncate block text-[11px] leading-tight">{it.name}</span>
+                        <span className="text-slate-400 text-[10px] leading-tight">×{it.quantity}</span>
                       </div>
-                      <span className="font-bold text-slate-800 money shrink-0 ml-2">{formatVND(it.subtotal)}</span>
+                      <span className="font-bold text-slate-800 money shrink-0 text-xs">{formatVND(it.subtotal)}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* Payment summary */}
-              <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Tổng tiền hàng</span>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Tổng tiền hàng</span>
                   <span className="font-semibold text-slate-800 money">{formatVND(subtotalAmount)}</span>
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Giảm giá</span>
-                  <div className="w-32">
+                  <span className="text-slate-600">Giảm giá</span>
+                  <div className="w-28">
                     <input
                       type="number"
                       min="0"
                       value={activeTab.discount || ''}
                       onChange={(e) => updateActiveTab({ discount: Number(e.target.value) || 0 })}
                       placeholder="0"
-                      className="w-full text-right text-sm py-1.5 px-2.5 border border-slate-200 rounded-lg bg-white text-slate-800 font-semibold focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      className="w-full text-right text-xs py-1 px-2 border border-slate-200 rounded-lg bg-white text-slate-800 font-semibold focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
                     />
                   </div>
                 </div>
 
                 <div
-                  className="flex justify-between items-center py-3 px-4 rounded-xl"
-                  style={{ background: 'linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%)' }}
+                  className="flex justify-between items-center py-2.5 px-3.5 rounded-xl border"
+                  style={{
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                    borderColor: '#bfdbfe',
+                  }}
                 >
-                  <span className="font-bold text-white">Khách cần trả</span>
-                  <span className="text-2xl font-black text-white money">{formatVND(totalPayable)}</span>
+                  <span className="font-bold text-blue-900 text-xs">Khách cần trả</span>
+                  <span className="text-xl font-black text-blue-700 money">{formatVND(totalPayable)}</span>
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="font-medium text-slate-600">Khách thanh toán</span>
-                  <div className="w-44">
+                  <span className="font-medium text-slate-700 text-xs">Khách thanh toán</span>
+                  <div className="w-36">
                     <input
                       type="number"
                       min="0"
                       value={amountGiven}
                       onChange={(e) => setAmountGiven(e.target.value)}
-                      className="w-full text-right text-base font-bold py-1.5 px-2.5 border border-slate-200 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      className="w-full text-right text-sm font-bold py-1 px-2 border border-slate-200 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
                     />
                   </div>
                 </div>
 
                 {/* Quick amounts */}
-                <div className="flex gap-1.5 justify-end flex-wrap">
+                <div className="flex gap-1 justify-end flex-wrap">
                   <button
                     onClick={() => setAmountGiven(String(totalPayable))}
-                    className="px-2 py-1 text-[11px] font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all"
+                    className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all cursor-pointer"
                   >
                     Đủ tiền
                   </button>
@@ -1699,29 +1715,29 @@ export function PosPage() {
                     <button
                       key={val}
                       onClick={() => setAmountGiven(String(val))}
-                      className="px-2 py-1 text-[11px] font-bold rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition-all"
+                      className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition-all cursor-pointer"
                     >
                       {val.toLocaleString('vi-VN')}
                     </button>
                   ))}
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Tiền thừa trả khách</span>
-                  <span className={`font-black text-base money ${changeDue >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                <div className="flex justify-between items-center pt-0.5">
+                  <span className="text-slate-600">Tiền thừa trả khách</span>
+                  <span className={`font-black text-sm money ${changeDue >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                     {changeDue >= 0 ? formatVND(changeDue) : `Thiếu ${formatVND(Math.abs(changeDue))}`}
                   </span>
                 </div>
               </div>
 
               {/* Payment methods */}
-              <div className="space-y-2.5 pt-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Phương thức thanh toán</span>
-                <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1.5 pt-0.5">
+                <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 block">Phương thức thanh toán</span>
+                <div className="grid grid-cols-3 gap-1.5">
                   {[
-                    { id: 'CASH', label: 'Tiền mặt', icon: Banknote, color: 'emerald' },
-                    { id: 'BANK_TRANSFER', label: 'VietQR PayOS', icon: QrCode, color: 'blue' },
-                    { id: 'MOMO', label: 'Ví MoMo', icon: Smartphone, color: 'pink' },
+                    { id: 'CASH', label: 'Tiền mặt', icon: Banknote },
+                    { id: 'BANK_TRANSFER', label: 'VietQR PayOS', icon: QrCode },
+                    { id: 'MOMO', label: 'Ví MoMo', icon: Smartphone },
                   ].map((m) => {
                     const Icon = m.icon;
                     const isSelected = paymentMethod === m.id;
@@ -1730,18 +1746,31 @@ export function PosPage() {
                       <button
                         key={m.id}
                         onClick={() => setPaymentMethod(m.id)}
-                        className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+                        className={`relative py-2 px-1 rounded-xl border flex flex-col items-center justify-center gap-1 text-[11px] font-bold transition-all cursor-pointer ${
                           isSelected
-                            ? isMomo
-                              ? 'border-pink-500 bg-pink-50 text-pink-700 shadow-sm'
-                              : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
                             : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                         }`}
-                        style={isSelected ? { boxShadow: isMomo ? '0 0 0 2px rgb(236 72 153 / 0.25)' : '0 0 0 2px rgb(59 130 246 / 0.2)' } : {}}
+                        style={isSelected ? { boxShadow: '0 0 0 2px rgb(59 130 246 / 0.2)' } : {}}
                       >
-                        <Icon className={`w-5 h-5 ${isSelected ? (isMomo ? 'text-pink-600' : 'text-blue-600') : 'text-slate-400'}`} />
-                        <span className="text-center leading-tight">{m.label}</span>
-                        {isSelected && <div className={`w-1.5 h-1.5 rounded-full ${isMomo ? 'bg-pink-500' : 'bg-blue-500'}`} />}
+                        {isMomo && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMomoConfigModalOpen(true);
+                            }}
+                            className="absolute top-1 right-1 p-0.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-100/60 transition-colors cursor-pointer"
+                            title="Cấu hình tài khoản MoMo"
+                          >
+                            <Settings className="w-3 h-3" />
+                          </button>
+                        )}
+                        <Icon className={`w-4 h-4 ${isSelected ? 'text-blue-600' : 'text-slate-400'}`} />
+                        <span className="text-center leading-tight">
+                          {m.label}
+                        </span>
+                        {isSelected && <div className="w-1 h-1 rounded-full bg-blue-500" />}
                       </button>
                     );
                   })}
@@ -1750,24 +1779,23 @@ export function PosPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="pt-4 space-y-2.5 border-t mt-4" style={{ borderColor: 'hsl(214 25% 90%)' }}>
+            <div className="pt-2.5 space-y-1.5 border-t mt-2" style={{ borderColor: 'hsl(214 25% 90%)' }}>
               <button
                 onClick={() => handleCompleteSale(true)}
                 disabled={isProcessing}
-                className="w-full py-3.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2.5 disabled:opacity-50 transition-all active:scale-[0.99]"
+                className="w-full py-2.5 rounded-xl border border-blue-200 hover:border-blue-300 text-blue-700 font-black text-xs sm:text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-[0.99] shadow-xs hover:shadow-sm cursor-pointer"
                 style={{
-                  background: 'linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%)',
-                  boxShadow: '0 4px 16px rgb(59 130 246 / 0.35)',
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
                 }}
               >
-                <Printer className="w-4 h-4" />
+                <Printer className="w-4 h-4 text-blue-600" />
                 {isProcessing ? 'Đang xử lý...' : 'THANH TOÁN & IN HÓA ĐƠN'}
               </button>
 
               <button
                 onClick={() => handleCompleteSale(false)}
                 disabled={isProcessing}
-                className="w-full py-2.5 rounded-xl border text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-all disabled:opacity-50"
+                className="w-full py-1.5 rounded-xl border text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-all disabled:opacity-50 cursor-pointer"
                 style={{ borderColor: 'hsl(214 25% 87%)' }}
               >
                 Chỉ thanh toán (Không in)
@@ -2653,85 +2681,101 @@ export function PosPage() {
           <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
             <div
               className="px-6 py-4 flex items-center justify-between text-white"
-              style={{ background: 'linear-gradient(135deg, #a50064 0%, #d82d8b 100%)' }}
+              style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}
             >
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center">
                   <Smartphone className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="font-extrabold text-white text-base">Cấu hình Cổng MoMo Doanh Nghiệp</h3>
-                  <p className="text-xs text-pink-100">Kết nối trực tiếp MoMo Gateway Production</p>
+                  <p className="text-xs text-slate-300">Kết nối trực tiếp MoMo Gateway Production</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setMomoConfigModalOpen(false)}
-                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/20 transition-all cursor-pointer"
+                className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveMomoConfig} className="p-6 space-y-3.5">
+            <form onSubmit={handleSaveMomoConfig} autoComplete="off" className="p-6 space-y-3.5">
+              {!momoConfig?.isConfigured && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs leading-relaxed">
+                  ⚠️ <strong>Chưa cấu hình MoMo:</strong> Cửa hàng chưa lưu thông tin kết nối. Vui lòng nhập Partner Code, Access Key và Secret Key từ hợp đồng MoMo Doanh Nghiệp để bật tính năng này.
+                </div>
+              )}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Mã đối tác (Partner Code) <span className="text-pink-600">*</span>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Mã đối tác (Partner Code) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  name="momoPartnerCode"
+                  autoComplete="off"
                   value={momoPartnerCodeInput}
                   onChange={(e) => setMomoPartnerCodeInput(e.target.value)}
-                  placeholder="Partner Code trên MoMo Business"
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                  placeholder="MOMOVA0I20261015"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 bg-white placeholder:text-slate-900 focus:outline-none focus:border-slate-800 focus:ring-2 focus:ring-slate-900/10"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Access Key <span className="text-pink-600">*</span>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Access Key <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  name="momoAccessKey"
+                  autoComplete="new-password"
                   value={momoAccessKeyInput}
                   onChange={(e) => setMomoAccessKeyInput(e.target.value)}
-                  placeholder="Access Key trên MoMo Business"
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                  placeholder="sjqZwImFcjxZBhHF"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 bg-white placeholder:text-slate-900 focus:outline-none focus:border-slate-800 focus:ring-2 focus:ring-slate-900/10"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Secret Key <span className="text-pink-600">*</span>
+                <label className="block text-xs font-bold text-slate-800 mb-1">
+                  Secret Key {!momoConfig?.hasSecretKey && <span className="text-red-500">*</span>}
+                  {momoConfig?.hasSecretKey && (
+                    <span className="text-[10px] text-emerald-600 font-normal ml-1.5">(Đã lưu khóa bí mật an toàn)</span>
+                  )}
                 </label>
                 <input
                   type="password"
+                  name="momoSecretKey"
+                  autoComplete="new-password"
                   value={momoSecretKeyInput}
                   onChange={(e) => setMomoSecretKeyInput(e.target.value)}
-                  placeholder="Secret Key trên MoMo Business"
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
-                  required
+                  placeholder={momoConfig?.hasSecretKey ? '•••••••••••••••• (Để trống để giữ nguyên khóa cũ)' : '••••••••••••••••'}
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold text-slate-900 bg-white placeholder:text-slate-900 focus:outline-none focus:border-slate-800 focus:ring-2 focus:ring-slate-900/10"
+                  required={!momoConfig?.hasSecretKey}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-bold text-slate-800 mb-1">
                   Tên Doanh nghiệp / Cửa hàng
                 </label>
                 <input
                   type="text"
+                  name="momoBusinessName"
+                  autoComplete="off"
                   value={momoBusinessNameInput}
                   onChange={(e) => setMomoBusinessNameInput(e.target.value.toUpperCase())}
-                  placeholder="VD: STOCKPILOT"
-                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold uppercase focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
+                  placeholder="STOCKPILOT"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold uppercase text-slate-900 bg-white placeholder:text-slate-900 focus:outline-none focus:border-slate-800 focus:ring-2 focus:ring-slate-900/10"
                 />
               </div>
 
-              <div className="p-3 rounded-xl bg-pink-50/80 border border-pink-200/80 text-[11px] text-pink-900 space-y-1">
-                <p className="font-bold flex items-center gap-1.5 text-pink-700">
-                  <Sparkles className="w-3.5 h-3.5 text-pink-600" /> Cổng MoMo Doanh Nghiệp Thật:
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-700 space-y-1">
+                <p className="font-bold flex items-center gap-1.5 text-slate-900">
+                  <Sparkles className="w-3.5 h-3.5 text-slate-900" /> Cổng MoMo Doanh Nghiệp Thật:
                 </p>
                 <p className="leading-relaxed">
                   Đã kết nối với Cổng thanh toán <strong>payment.momo.vn</strong> theo hợp đồng doanh nghiệp đã duyệt. Toàn bộ tiền thanh toán sẽ chuyển trực tiếp vào tài khoản ngân hàng của doanh nghiệp.
@@ -2749,7 +2793,7 @@ export function PosPage() {
                 <button
                   type="submit"
                   disabled={isSavingMomoConfig}
-                  className="flex-1 py-2 rounded-xl bg-linear-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-bold text-xs shadow-md shadow-pink-500/25 transition-all cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs shadow-md shadow-slate-900/25 transition-all cursor-pointer disabled:opacity-50"
                 >
                   {isSavingMomoConfig ? 'Đang lưu...' : 'Lưu cấu hình Doanh Nghiệp'}
                 </button>
