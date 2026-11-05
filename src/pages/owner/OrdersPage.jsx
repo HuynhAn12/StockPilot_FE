@@ -1103,8 +1103,30 @@ export function OrdersPage() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [normalizedOrders, isEn]);
 
-  // Filtered orders for table (filtered by client payment method pill & staff)
+  // Filtered orders for table (filtered by client payment method pill, staff, and keywords)
   const filteredOrders = useMemo(() => {
+    const rawSearch = (searchQuery || '').trim();
+    const lowerSearch = rawSearch.toLowerCase();
+    const noDiacritics = lowerSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+
+    const isCancelKeyword =
+      lowerSearch.includes('hủy') ||
+      lowerSearch.includes('huỷ') ||
+      noDiacritics.includes('huy') ||
+      lowerSearch.includes('cancel');
+
+    const isReturnKeyword =
+      lowerSearch.includes('trả') ||
+      noDiacritics.includes('tra') ||
+      lowerSearch.includes('hoàn') ||
+      noDiacritics.includes('hoan') ||
+      lowerSearch.includes('đổi') ||
+      noDiacritics.includes('doi') ||
+      lowerSearch.includes('return') ||
+      lowerSearch.includes('refund');
+
+    const cleanDigits = rawSearch.replace(/[^\d]/g, '');
+
     return normalizedOrders.filter((o) => {
       if (selectedPaymentMethod !== 'ALL') {
         if (selectedPaymentMethod === 'CASH' && o.paymentMethod !== 'CASH') return false;
@@ -1114,9 +1136,49 @@ export function OrdersPage() {
         const orderStaffId = o.createdById || o.createdBy?.id || 0;
         if (String(orderStaffId) !== String(selectedStaffFilter)) return false;
       }
+
+      // Filter by keywords on client-side as well for instant responsiveness
+      if (rawSearch) {
+        const isCanceled = o.status === 'CANCELED' || o.status === 'CANCELLED';
+        const hasReturns = safeNum(o.returnedQuantity) > 0 || safeNum(o.refundedAmount) > 0 || (o.returns && o.returns.length > 0);
+
+        if (isCancelKeyword && isCanceled) return true;
+        if (isReturnKeyword && hasReturns) return true;
+
+        // Match order code
+        const code = (o.orderNumber || o.orderId || '').toLowerCase();
+        if (code.includes(lowerSearch) || code.includes(noDiacritics)) return true;
+
+        // Match staff name
+        const staff = (o.createdBy?.fullName || '').toLowerCase();
+        const staffNoDia = staff.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+        if (staff.includes(lowerSearch) || staffNoDia.includes(noDiacritics)) return true;
+
+        // Match customer name / phone
+        const custName = (o.customerName || '').toLowerCase();
+        const custNameNoDia = custName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+        const custPhone = (o.customerPhone || '').toLowerCase();
+        if (custName.includes(lowerSearch) || custNameNoDia.includes(noDiacritics) || (cleanDigits && custPhone.includes(cleanDigits))) return true;
+
+        // Match amounts (totalAmount, grossAmount, netAmount)
+        if (cleanDigits && cleanDigits.length >= 3) {
+          const totalStr = String(Math.round(safeNum(o.totalAmount)));
+          const grossStr = String(Math.round(safeNum(o.grossAmount)));
+          const netStr = String(Math.round(safeNum(o.netAmount)));
+          if (totalStr.includes(cleanDigits) || grossStr.includes(cleanDigits) || netStr.includes(cleanDigits)) return true;
+        }
+
+        // Match note / cancel reason
+        const note = (o.note || '').toLowerCase();
+        const reason = (o.cancelReason || '').toLowerCase();
+        if (note.includes(lowerSearch) || reason.includes(lowerSearch)) return true;
+
+        return false;
+      }
+
       return true;
     });
-  }, [normalizedOrders, selectedPaymentMethod, selectedStaffFilter, staffMode]);
+  }, [normalizedOrders, selectedPaymentMethod, selectedStaffFilter, staffMode, searchQuery]);
 
 
 
@@ -2357,7 +2419,7 @@ export function OrdersPage() {
 
               type="text"
 
-              placeholder={isEn ? "Search order code, staff, customer, total..." : "Tìm mã đơn, nhân viên, khách, tổng tiền..."}
+              placeholder={isEn ? "Search order code, staff, customer, total, cancel, return..." : "Tìm mã đơn, nhân viên, khách, tổng tiền, hủy, trả..."}
 
               value={searchQuery}
 
