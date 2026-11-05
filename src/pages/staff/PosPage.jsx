@@ -1592,42 +1592,42 @@ export function PosPage() {
       {isCheckoutOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-end" style={{ background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(4px)' }}>
           <div
-            className="w-full max-w-105 h-full border-l flex flex-col p-6 overflow-y-auto animate-in slide-in-from-right-full"
+            className="w-full max-w-105 h-full border-l flex flex-col justify-between p-4 sm:p-5 overflow-y-auto animate-in slide-in-from-right-full"
             style={{
               background: '#fff',
               borderColor: 'hsl(214 25% 88%)',
               boxShadow: '-8px 0 40px rgb(0 0 0 / 0.12)',
             }}
           >
-            <div className="space-y-5 flex-1">
+            <div className="space-y-2.5 sm:space-y-3 flex-1 flex flex-col justify-start">
               {/* Header */}
-              <div className="flex items-start justify-between pb-4 border-b" style={{ borderColor: 'hsl(214 25% 90%)' }}>
+              <div className="flex items-center justify-between pb-2.5 border-b" style={{ borderColor: 'hsl(214 25% 90%)' }}>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Xác nhận thanh toán</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <h3 className="text-base font-black text-slate-900 tracking-tight">Xác nhận thanh toán</h3>
+                  <p className="text-[11px] text-slate-400">
                     {user?.fullName || 'Nhân viên'} · {new Date().toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}
                   </p>
                 </div>
                 <button
                   onClick={() => setIsCheckoutOpen(false)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Customer card */}
               <div
-                className="p-3.5 rounded-xl flex items-center justify-between"
+                className="py-2 px-3 rounded-xl flex items-center justify-between"
                 style={{ background: 'linear-gradient(135deg, hsl(213 100% 97%) 0%, hsl(221 100% 95%) 100%)', border: '1px solid hsl(217 91% 88%)' }}
               >
                 <div>
-                  <span className="text-[10px] text-blue-500 font-bold uppercase tracking-wider block">Khách hàng</span>
-                  <p className="font-bold text-sm text-slate-800 mt-0.5">{activeTab.customer.name || 'Khách lẻ'}</p>
-                  {activeTab.customer.phone && <p className="text-xs text-slate-500 mt-0.5">{activeTab.customer.phone}</p>}
+                  <span className="text-[9.5px] text-blue-500 font-bold uppercase tracking-wider block">Khách hàng</span>
+                  <p className="font-bold text-xs text-slate-800 mt-0.5">{activeTab.customer.name || 'Khách lẻ'}</p>
+                  {activeTab.customer.phone && <p className="text-[11px] text-slate-500">{activeTab.customer.phone}</p>}
                 </div>
                 <span
-                  className="text-xs font-black px-2.5 py-1.5 rounded-lg text-blue-700"
+                  className="text-[11px] font-black px-2 py-1 rounded-lg text-blue-700"
                   style={{ background: 'hsl(213 100% 91%)' }}
                 >
                   {activeTab.items.length} mặt hàng
@@ -1636,69 +1636,70 @@ export function PosPage() {
 
               {/* Order Items summary */}
               <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'hsl(214 25% 89%)' }}>
-                <div className="px-3.5 py-2 border-b" style={{ background: 'hsl(214 30% 96%)', borderColor: 'hsl(214 25% 89%)' }}>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Chi tiết đơn hàng</span>
+                <div className="px-3 py-1.5 border-b flex items-center justify-between" style={{ background: 'hsl(214 30% 96%)', borderColor: 'hsl(214 25% 89%)' }}>
+                  <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500">Chi tiết đơn hàng</span>
+                  <span className="text-[10px] text-slate-400 font-medium">({activeTab.items.reduce((s, it) => s + it.quantity, 0)} sản phẩm)</span>
                 </div>
-                <div className="divide-y max-h-36 overflow-y-auto" style={{ divideColor: 'hsl(214 25% 92%)' }}>
+                <div className="divide-y max-h-24 sm:max-h-28 overflow-y-auto" style={{ divideColor: 'hsl(214 25% 92%)' }}>
                   {activeTab.items.map((it) => (
-                    <div key={it.stockItemId} className="flex justify-between items-center px-3.5 py-2 text-xs">
-                      <div>
-                        <span className="font-semibold text-slate-700 line-clamp-1">{it.name}</span>
-                        <span className="text-slate-400 ml-1">×{it.quantity}</span>
+                    <div key={it.stockItemId} className="flex justify-between items-center px-3 py-1 text-xs">
+                      <div className="min-w-0 pr-2">
+                        <span className="font-semibold text-slate-700 truncate block text-[11px]">{it.name}</span>
+                        <span className="text-slate-400 text-[10px]">×{it.quantity}</span>
                       </div>
-                      <span className="font-bold text-slate-800 money shrink-0 ml-2">{formatVND(it.subtotal)}</span>
+                      <span className="font-bold text-slate-800 money shrink-0 text-xs">{formatVND(it.subtotal)}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* Payment summary */}
-              <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Tổng tiền hàng</span>
+              <div className="space-y-1.5 text-xs">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Tổng tiền hàng</span>
                   <span className="font-semibold text-slate-800 money">{formatVND(subtotalAmount)}</span>
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Giảm giá</span>
-                  <div className="w-32">
+                  <span className="text-slate-600">Giảm giá</span>
+                  <div className="w-28">
                     <input
                       type="number"
                       min="0"
                       value={activeTab.discount || ''}
                       onChange={(e) => updateActiveTab({ discount: Number(e.target.value) || 0 })}
                       placeholder="0"
-                      className="w-full text-right text-sm py-1.5 px-2.5 border border-slate-200 rounded-lg bg-white text-slate-800 font-semibold focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      className="w-full text-right text-xs py-1 px-2 border border-slate-200 rounded-lg bg-white text-slate-800 font-semibold focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
                     />
                   </div>
                 </div>
 
                 <div
-                  className="flex justify-between items-center py-3 px-4 rounded-xl"
+                  className="flex justify-between items-center py-2 px-3.5 rounded-xl"
                   style={{ background: 'linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%)' }}
                 >
-                  <span className="font-bold text-white">Khách cần trả</span>
-                  <span className="text-2xl font-black text-white money">{formatVND(totalPayable)}</span>
+                  <span className="font-bold text-white text-xs">Khách cần trả</span>
+                  <span className="text-xl font-black text-white money">{formatVND(totalPayable)}</span>
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="font-medium text-slate-600">Khách thanh toán</span>
-                  <div className="w-44">
+                  <span className="font-medium text-slate-700 text-xs">Khách thanh toán</span>
+                  <div className="w-36">
                     <input
                       type="number"
                       min="0"
                       value={amountGiven}
                       onChange={(e) => setAmountGiven(e.target.value)}
-                      className="w-full text-right text-base font-bold py-1.5 px-2.5 border border-slate-200 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                      className="w-full text-right text-sm font-bold py-1 px-2 border border-slate-200 rounded-lg bg-white text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
                     />
                   </div>
                 </div>
 
                 {/* Quick amounts */}
-                <div className="flex gap-1.5 justify-end flex-wrap">
+                <div className="flex gap-1 justify-end flex-wrap">
                   <button
                     onClick={() => setAmountGiven(String(totalPayable))}
-                    className="px-2 py-1 text-[11px] font-bold rounded-lg bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all"
+                    className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all cursor-pointer"
                   >
                     Đủ tiền
                   </button>
@@ -1706,25 +1707,25 @@ export function PosPage() {
                     <button
                       key={val}
                       onClick={() => setAmountGiven(String(val))}
-                      className="px-2 py-1 text-[11px] font-bold rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition-all"
+                      className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100 transition-all cursor-pointer"
                     >
                       {val.toLocaleString('vi-VN')}
                     </button>
                   ))}
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Tiền thừa trả khách</span>
-                  <span className={`font-black text-base money ${changeDue >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                <div className="flex justify-between items-center pt-0.5">
+                  <span className="text-slate-600">Tiền thừa trả khách</span>
+                  <span className={`font-black text-sm money ${changeDue >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                     {changeDue >= 0 ? formatVND(changeDue) : `Thiếu ${formatVND(Math.abs(changeDue))}`}
                   </span>
                 </div>
               </div>
 
               {/* Payment methods */}
-              <div className="space-y-2.5 pt-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Phương thức thanh toán</span>
-                <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1.5 pt-0.5">
+                <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 block">Phương thức thanh toán</span>
+                <div className="grid grid-cols-3 gap-1.5">
                   {[
                     { id: 'CASH', label: 'Tiền mặt', icon: Banknote },
                     { id: 'BANK_TRANSFER', label: 'VietQR PayOS', icon: QrCode },
@@ -1737,7 +1738,7 @@ export function PosPage() {
                       <button
                         key={m.id}
                         onClick={() => setPaymentMethod(m.id)}
-                        className={`relative p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all ${
+                        className={`relative py-2 px-1 rounded-xl border flex flex-col items-center justify-center gap-1 text-[11px] font-bold transition-all cursor-pointer ${
                           isSelected
                             ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
                             : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
@@ -1751,17 +1752,17 @@ export function PosPage() {
                               e.stopPropagation();
                               setMomoConfigModalOpen(true);
                             }}
-                            className="absolute top-1 right-1 p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-100/60 transition-colors cursor-pointer"
+                            className="absolute top-1 right-1 p-0.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-100/60 transition-colors cursor-pointer"
                             title="Cấu hình tài khoản MoMo"
                           >
-                            <Settings className="w-3.5 h-3.5" />
+                            <Settings className="w-3 h-3" />
                           </button>
                         )}
-                        <Icon className={`w-5 h-5 ${isSelected ? 'text-blue-600' : 'text-slate-400'}`} />
+                        <Icon className={`w-4 h-4 ${isSelected ? 'text-blue-600' : 'text-slate-400'}`} />
                         <span className="text-center leading-tight">
                           {m.label}
                         </span>
-                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                        {isSelected && <div className="w-1 h-1 rounded-full bg-blue-500" />}
                       </button>
                     );
                   })}
@@ -1770,11 +1771,11 @@ export function PosPage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="pt-4 space-y-2.5 border-t mt-4" style={{ borderColor: 'hsl(214 25% 90%)' }}>
+            <div className="pt-2.5 space-y-1.5 border-t mt-2" style={{ borderColor: 'hsl(214 25% 90%)' }}>
               <button
                 onClick={() => handleCompleteSale(true)}
                 disabled={isProcessing}
-                className="w-full py-3.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2.5 disabled:opacity-50 transition-all active:scale-[0.99]"
+                className="w-full py-2.5 rounded-xl text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-[0.99] cursor-pointer"
                 style={{
                   background: 'linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%)',
                   boxShadow: '0 4px 16px rgb(59 130 246 / 0.35)',
@@ -1787,7 +1788,7 @@ export function PosPage() {
               <button
                 onClick={() => handleCompleteSale(false)}
                 disabled={isProcessing}
-                className="w-full py-2.5 rounded-xl border text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-all disabled:opacity-50"
+                className="w-full py-1.5 rounded-xl border text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-all disabled:opacity-50 cursor-pointer"
                 style={{ borderColor: 'hsl(214 25% 87%)' }}
               >
                 Chỉ thanh toán (Không in)
