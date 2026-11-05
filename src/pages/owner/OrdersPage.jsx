@@ -3042,21 +3042,21 @@ export function OrdersPage() {
 
               <tr className="whitespace-nowrap">
 
-                <th className="py-3 px-2.5 whitespace-nowrap">{isEn ? 'Order Code' : 'Mã đơn hàng'}</th>
+                <th className="py-3 px-3.5 whitespace-nowrap">{isEn ? 'Order Code' : 'Mã đơn hàng'}</th>
 
-                <th className="py-3 px-2.5 whitespace-nowrap">{isEn ? 'Time' : 'Thời gian'}</th>
+                <th className="py-3 px-3.5 whitespace-nowrap">{isEn ? 'Time' : 'Thời gian'}</th>
 
-                <th className="py-3 px-2.5 whitespace-nowrap">{isEn ? 'Handler' : 'Nhân viên xử lý'}</th>
+                <th className="py-3 px-3.5 whitespace-nowrap">{isEn ? 'Handler' : 'Nhân viên xử lý'}</th>
 
-                <th className="py-3 px-2.5 whitespace-nowrap">{isEn ? 'Payment' : 'Thanh toán'}</th>
+                <th className="py-3 px-3.5 whitespace-nowrap">{isEn ? 'Payment' : 'Thanh toán'}</th>
 
-                <th className="py-3 px-2.5 text-center whitespace-nowrap">{isEn ? 'Quantity' : 'Số lượng'}</th>
+                <th className="py-3 px-3.5 text-center whitespace-nowrap">{isEn ? 'Quantity' : 'Số lượng'}</th>
 
-                <th className="py-3 px-2.5 text-right whitespace-nowrap">{isEn ? 'Total' : 'Tổng tiền'}</th>
+                <th className="py-3 px-3.5 text-right whitespace-nowrap">{isEn ? 'Total' : 'Tổng tiền'}</th>
 
-                <th className="py-3 px-2.5 text-center whitespace-nowrap">{isEn ? 'Status' : 'Trạng thái'}</th>
+                <th className="py-3 px-3.5 text-center whitespace-nowrap">{isEn ? 'Status' : 'Trạng thái'}</th>
 
-                <th className="py-3 pr-3.5 pl-1.5 text-right whitespace-nowrap">{isEn ? 'Actions' : 'Thao tác'}</th>
+                <th className="py-3 pr-4 pl-2 text-right whitespace-nowrap">{isEn ? 'Actions' : 'Thao tác'}</th>
 
               </tr>
 
@@ -3128,7 +3128,7 @@ export function OrdersPage() {
 
                       {/* Mã đơn hàng */}
 
-                      <td className="py-2.5 px-2.5 whitespace-nowrap">
+                      <td className="py-3 px-3.5 whitespace-nowrap">
 
                         <div
 
@@ -3162,7 +3162,7 @@ export function OrdersPage() {
 
                       {/* Thời gian */}
 
-                      <td className="py-2.5 px-2.5 whitespace-nowrap">
+                      <td className="py-3 px-3.5 whitespace-nowrap">
 
                         <div className="flex flex-col">
 
@@ -3188,7 +3188,7 @@ export function OrdersPage() {
 
                       {/* Nhân viên xử lý */}
 
-                      <td className="py-2.5 px-2.5 whitespace-nowrap">
+                      <td className="py-3 px-3.5 whitespace-nowrap">
 
                         <span className="font-semibold text-slate-800 text-xs">
 
@@ -3202,7 +3202,7 @@ export function OrdersPage() {
 
                       {/* Payment Method */}
 
-                      <td className="py-2.5 px-2.5 whitespace-nowrap">
+                      <td className="py-3 px-3.5 whitespace-nowrap">
 
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[11px] font-bold shadow-xs whitespace-nowrap shrink-0 ${payBadge.className}`}>
 
@@ -3218,7 +3218,7 @@ export function OrdersPage() {
 
                       {/* Số lượng */}
 
-                      <td className="py-2.5 px-2.5 text-center whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-center whitespace-nowrap">
 
                         <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs whitespace-nowrap">
 
@@ -3242,7 +3242,7 @@ export function OrdersPage() {
 
                       {/* Tổng tiền */}
 
-                      <td className="py-2.5 px-2.5 text-right whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-right whitespace-nowrap">
 
                         <span className="font-black text-slate-900 text-sm tracking-tight font-sans whitespace-nowrap">
 
@@ -3266,7 +3266,7 @@ export function OrdersPage() {
 
                       {/* Status */}
 
-                      <td className="py-2.5 px-2.5 text-center whitespace-nowrap">
+                      <td className="py-3 px-3.5 text-center whitespace-nowrap">
 
                         <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold inline-flex items-center justify-center border shadow-sm whitespace-nowrap ${statusBadge.className}`}>
 
@@ -3281,7 +3281,7 @@ export function OrdersPage() {
 
                       {/* Actions */}
 
-                      <td className="py-2.5 pr-3.5 pl-1.5 text-right whitespace-nowrap">
+                      <td className="py-3 pr-4 pl-2 text-right whitespace-nowrap">
 
                         <div className="flex items-center justify-end gap-1 whitespace-nowrap">
 
