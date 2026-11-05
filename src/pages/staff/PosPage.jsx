@@ -1675,11 +1675,14 @@ export function PosPage() {
                 </div>
 
                 <div
-                  className="flex justify-between items-center py-2 px-3.5 rounded-xl"
-                  style={{ background: 'linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%)' }}
+                  className="flex justify-between items-center py-2.5 px-3.5 rounded-xl border"
+                  style={{
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                    borderColor: '#bfdbfe',
+                  }}
                 >
-                  <span className="font-bold text-white text-xs">Khách cần trả</span>
-                  <span className="text-xl font-black text-white money">{formatVND(totalPayable)}</span>
+                  <span className="font-bold text-blue-900 text-xs">Khách cần trả</span>
+                  <span className="text-xl font-black text-blue-700 money">{formatVND(totalPayable)}</span>
                 </div>
 
                 <div className="flex justify-between items-center">
