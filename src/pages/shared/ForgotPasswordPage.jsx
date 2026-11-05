@@ -387,8 +387,7 @@ export function ForgotPasswordPage() {
         </div>
 
         <div className="relative z-10 text-center text-[11px] font-bold text-slate-900">
-          {isEn ? 'Emergency Support Hotline: ' : 'Tổng đài hỗ trợ xác minh khẩn cấp: '}
-          <span className="underline font-black">1900 8888</span>
+          {isEn ? 'Cannot receive the code? Ask your store owner or the StockPilot team to reset your password.' : 'Không nhận được mã? Nhờ chủ cửa hàng hoặc đội StockPilot đặt lại mật khẩu.'}
         </div>
       </div>
 

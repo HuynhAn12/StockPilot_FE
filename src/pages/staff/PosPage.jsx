@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
 import { useAuthStore } from '../../components/store/authStore';
+import { isOwner } from '../../config/permissions.config';
 import { useTranslation } from '../../i18n/useTranslation';
 import { formatCategoryName } from '../../components/store/productStore';
 import {
@@ -195,9 +196,9 @@ export function PosPage() {
   // ── MoMo Real Account Config State ─────────────────────────────
   const [momoConfigModalOpen, setMomoConfigModalOpen] = useState(false);
   const [momoConfig, setMomoConfig] = useState(null);
-  const [momoPartnerCodeInput, setMomoPartnerCodeInput] = useState('MOMOVA0I20261015');
-  const [momoAccessKeyInput, setMomoAccessKeyInput] = useState('sjqZwImFcjxZBhHF');
-  const [momoSecretKeyInput, setMomoSecretKeyInput] = useState('OK6GwHc66ZBSdqyuR5RXKTx0xA718DKh');
+  const [momoPartnerCodeInput, setMomoPartnerCodeInput] = useState('');
+  const [momoAccessKeyInput, setMomoAccessKeyInput] = useState('');
+  const [momoSecretKeyInput, setMomoSecretKeyInput] = useState('');
   const [momoBusinessNameInput, setMomoBusinessNameInput] = useState('STOCKPILOT');
   const [isSavingMomoConfig, setIsSavingMomoConfig] = useState(false);
 
@@ -206,9 +207,9 @@ export function PosPage() {
       const cfg = await apiGetMomoConfig();
       if (cfg) {
         setMomoConfig(cfg);
-        setMomoPartnerCodeInput(cfg.partnerCode || 'MOMOVA0I20261015');
-        setMomoAccessKeyInput(cfg.accessKey || 'sjqZwImFcjxZBhHF');
-        setMomoSecretKeyInput(cfg.secretKey || 'OK6GwHc66ZBSdqyuR5RXKTx0xA718DKh');
+        setMomoPartnerCodeInput(cfg.partnerCode || '');
+        setMomoAccessKeyInput(cfg.accessKey || '');
+        setMomoSecretKeyInput(cfg.secretKey || '');
         setMomoBusinessNameInput(cfg.businessName || 'STOCKPILOT');
       }
     } catch (e) {
@@ -216,9 +217,10 @@ export function PosPage() {
     }
   }, []);
 
+  const canManageMomoConfig = isOwner(user?.role);
   useEffect(() => {
-    loadMomoConfig();
-  }, [loadMomoConfig]);
+    if (canManageMomoConfig) loadMomoConfig();
+  }, [canManageMomoConfig, loadMomoConfig]);
 
   const handleSaveMomoConfig = async (e) => {
     e?.preventDefault();
@@ -2374,10 +2376,10 @@ export function PosPage() {
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500 font-medium">Mã đối tác MoMo:</span>
                       <div className="flex items-center gap-1.5">
-                        <strong className="text-slate-900 font-bold font-mono">{momoData.partnerCode || 'MOMOVA0I20261015'}</strong>
+                        <strong className="text-slate-900 font-bold font-mono">{momoData.partnerCode || ''}</strong>
                         <button
                           type="button"
-                          onClick={() => handleCopyText('momo_partner', momoData.partnerCode || 'MOMOVA0I20261015')}
+                          onClick={() => handleCopyText('momo_partner', momoData.partnerCode || '')}
                           className="p-1 hover:bg-pink-100 rounded text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
                           title="Sao chép Mã đối tác"
                         >
@@ -2680,7 +2682,7 @@ export function PosPage() {
                   type="text"
                   value={momoPartnerCodeInput}
                   onChange={(e) => setMomoPartnerCodeInput(e.target.value)}
-                  placeholder="VD: MOMOVA0I20261015"
+                  placeholder="Partner Code trên MoMo Business"
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
                   required
                 />
@@ -2694,7 +2696,7 @@ export function PosPage() {
                   type="text"
                   value={momoAccessKeyInput}
                   onChange={(e) => setMomoAccessKeyInput(e.target.value)}
-                  placeholder="VD: sjqZwImFcjxZBhHF"
+                  placeholder="Access Key trên MoMo Business"
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
                   required
                 />
@@ -2708,7 +2710,7 @@ export function PosPage() {
                   type="password"
                   value={momoSecretKeyInput}
                   onChange={(e) => setMomoSecretKeyInput(e.target.value)}
-                  placeholder="VD: OK6GwHc66ZBSdqyu..."
+                  placeholder="Secret Key trên MoMo Business"
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-mono font-bold focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20"
                   required
                 />
