@@ -1018,7 +1018,7 @@ export function AIAssistantPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      stopListening();
+                      stopListening({ cancel: true });
                       setVoiceInterimText('');
                       setInputMessage('');
                     }}
