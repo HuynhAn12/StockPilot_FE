@@ -1109,21 +1109,28 @@ export function OrdersPage() {
     const lowerSearch = rawSearch.toLowerCase();
     const noDiacritics = lowerSearch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
 
-    const isCancelKeyword =
-      lowerSearch.includes('hủy') ||
-      lowerSearch.includes('huỷ') ||
-      noDiacritics.includes('huy') ||
-      lowerSearch.includes('cancel');
+    // Định danh chính xác từ khóa Lọc Trả hàng & Hủy đơn
+    const isPureReturnSearch =
+      lowerSearch === 'trả' ||
+      lowerSearch === 'tra' ||
+      lowerSearch === 'đã trả' ||
+      lowerSearch === 'da tra' ||
+      lowerSearch === 'trả hàng' ||
+      lowerSearch === 'tra hang' ||
+      lowerSearch === 'đổi trả' ||
+      lowerSearch === 'doi tra';
 
-    const isReturnKeyword =
-      lowerSearch.includes('trả') ||
-      noDiacritics.includes('tra') ||
-      lowerSearch.includes('hoàn') ||
-      noDiacritics.includes('hoan') ||
-      lowerSearch.includes('đổi') ||
-      noDiacritics.includes('doi') ||
-      lowerSearch.includes('return') ||
-      lowerSearch.includes('refund');
+    const isPureCancelSearch =
+      lowerSearch === 'hủy' ||
+      lowerSearch === 'huỷ' ||
+      lowerSearch === 'huy' ||
+      lowerSearch === 'đã hủy' ||
+      lowerSearch === 'da huy' ||
+      lowerSearch === 'hủy đơn' ||
+      lowerSearch === 'huy don' ||
+      lowerSearch === 'cancel' ||
+      lowerSearch === 'canceled' ||
+      lowerSearch === 'cancelled';
 
     const cleanDigits = rawSearch.replace(/[^\d]/g, '');
 
@@ -1137,41 +1144,41 @@ export function OrdersPage() {
         if (String(orderStaffId) !== String(selectedStaffFilter)) return false;
       }
 
-      // Filter by keywords on client-side as well for instant responsiveness
       if (rawSearch) {
-        const isCanceled = o.status === 'CANCELED' || o.status === 'CANCELLED';
-        const hasReturns = safeNum(o.returnedQuantity) > 0 || safeNum(o.refundedAmount) > 0 || (o.returns && o.returns.length > 0);
+        // Khi tìm "trả": CHỈ hiện đơn có số lượng hiển thị chữ "Trả" (returnedQuantity > 0)
+        if (isPureReturnSearch) {
+          return Number(o.returnedQuantity || 0) > 0;
+        }
 
-        if (isCancelKeyword && isCanceled) return true;
-        if (isReturnKeyword && hasReturns) return true;
+        // Khi tìm "hủy": CHỈ hiện đơn có trạng thái ĐÃ HỦY
+        if (isPureCancelSearch) {
+          return o.status === 'CANCELED' || o.status === 'CANCELLED';
+        }
 
-        // Match order code
+        // Tìm kiếm thông thường:
+        // 1. Mã đơn hàng
         const code = (o.orderNumber || o.orderId || '').toLowerCase();
-        if (code.includes(lowerSearch) || code.includes(noDiacritics)) return true;
+        if (code.includes(lowerSearch)) return true;
 
-        // Match staff name
+        // 2. Nhân viên xử lý (tìm theo từ cụ thể để không bị nhầm họ Trần với chữ trả)
         const staff = (o.createdBy?.fullName || '').toLowerCase();
         const staffNoDia = staff.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
-        if (staff.includes(lowerSearch) || staffNoDia.includes(noDiacritics)) return true;
+        const staffWords = staffNoDia.split(/\s+/);
+        if (staffWords.some((w) => w === noDiacritics || (noDiacritics.length >= 3 && w.startsWith(noDiacritics)))) return true;
 
-        // Match customer name / phone
+        // 3. Khách hàng
         const custName = (o.customerName || '').toLowerCase();
         const custNameNoDia = custName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
         const custPhone = (o.customerPhone || '').toLowerCase();
         if (custName.includes(lowerSearch) || custNameNoDia.includes(noDiacritics) || (cleanDigits && custPhone.includes(cleanDigits))) return true;
 
-        // Match amounts (totalAmount, grossAmount, netAmount)
+        // 4. Số tiền
         if (cleanDigits && cleanDigits.length >= 3) {
           const totalStr = String(Math.round(safeNum(o.totalAmount)));
           const grossStr = String(Math.round(safeNum(o.grossAmount)));
           const netStr = String(Math.round(safeNum(o.netAmount)));
           if (totalStr.includes(cleanDigits) || grossStr.includes(cleanDigits) || netStr.includes(cleanDigits)) return true;
         }
-
-        // Match note / cancel reason
-        const note = (o.note || '').toLowerCase();
-        const reason = (o.cancelReason || '').toLowerCase();
-        if (note.includes(lowerSearch) || reason.includes(lowerSearch)) return true;
 
         return false;
       }
