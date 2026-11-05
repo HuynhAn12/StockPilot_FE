@@ -1200,9 +1200,9 @@ export function PosPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '44px 44px 1fr 70px 88px 100px',
+            gridTemplateColumns: '40px 38px 1fr 70px 88px 96px',
             gap: 8,
-            padding: '10px 20px',
+            padding: '10px 16px',
             borderBottom: '1px solid hsl(214 25% 89%)',
             background: 'hsl(214 30% 96%)',
             color: 'hsl(215 16% 55%)',
@@ -1241,9 +1241,9 @@ export function PosPage() {
                 key={item.stockItemId}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '44px 44px 1fr 70px 88px 100px',
+                  gridTemplateColumns: '40px 38px 1fr 70px 88px 96px',
                   gap: 8,
-                  padding: '12px 20px',
+                  padding: '10px 16px',
                   alignItems: 'center',
                   borderBottom: '1px solid hsl(214 25% 91%)',
                   transition: 'background 0.15s',
@@ -1398,7 +1398,7 @@ export function PosPage() {
 
       {/* ─── RIGHT COLUMN: CATALOG + CHECKOUT (45%) ─── */}
       <div
-        className="w-full lg:w-130 xl:w-150 2xl:w-165 flex flex-col overflow-hidden shrink-0 rounded-2xl border border-white/80"
+        className="w-full lg:w-[580px] xl:w-[660px] 2xl:w-[740px] flex flex-col overflow-hidden shrink-0 rounded-2xl border border-white/80"
         style={{ background: '#fff', boxShadow: '0 2px 12px rgb(0 0 0 / 0.06), 0 0 0 1px rgb(0 0 0 / 0.04)' }}
       >
         {/* Product Search */}
