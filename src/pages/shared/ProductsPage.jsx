@@ -1421,7 +1421,7 @@ export function ProductsPage() {
         {/* Card 2: Khuyến mãi */}
         <div className="pp-stat-card">
           <div className="pp-stat-icon-wrap" style={{ background: "#fef2f2", color: "#c31c2e" }}>
-            <RedLightningLogo style={{ width: 22, height: 26, color: "#c31c2e" }} />
+            <RedLightningLogo style={{ width: 28, height: 29, color: "#c31c2e" }} />
           </div>
           <div>
             <div className="pp-stat-label">{t('productsFlashSale', 'KHUYẾN MÃI')}</div>

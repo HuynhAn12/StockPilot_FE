@@ -3,11 +3,12 @@ import React from 'react';
 /**
  * Red Lightning Bolt Logo matching user design (stylized sharp S-lightning bolt).
  */
-export function RedLightningLogo({ className = '', style = {} }) {
+export function RedLightningLogo({ className = '', style = {}, preserveAspectRatio = 'none' }) {
   return (
     <svg
       viewBox="0 0 80 118"
       fill="currentColor"
+      preserveAspectRatio={preserveAspectRatio}
       className={className}
       style={{ display: 'inline-block', flexShrink: 0, ...style }}
       aria-hidden="true"
