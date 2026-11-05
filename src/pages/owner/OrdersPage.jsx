@@ -3230,7 +3230,7 @@ export function OrdersPage() {
 
                           <span className="block text-[9.5px] font-semibold text-amber-600 mt-0.5 whitespace-nowrap">
 
-                            (Gốc {ord.grossItemsCount || (ord.netItemsCount + ord.returnedQuantity)} SP · Đã trả {ord.returnedQuantity} SP)
+                            ({isEn ? `Returned ${ord.returnedQuantity} items` : `Trả ${ord.returnedQuantity} SP`})
 
                           </span>
 
@@ -3254,7 +3254,7 @@ export function OrdersPage() {
 
                           <span className="block text-[9.5px] font-semibold text-amber-600 mt-0.5 whitespace-nowrap">
 
-                            (Gốc {formatVND(ord.grossAmount)} · Hoàn {formatVND(ord.refundedAmount)})
+                            ({isEn ? `Refund ${formatVND(ord.refundedAmount)}` : `Hoàn ${formatVND(ord.refundedAmount)}`})
 
                           </span>
 
