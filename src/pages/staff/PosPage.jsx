@@ -144,7 +144,7 @@ export function PosPage() {
       customer: { name: 'Khách lẻ', phone: '' },
       note: '',
       discount: 0,
-      saleMode: 'standard'
+      saleMode: 'counter'
     }
   ]);
   const [activeTabId, setActiveTabId] = useState(1);
@@ -606,7 +606,7 @@ export function PosPage() {
       customer: { name: 'Khách lẻ', phone: '' },
       note: '',
       discount: 0,
-      saleMode: 'standard'
+      saleMode: 'counter'
     }]);
     setActiveTabId(nextId);
   };
@@ -614,7 +614,7 @@ export function PosPage() {
   const closeTab = (tabId, e) => {
     e.stopPropagation();
     if (tabs.length === 1) {
-      setTabs([{ id: 1, name: 'Hóa đơn 1', items: [], customer: { name: 'Khách lẻ', phone: '' }, note: '', discount: 0, saleMode: 'standard' }]);
+      setTabs([{ id: 1, name: 'Hóa đơn 1', items: [], customer: { name: 'Khách lẻ', phone: '' }, note: '', discount: 0, saleMode: 'counter' }]);
       return;
     }
     const filtered = tabs.filter((t) => t.id !== tabId);
@@ -1366,15 +1366,14 @@ export function PosPage() {
             {/* Sale mode pills */}
             <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs font-semibold gap-0.5">
               {[
-                { id: 'quick', label: language === 'vi' ? 'Bán nhanh' : 'Quick Sale' },
-                { id: 'standard', label: language === 'vi' ? 'Bán thường' : 'Standard' },
+                { id: 'counter', label: language === 'vi' ? 'Bán tại quầy' : 'Counter Sale' },
                 { id: 'delivery', label: language === 'vi' ? 'Giao hàng' : 'Delivery' },
               ].map((mode) => (
                 <button
                   key={mode.id}
                   onClick={() => updateActiveTab({ saleMode: mode.id })}
                   className={`px-3 py-1.5 rounded-md transition-all ${
-                    activeTab.saleMode === mode.id
+                    (activeTab.saleMode === mode.id || (mode.id === 'counter' && (!activeTab.saleMode || activeTab.saleMode === 'standard' || activeTab.saleMode === 'quick')))
                       ? 'bg-white text-blue-600 shadow-sm'
                       : 'text-slate-500 hover:text-slate-700'
                   }`}
