@@ -639,8 +639,8 @@ export function StaffPage() {
           <div className="overflow-x-auto rounded-xl border border-slate-200/80">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50/90 text-slate-500 uppercase tracking-wider text-[11px] font-bold border-b border-slate-200">
-                  <th className="py-3 px-3 w-10 text-center">
+                <tr className="bg-slate-50/90 text-slate-500 uppercase tracking-wider text-[11px] font-bold border-b border-slate-200 whitespace-nowrap">
+                  <th className="py-3 px-3 w-10 text-center whitespace-nowrap">
                     <input
                       type="checkbox"
                       checked={isAllSelected}
@@ -648,13 +648,13 @@ export function StaffPage() {
                       className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </th>
-                  <th className="py-3 px-3 font-bold">{isEn ? 'ID' : 'ID'}</th>
-                  <th className="py-3 px-3 font-bold">{isEn ? 'Staff Member' : 'NHÂN VIÊN'}</th>
+                  <th className="py-3 px-3 font-bold whitespace-nowrap">{isEn ? 'ID' : 'ID'}</th>
+                  <th className="py-3 px-3 font-bold whitespace-nowrap">{isEn ? 'Staff Member' : 'NHÂN VIÊN'}</th>
                   <th className="py-3 px-3 font-bold whitespace-nowrap">{isEn ? 'Role' : 'VAI TRÒ'}</th>
                   <th className="py-3 px-3 font-bold whitespace-nowrap">{isEn ? 'Status' : 'TRẠNG THÁI'}</th>
-                  <th className="py-3 px-3 font-bold text-center">{isEn ? 'Completed' : 'ĐƠN HOÀN THÀNH'}</th>
-                  <th className="py-3 px-3 font-bold text-right">{isEn ? 'Sales Paid' : 'TIỀN ĐÃ THANH TOÁN'}</th>
-                  <th className="py-3 px-3 font-bold text-center w-24">{isEn ? 'Actions' : 'THAO TÁC'}</th>
+                  <th className="py-3 px-3 font-bold text-center whitespace-nowrap">{isEn ? 'Completed' : 'ĐƠN HOÀN THÀNH'}</th>
+                  <th className="py-3 px-3 font-bold text-right whitespace-nowrap">{isEn ? 'Sales Paid' : 'TIỀN ĐÃ THANH TOÁN'}</th>
+                  <th className="py-3 px-3 font-bold text-center w-24 whitespace-nowrap">{isEn ? 'Actions' : 'THAO TÁC'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -759,14 +759,14 @@ export function StaffPage() {
                         </td>
 
                         {/* Completed Orders Count */}
-                        <td className="py-3 px-3 text-center">
+                        <td className="py-3 px-3 text-center whitespace-nowrap">
                           <span className="font-bold text-blue-600 text-xs px-2 py-0.5 rounded-lg bg-blue-50/80 border border-blue-100 tabular-nums">
                             {staff.completedOrdersCount || 0}
                           </span>
                         </td>
 
                         {/* Total Amount Paid */}
-                        <td className="py-3 px-3 text-right">
+                        <td className="py-3 px-3 text-right whitespace-nowrap">
                           <span className="font-bold text-slate-900 tabular-nums">
                             {formatVND(staff.totalAmountPaid || 0)}
                           </span>

@@ -2984,7 +2984,7 @@ export function OrdersPage() {
 
               onClick={() => setSelectedPaymentMethod(item.key)}
 
-              className={`px-3.5 py-1.5 rounded-xl border transition-all duration-150 flex items-center gap-1.5 text-xs font-semibold ${
+              className={`px-3.5 py-1.5 rounded-xl border transition-all duration-150 flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap shrink-0 ${
 
                 isSelected
 
@@ -2996,9 +2996,9 @@ export function OrdersPage() {
 
             >
 
-              {Icon && <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-slate-500'}`} />}
+              {Icon && <Icon className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'text-slate-500'}`} />}
 
-              <span>{item.label}</span>
+              <span className="whitespace-nowrap">{item.label}</span>
 
             </button>
 
@@ -3038,25 +3038,25 @@ export function OrdersPage() {
 
           <table className="w-full text-left text-xs">
 
-            <thead className="bg-slate-50/90 border-b border-slate-200/80 text-slate-500 uppercase font-bold text-[11px] tracking-wider">
+            <thead className="bg-slate-50/90 border-b border-slate-200/80 text-slate-500 uppercase font-bold text-[11px] tracking-wider whitespace-nowrap">
 
-              <tr>
+              <tr className="whitespace-nowrap">
 
-                <th className="py-3.5 px-4">{isEn ? 'Order Code' : 'Mã đơn hàng'}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{isEn ? 'Order Code' : 'Mã đơn hàng'}</th>
 
-                <th className="py-3.5 px-4">{isEn ? 'Time' : 'Thời gian'}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{isEn ? 'Time' : 'Thời gian'}</th>
 
-                <th className="py-3.5 px-4">{isEn ? 'Handler' : 'Nhân viên xử lý'}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{isEn ? 'Handler' : 'Nhân viên xử lý'}</th>
 
-                <th className="py-3.5 px-4">{isEn ? 'Payment' : 'Thanh toán'}</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">{isEn ? 'Payment' : 'Thanh toán'}</th>
 
-                <th className="py-3.5 px-4 text-center">{isEn ? 'Quantity' : 'Số lượng'}</th>
+                <th className="py-3.5 px-4 text-center whitespace-nowrap">{isEn ? 'Quantity' : 'Số lượng'}</th>
 
-                <th className="py-3.5 px-4 text-right">{isEn ? 'Total' : 'Tổng tiền'}</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">{isEn ? 'Total' : 'Tổng tiền'}</th>
 
                 <th className="py-3.5 px-4 text-center whitespace-nowrap">{isEn ? 'Status' : 'Trạng thái'}</th>
 
-                <th className="py-3.5 px-4 text-right">{isEn ? 'Actions' : 'Thao tác'}</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">{isEn ? 'Actions' : 'Thao tác'}</th>
 
               </tr>
 
@@ -3128,7 +3128,7 @@ export function OrdersPage() {
 
                       {/* Mã đơn hàng */}
 
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 whitespace-nowrap">
 
                         <div
 
@@ -3144,15 +3144,15 @@ export function OrdersPage() {
 
                           }}
 
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200/70 text-slate-800 font-mono text-xs font-bold cursor-pointer transition-colors"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200/80 border border-slate-200/70 text-slate-800 font-mono text-xs font-bold cursor-pointer transition-colors whitespace-nowrap shrink-0"
 
                           title={isEn ? "Click to copy order code" : "Click để sao chép mã đơn"}
 
                         >
 
-                          <span>{ord.orderId}</span>
+                          <span className="whitespace-nowrap select-all">{ord.orderId}</span>
 
-                          <Copy className="w-3 h-3 text-slate-400 group-hover:text-slate-600" />
+                          <Copy className="w-3 h-3 text-slate-400 group-hover:text-slate-600 shrink-0" />
 
                         </div>
 
