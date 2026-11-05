@@ -655,7 +655,7 @@ export function OrdersPage() {
 
     setReturnModalOrder(ord);
 
-    setReturnTab(staffMode ? 'CANCEL_ALL' : (ord.status === 'DRAFT' ? 'CANCEL_ALL' : 'PARTIAL'));
+    setReturnTab(ord.status === 'DRAFT' ? 'CANCEL_ALL' : 'PARTIAL');
 
     const initQty = {};
 
@@ -3956,20 +3956,7 @@ export function OrdersPage() {
 
             {/* Tabs */}
 
-            {staffMode ? (
-              <div className="flex border-b border-border bg-rose-50/60 p-2.5 items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                  <span className="text-xs font-bold text-rose-800">
-                    Xác nhận hủy đơn hàng trong ca trực hôm nay
-                  </span>
-                </div>
-                <span className="text-[11px] font-semibold text-slate-500">
-                  Hàng sẽ tự động hoàn kho
-                </span>
-              </div>
-            ) : (
-              <div className="flex border-b border-border bg-slate-100/60 p-1.5 gap-1.5">
+            <div className="flex border-b border-border bg-slate-100/60 p-1.5 gap-1.5">
 
               <button
 
@@ -3978,13 +3965,9 @@ export function OrdersPage() {
                 onClick={() => setReturnTab('PARTIAL')}
 
                 className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-
                   returnTab === 'PARTIAL'
-
                     ? 'bg-white text-slate-900 shadow-sm border border-slate-300'
-
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-
                 }`}
 
               >
@@ -4002,13 +3985,9 @@ export function OrdersPage() {
                 onClick={() => setReturnTab('CANCEL_ALL')}
 
                 className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-
                   returnTab === 'CANCEL_ALL'
-
                     ? 'bg-white text-slate-900 shadow-sm border border-slate-300'
-
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-
                 }`}
 
               >
@@ -4020,7 +3999,6 @@ export function OrdersPage() {
               </button>
 
             </div>
-            )}
 
 
 
