@@ -12,9 +12,44 @@ function emitToast(toast) {
 }
 
 export function useToast() {
-  const toast = useCallback(({ type = 'info', title, message, description, duration = 4000 }) => {
+  const toast = useCallback((options) => {
+    if (typeof options === 'string') {
+      emitToast({ id: ++toastIdCounter, type: 'info', title: undefined, message: options, duration: 4000 });
+      return;
+    }
+    const { type = 'info', title, message, description, duration = 4000 } = options || {};
     emitToast({ id: ++toastIdCounter, type, title, message: message || description, duration });
   }, []);
+
+  toast.success = (msg, title) => {
+    if (typeof msg === 'object' && msg !== null) {
+      toast({ type: 'success', ...msg });
+    } else {
+      toast({ type: 'success', title, message: msg });
+    }
+  };
+  toast.error = (msg, title) => {
+    if (typeof msg === 'object' && msg !== null) {
+      toast({ type: 'error', ...msg });
+    } else {
+      toast({ type: 'error', title: title || 'Lỗi', message: msg });
+    }
+  };
+  toast.info = (msg, title) => {
+    if (typeof msg === 'object' && msg !== null) {
+      toast({ type: 'info', ...msg });
+    } else {
+      toast({ type: 'info', title, message: msg });
+    }
+  };
+  toast.warning = (msg, title) => {
+    if (typeof msg === 'object' && msg !== null) {
+      toast({ type: 'warning', ...msg });
+    } else {
+      toast({ type: 'warning', title, message: msg });
+    }
+  };
+
   return { toast };
 }
 

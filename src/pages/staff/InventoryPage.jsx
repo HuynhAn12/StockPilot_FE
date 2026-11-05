@@ -29,7 +29,7 @@ function movTypeBadge(type, isEn = false) {
     RETURN: { label: isEn ? 'Return' : 'Trả hàng', cls: 'bg-pink-100 text-pink-800' },
   };
   const d = map[type] || { label: type, cls: 'bg-slate-100 text-slate-700' };
-  return <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${d.cls}`}>{d.label}</span>;
+  return <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold whitespace-nowrap ${d.cls}`}>{d.label}</span>;
 }
 
 const CSS = `
@@ -79,12 +79,12 @@ const CSS = `
 .inv-card { background:#fff; border:1px solid #edf2f7; border-radius:18px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.03); }
 .inv-table { width:100%; text-align:left; border-collapse:collapse; font-size:12.5px; }
 .inv-table thead tr { background:#f8fafc; border-bottom:1px solid #edf2f7; }
-.inv-table thead th { padding:11px 14px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#64748b; }
+.inv-table thead th { padding:11px 14px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#64748b; white-space:nowrap; }
 .inv-table tbody tr { border-bottom:1px solid #f1f5f9; transition:background .15s; }
 .inv-table tbody tr:last-child { border-bottom:none; }
 .inv-table tbody tr:hover { background:#f8fafc; }
 .inv-table td { padding:11px 14px; color:#0f172a; }
-.inv-status-pill { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+.inv-status-pill { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; }
 .inv-modal-overlay { position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,.55); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn .15s ease; }
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 .inv-modal { background:#fff; border-radius:20px; padding:24px; width:100%; max-width:480px; box-shadow:0 24px 64px rgba(0,0,0,.15),0 8px 20px rgba(0,0,0,.08); animation:slideUp .18s ease; }
@@ -378,7 +378,7 @@ export function InventoryPage() {
                     <th style={{ textAlign: 'center' }}>{isEn ? 'Safety Threshold' : 'Ngưỡng an toàn'}</th>
                     {canSeeCost && <th style={{ textAlign: 'right' }}>{isEn ? 'Cost Price' : 'Giá vốn'}</th>}
                     {canSeeCost && <th style={{ textAlign: 'right' }}>{isEn ? 'Total Value' : 'Tổng giá trị'}</th>}
-                    <th>{isEn ? 'Status' : 'Trạng thái'}</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>{isEn ? 'Status' : 'Trạng thái'}</th>
                     <th>{isEn ? 'Actions' : 'Thao tác'}</th>
                   </tr>
                 </thead>
@@ -404,13 +404,13 @@ export function InventoryPage() {
                         <td style={{ textAlign: 'center', color: '#64748b', fontSize: 12 }}>{p.alertThreshold || 10} {formatUnit(p.unit, isEn)}</td>
                         {canSeeCost && <td style={{ textAlign: 'right', color: '#64748b', fontSize: 12 }}>{fmtVND(p.costPrice)}</td>}
                         {canSeeCost && <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtVND(p.stock * p.costPrice)}</td>}
-                        <td>
-                          <span className="inv-status-pill" style={
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <span className="inv-status-pill" style={{ whiteSpace: 'nowrap', ...(
                             isOut  ? { background: '#fef2f2', color: '#dc2626' } :
                             isLow  ? { background: '#fffbeb', color: '#d97706' } :
                             isOver ? { background: '#eff6ff', color: '#2563eb' } :
-                                     { background: '#f0fdf4', color: '#16a34a' }
-                          }>
+                                     { background: '#f0fdf4', color: '#16a34a' })
+                          }}>
                             {isOut ? (isEn ? '⚠ Out of stock' : '⚠ Hết hàng') : isLow ? (isEn ? '↓ Low stock' : '↓ Sắp hết') : isOver ? (isEn ? '↑ Overstock' : '↑ Tồn nhiều') : (isEn ? '✓ Normal' : '✓ Ổn định')}
                           </span>
                         </td>
@@ -489,7 +489,7 @@ export function InventoryPage() {
                     return (
                       <tr key={m.id}>
                         <td style={{ fontSize: 11.5, color: '#64748b', whiteSpace: 'nowrap' }}>{fmtDate(m.createdAt, isEn)}</td>
-                        <td>{movTypeBadge(m.type, isEn)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{movTypeBadge(m.type, isEn)}</td>
                         <td>
                           <div style={{ fontWeight: 700, fontSize: 13 }}>{productName}</div>
                           <div style={{ fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>{sku}</div>
@@ -543,7 +543,7 @@ export function InventoryPage() {
                     <th style={{ textAlign: 'center' }}>{isEn ? 'System Stock' : 'Tồn hệ thống'}</th>
                     <th style={{ textAlign: 'center', width: 160 }}>{isEn ? 'Actual Count' : 'Số đếm thực tế'}</th>
                     <th style={{ textAlign: 'center' }}>{isEn ? 'Variance' : 'Chênh lệch'}</th>
-                    <th>{isEn ? 'Status' : 'Trạng thái'}</th>
+                    <th style={{ whiteSpace: 'nowrap' }}>{isEn ? 'Status' : 'Trạng thái'}</th>
                   </tr>
                 </thead>
                 <tbody>

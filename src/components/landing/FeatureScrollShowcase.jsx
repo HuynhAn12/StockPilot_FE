@@ -40,17 +40,17 @@ const FEATURES = [
     titleVi: 'Bán hàng tại quầy chỉ trong vài giây',
     titleEn: 'Check out customers in seconds',
     descVi:
-      'Chọn sản phẩm hoặc quét mã, hệ thống tự tính tiền và tạo mã VietQR qua PayOS hoặc ví MoMo theo cấu hình riêng của từng cửa hàng. Khách thanh toán xong là in hóa đơn ngay.',
+      'Chọn sản phẩm hoặc quét mã, hệ thống tự tính tiền và tạo mã VietQR qua PayOS theo cấu hình riêng của từng cửa hàng. Khách thanh toán xong là in hóa đơn ngay.',
     descEn:
-      'Pick items or scan a barcode. StockPilot totals the order and generates a VietQR code via PayOS or a MoMo request using each store’s own payment settings, then prints the receipt.',
+      'Pick items or scan a barcode. StockPilot totals the order and generates a VietQR code via PayOS using each store’s own payment settings, then prints the receipt.',
     pointsVi: [
       'Tồn kho được trừ trong cùng giao dịch, không bán âm kho',
-      'VietQR (PayOS) và MoMo cấu hình riêng cho từng cửa hàng',
+      'VietQR (PayOS) cấu hình riêng cho từng cửa hàng',
       'In hóa đơn nhiệt khổ 80mm, chống in trùng',
     ],
     pointsEn: [
       'Stock is deducted in the same transaction — no negative stock',
-      'VietQR (PayOS) and MoMo configured per store',
+      'VietQR (PayOS) configured per store',
       '80mm thermal receipts with duplicate-print protection',
     ],
   },
