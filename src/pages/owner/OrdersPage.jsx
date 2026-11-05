@@ -3202,13 +3202,13 @@ export function OrdersPage() {
 
                       {/* Payment Method */}
 
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 whitespace-nowrap">
 
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold shadow-sm ${payBadge.className}`}>
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold shadow-sm whitespace-nowrap shrink-0 ${payBadge.className}`}>
 
-                          <PayIcon className="w-3.5 h-3.5" />
+                          <PayIcon className="w-3.5 h-3.5 shrink-0" />
 
-                          <span>{payBadge.label}</span>
+                          <span className="whitespace-nowrap">{payBadge.label}</span>
 
                         </span>
 
@@ -3218,9 +3218,9 @@ export function OrdersPage() {
 
                       {/* Số lượng */}
 
-                      <td className="py-3.5 px-4 text-center">
+                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
 
-                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
+                        <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs whitespace-nowrap">
 
                           {ord.netItemsCount ?? ord.itemsCount} SP
 
@@ -3242,9 +3242,9 @@ export function OrdersPage() {
 
                       {/* Tổng tiền */}
 
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
 
-                        <span className="font-black text-slate-900 text-sm tracking-tight font-sans">
+                        <span className="font-black text-slate-900 text-sm tracking-tight font-sans whitespace-nowrap">
 
                           {formatVND(ord.netAmount ?? ord.totalAmount)}
 
@@ -3281,9 +3281,9 @@ export function OrdersPage() {
 
                       {/* Actions */}
 
-                      <td className="py-3.5 px-4 text-right">
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
 
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
 
                           {staffMode ? (
 
