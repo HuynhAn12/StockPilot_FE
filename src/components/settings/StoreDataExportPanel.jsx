@@ -8,8 +8,8 @@ const INCLUDED = {
   en: ['Store profile, warehouses, categories, products, SKUs (with cost)', 'Stock levels and stock movement history', 'Orders, order lines, returns and payments', 'Staff accounts (no passwords)'],
 };
 const EXCLUDED = {
-  vi: ['Mật khẩu và phiên đăng nhập', 'Khóa kết nối cổng thanh toán PayOS / MoMo', 'Nội dung trò chuyện với Trợ lý AI'],
-  en: ['Passwords and login sessions', 'PayOS / MoMo gateway credentials', 'AI assistant conversations'],
+  vi: ['Mật khẩu và phiên đăng nhập', 'Khóa kết nối cổng thanh toán PayOS', 'Nội dung trò chuyện với Trợ lý AI'],
+  en: ['Passwords and login sessions', 'PayOS gateway credentials', 'AI assistant conversations'],
 };
 
 /**

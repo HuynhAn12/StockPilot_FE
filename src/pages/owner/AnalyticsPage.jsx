@@ -386,8 +386,8 @@ export function AnalyticsPage() {
           </div>
 
           {/* 6 Key Financial & Operational KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3.5">
-            {/* 1. Net Revenue */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {/* 1. Doanh thu thực tế */}
             <div
               style={{
                 backgroundColor: '#ffffff',
@@ -397,15 +397,15 @@ export function AnalyticsPage() {
               }}
               className="border border-slate-200/80 flex flex-col justify-between transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="px-3 py-2 rounded-lg bg-[#eff6ff] flex items-center justify-between">
-                <div className="flex items-center gap-1.5 truncate">
+              <div className="px-2.5 py-1.5 rounded-lg bg-[#eff6ff] flex items-center justify-between gap-1">
+                <div className="flex items-center gap-1 min-w-0">
                   <DollarSign className="w-3.5 h-3.5 text-[#2563eb] shrink-0" />
-                  <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider truncate">
-                    {isEn ? 'Net Revenue' : 'Doanh thu thuần'}
+                  <span className="text-[10px] sm:text-[10.5px] font-bold text-slate-800 uppercase tracking-tight whitespace-nowrap">
+                    {isEn ? 'Net Revenue' : 'Doanh thu thực tế'}
                   </span>
                 </div>
                 {data?.growth?.revenue && (
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                  <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
                     data.growth.revenue.startsWith('+') ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-rose-50 text-rose-700 border border-rose-200/60'
                   }`}>
                     {data.growth.revenue}
@@ -414,13 +414,15 @@ export function AnalyticsPage() {
               </div>
               <div className="px-2 pt-2.5 pb-1 flex-1 flex flex-col justify-between">
                 <h3 className="text-xl font-bold text-slate-900 mt-0.5">{formatVND(data?.netRevenue || 0)}</h3>
-                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                  {isEn ? `Less refunds ${formatVND(data?.refundedAmount || 0)}` : `Đã trừ hoàn trả ${formatVND(data?.refundedAmount || 0)}`}
+                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100 truncate" title={Number(data?.refundedAmount || 0) > 0 ? `Đã trừ hoàn trả ${formatVND(data?.refundedAmount || 0)}` : 'Doanh thu bán hàng'}>
+                  {Number(data?.refundedAmount || 0) > 0
+                    ? (isEn ? `Less refunds ${formatVND(data?.refundedAmount || 0)}` : `Đã trừ hoàn trả ${formatVND(data?.refundedAmount || 0)}`)
+                    : (isEn ? 'Net collected revenue' : 'Doanh thu bán hàng')}
                 </p>
               </div>
             </div>
 
-            {/* 2. Gross Profit & Margin */}
+            {/* 2. Lợi nhuận gộp */}
             <div
               style={{
                 backgroundColor: '#ffffff',
@@ -430,26 +432,26 @@ export function AnalyticsPage() {
               }}
               className="border border-slate-200/80 flex flex-col justify-between transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="px-3 py-2 rounded-lg bg-[#f0fdf4] flex items-center justify-between">
-                <div className="flex items-center gap-1.5 truncate">
+              <div className="px-2.5 py-1.5 rounded-lg bg-[#f0fdf4] flex items-center justify-between gap-1">
+                <div className="flex items-center gap-1 min-w-0">
                   <TrendingUp className="w-3.5 h-3.5 text-[#16a34a] shrink-0" />
-                  <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider truncate">
+                  <span className="text-[10px] sm:text-[10.5px] font-bold text-slate-800 uppercase tracking-tight whitespace-nowrap">
                     {isEn ? 'Gross Profit' : 'Lợi nhuận gộp'}
                   </span>
                 </div>
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">
+                <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 shrink-0">
                   {data?.profitMargin || 0}%
                 </span>
               </div>
               <div className="px-2 pt-2.5 pb-1 flex-1 flex flex-col justify-between">
                 <h3 className="text-xl font-bold text-emerald-600 mt-0.5">{formatVND(data?.grossProfit || 0)}</h3>
-                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
+                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100 truncate">
                   {isEn ? 'Target profit margin' : 'Biên LN gộp mục tiêu'}
                 </p>
               </div>
             </div>
 
-            {/* 3. COGS */}
+            {/* 3. Vốn xuất thực bán */}
             <div
               style={{
                 backgroundColor: '#ffffff',
@@ -459,23 +461,25 @@ export function AnalyticsPage() {
               }}
               className="border border-slate-200/80 flex flex-col justify-between transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="px-3 py-2 rounded-lg bg-slate-100/90 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 truncate">
+              <div className="px-2.5 py-1.5 rounded-lg bg-slate-100/90 flex items-center justify-between gap-1">
+                <div className="flex items-center gap-1 min-w-0">
                   <DollarSign className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                  <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider truncate">
-                    {isEn ? 'COGS' : 'Giá vốn hàng bán'}
+                  <span className="text-[10px] sm:text-[10.5px] font-bold text-slate-800 uppercase tracking-tight whitespace-nowrap">
+                    {isEn ? 'COGS' : 'Vốn xuất thực bán'}
                   </span>
                 </div>
               </div>
               <div className="px-2 pt-2.5 pb-1 flex-1 flex flex-col justify-between">
                 <h3 className="text-xl font-bold text-slate-800 mt-0.5">{formatVND(data?.cogs || 0)}</h3>
-                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                  {isEn ? 'Cost for fulfilled orders' : 'Vốn xuất cho các đơn'}
+                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100 truncate" title={Number(data?.returnedUnits || 0) > 0 ? 'Đã trừ vốn hàng hoàn' : 'Vốn xuất cho các đơn'}>
+                  {Number(data?.returnedUnits || 0) > 0
+                    ? (isEn ? 'Less returned goods cost' : 'Đã trừ vốn hàng hoàn')
+                    : (isEn ? 'Cost for fulfilled orders' : 'Vốn xuất cho các đơn')}
                 </p>
               </div>
             </div>
 
-            {/* 4. Orders & AOV */}
+            {/* 4. Đơn thành công */}
             <div
               style={{
                 backgroundColor: '#ffffff',
@@ -485,15 +489,15 @@ export function AnalyticsPage() {
               }}
               className="border border-slate-200/80 flex flex-col justify-between transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="px-3 py-2 rounded-lg bg-[#eff6ff] flex items-center justify-between">
-                <div className="flex items-center gap-1.5 truncate">
+              <div className="px-2.5 py-1.5 rounded-lg bg-[#eff6ff] flex items-center justify-between gap-1">
+                <div className="flex items-center gap-1 min-w-0">
                   <ShoppingCart className="w-3.5 h-3.5 text-[#2563eb] shrink-0" />
-                  <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider truncate">
+                  <span className="text-[10px] sm:text-[10.5px] font-bold text-slate-800 uppercase tracking-tight whitespace-nowrap">
                     {isEn ? 'Orders' : 'Đơn thành công'}
                   </span>
                 </div>
                 {data?.growth?.orders && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60 shrink-0">
+                  <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60 shrink-0">
                     {data.growth.orders}
                   </span>
                 )}
@@ -502,13 +506,13 @@ export function AnalyticsPage() {
                 <h3 className="text-xl font-bold text-blue-600 mt-0.5">
                   {data?.orderCount || 0} {isEn ? 'orders' : 'đơn'}
                 </h3>
-                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
+                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100 truncate">
                   {isEn ? `Avg: ${formatVND(data?.avgOrderValue || 0)}/ord` : `TB: ${formatVND(data?.avgOrderValue || 0)}/đơn`}
                 </p>
               </div>
             </div>
 
-            {/* 5. Units Sold */}
+            {/* 5. Hàng đã bán */}
             <div
               style={{
                 backgroundColor: '#ffffff',
@@ -518,23 +522,25 @@ export function AnalyticsPage() {
               }}
               className="border border-slate-200/80 flex flex-col justify-between transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="px-3 py-2 rounded-lg bg-[#f5f3ff] flex items-center justify-between">
-                <div className="flex items-center gap-1.5 truncate">
+              <div className="px-2.5 py-1.5 rounded-lg bg-[#f5f3ff] flex items-center justify-between gap-1">
+                <div className="flex items-center gap-1 min-w-0">
                   <ShoppingBag className="w-3.5 h-3.5 text-[#6366f1] shrink-0" />
-                  <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider truncate">
+                  <span className="text-[10px] sm:text-[10.5px] font-bold text-slate-800 uppercase tracking-tight whitespace-nowrap">
                     {isEn ? 'Units Sold' : 'Hàng đã bán'}
                   </span>
                 </div>
               </div>
               <div className="px-2 pt-2.5 pb-1 flex-1 flex flex-col justify-between">
                 <h3 className="text-xl font-bold text-indigo-600 mt-0.5">{data?.totalUnitsSold || 0} SP</h3>
-                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                  {isEn ? 'Total dispatched goods' : 'Tổng sản phẩm xuất'}
+                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100 truncate" title={Number(data?.returnedUnits || 0) > 0 ? `Đã trừ hoàn trả ${data.returnedUnits} SP` : 'Tổng sản phẩm xuất'}>
+                  {Number(data?.returnedUnits || 0) > 0
+                    ? (isEn ? `Less returned ${data.returnedUnits} SP` : `Đã trừ hoàn trả ${data.returnedUnits} SP`)
+                    : (isEn ? 'Total dispatched goods' : 'Tổng sản phẩm xuất')}
                 </p>
               </div>
             </div>
 
-            {/* 6. Inventory Valuation */}
+            {/* 6. Vốn tồn kho */}
             <div
               style={{
                 backgroundColor: '#ffffff',
@@ -544,17 +550,17 @@ export function AnalyticsPage() {
               }}
               className="border border-slate-200/80 flex flex-col justify-between transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="px-3 py-2 rounded-lg bg-[#faf5ff] flex items-center justify-between">
-                <div className="flex items-center gap-1.5 truncate">
+              <div className="px-2.5 py-1.5 rounded-lg bg-[#faf5ff] flex items-center justify-between gap-1">
+                <div className="flex items-center gap-1 min-w-0">
                   <Box className="w-3.5 h-3.5 text-[#9333ea] shrink-0" />
-                  <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider truncate">
+                  <span className="text-[10px] sm:text-[10.5px] font-bold text-slate-800 uppercase tracking-tight whitespace-nowrap">
                     {isEn ? 'Inventory Value' : 'Vốn tồn kho'}
                   </span>
                 </div>
               </div>
               <div className="px-2 pt-2.5 pb-1 flex-1 flex flex-col justify-between">
                 <h3 className="text-xl font-bold text-purple-800 mt-0.5">{formatVND(data?.inventoryCostValuation || 0)}</h3>
-                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
+                <p className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-100 truncate">
                   {isEn ? `Stock: ${data?.totalStockQuantity || 0} SP` : `Tồn ${data?.totalStockQuantity || 0} SP`}
                 </p>
               </div>

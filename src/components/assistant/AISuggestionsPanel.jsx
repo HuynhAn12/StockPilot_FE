@@ -107,7 +107,7 @@ export function AISuggestionsPanel({ isEn, onClose }) {
         <div className="flex min-w-0 items-center gap-2">
           <Lightbulb className="h-4 w-4 shrink-0 text-amber-500" />
           <h3 className="truncate text-sm font-semibold text-slate-900">{isEn ? 'Suggested actions' : 'Gợi ý hành động'}</h3>
-          {status === 'ready' && <AISourceBadge source={suggestionsQuery.data?.source} isEn={isEn} />}
+
         </div>
         <div className="flex items-center gap-1">
           <button

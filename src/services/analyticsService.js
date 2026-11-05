@@ -111,6 +111,15 @@ export async function apiChatWithAssistant(question, stockItemId = null) {
   return data.data;
 }
 
+export async function apiTranscribeAudio(audioBlob) {
+  const formData = new FormData();
+  formData.append('audio', audioBlob, 'recording.webm');
+  const { data } = await apiClient.post('/assistant/transcribe', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data?.data?.text || '';
+}
+
 export async function apiGetAssistantHistory({ limit = 20, signal } = {}) {
   const { data } = await apiClient.get('/assistant/history', { params: { limit }, signal });
   return data.data;

@@ -200,7 +200,7 @@ export function StaffOperationalDashboard() {
               </div>
               <h3 className="text-xl font-black tracking-tight">Màn hình Bán hàng tại quầy (POS)</h3>
               <p className="text-xs text-blue-100 leading-relaxed font-medium">
-                Quét mã vạch, lên giỏ hàng, nhận thanh toán Tiền mặt / VietQR / MoMo và in bill tự động.
+                Quét mã vạch, lên giỏ hàng, nhận thanh toán Tiền mặt / VietQR và in bill tự động.
               </p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-white/25 flex items-center justify-center group-hover:translate-x-1 transition-transform shrink-0">

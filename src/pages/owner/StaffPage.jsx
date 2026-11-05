@@ -646,8 +646,8 @@ export function StaffPage() {
                   </th>
                   <th className="py-3 px-3 font-bold">{isEn ? 'ID' : 'ID'}</th>
                   <th className="py-3 px-3 font-bold">{isEn ? 'Staff Member' : 'NHÂN VIÊN'}</th>
-                  <th className="py-3 px-3 font-bold">{isEn ? 'Role' : 'VAI TRÒ'}</th>
-                  <th className="py-3 px-3 font-bold">{isEn ? 'Status' : 'TRẠNG THÁI'}</th>
+                  <th className="py-3 px-3 font-bold whitespace-nowrap">{isEn ? 'Role' : 'VAI TRÒ'}</th>
+                  <th className="py-3 px-3 font-bold whitespace-nowrap">{isEn ? 'Status' : 'TRẠNG THÁI'}</th>
                   <th className="py-3 px-3 font-bold text-center">{isEn ? 'Completed' : 'ĐƠN HOÀN THÀNH'}</th>
                   <th className="py-3 px-3 font-bold text-right">{isEn ? 'Sales Paid' : 'TIỀN ĐÃ THANH TOÁN'}</th>
                   <th className="py-3 px-3 font-bold text-center w-24">{isEn ? 'Actions' : 'THAO TÁC'}</th>
@@ -730,10 +730,10 @@ export function StaffPage() {
                         </td>
 
                         {/* Role badge */}
-                        <td className="py-3 px-3">
+                        <td className="py-3 px-3 whitespace-nowrap">
                           <span
                             className={cn(
-                              'px-2.5 py-0.5 rounded-full text-[11px] font-bold border inline-block',
+                              'px-2.5 py-0.5 rounded-full text-[11px] font-bold border inline-block whitespace-nowrap',
                               roleInfo.className
                             )}
                           >
@@ -742,15 +742,13 @@ export function StaffPage() {
                         </td>
 
                         {/* Status */}
-                        <td className="py-3 px-3">
+                        <td className="py-3 px-3 whitespace-nowrap">
                           {staff.isActive ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
                               {isEn ? 'Active' : 'Hoạt động'}
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                            <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
                               {isEn ? 'Locked' : 'Tạm khóa'}
                             </span>
                           )}
@@ -934,8 +932,7 @@ export function StaffPage() {
                       <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
                         {getRoleBadge(selectedStaff.role).label}
                       </span>
-                      <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs text-emerald-600 font-bold flex items-center gap-1 whitespace-nowrap">
                         {selectedStaff.isActive ? (isEn ? 'Active' : 'Đang hoạt động') : (isEn ? 'Locked' : 'Đã khóa')}
                       </span>
                     </div>
