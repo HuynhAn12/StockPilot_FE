@@ -786,7 +786,7 @@ export function AnalyticsPage() {
                 <div className="flex items-center gap-1 min-w-0">
                   <DollarSign className="w-3.5 h-3.5 text-[#2563eb] shrink-0" />
                   <span className="text-[10px] sm:text-[10.5px] font-bold text-slate-800 uppercase tracking-tight whitespace-nowrap">
-                    {isEn ? 'Net Revenue' : 'Doanh thu thực tế'}
+                    {isEn ? 'Revenue' : 'Doanh thu'}
                   </span>
                 </div>
                 {data?.growth?.revenue && (
@@ -881,11 +881,6 @@ export function AnalyticsPage() {
                     {isEn ? 'Orders' : 'Đơn thành công'}
                   </span>
                 </div>
-                {data?.growth?.orders && (
-                  <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60 shrink-0">
-                    {data.growth.orders}
-                  </span>
-                )}
               </div>
               <div className="px-2 pt-2.5 pb-1 flex-1 flex flex-col justify-between">
                 <h3 className="text-xl font-bold text-blue-600 mt-0.5">
