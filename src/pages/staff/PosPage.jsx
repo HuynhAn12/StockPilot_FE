@@ -1727,9 +1727,9 @@ export function PosPage() {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Phương thức thanh toán</span>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: 'CASH', label: 'Tiền mặt', icon: Banknote, color: 'emerald' },
-                    { id: 'BANK_TRANSFER', label: 'VietQR PayOS', icon: QrCode, color: 'blue' },
-                    { id: 'MOMO', label: 'Ví MoMo', icon: Smartphone, color: 'pink' },
+                    { id: 'CASH', label: 'Tiền mặt', icon: Banknote },
+                    { id: 'BANK_TRANSFER', label: 'VietQR PayOS', icon: QrCode },
+                    { id: 'MOMO', label: 'Ví MoMo', icon: Smartphone },
                   ].map((m) => {
                     const Icon = m.icon;
                     const isSelected = paymentMethod === m.id;
@@ -1740,12 +1740,10 @@ export function PosPage() {
                         onClick={() => setPaymentMethod(m.id)}
                         className={`relative p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 text-xs font-bold transition-all ${
                           isSelected
-                            ? isMomo
-                              ? 'border-pink-500 bg-pink-50 text-pink-700 shadow-sm'
-                              : 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
                             : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300'
                         }`}
-                        style={isSelected ? { boxShadow: isMomo ? '0 0 0 2px rgb(236 72 153 / 0.25)' : '0 0 0 2px rgb(59 130 246 / 0.2)' } : {}}
+                        style={isSelected ? { boxShadow: '0 0 0 2px rgb(59 130 246 / 0.2)' } : {}}
                       >
                         {isMomo && (
                           <button
@@ -1754,22 +1752,17 @@ export function PosPage() {
                               e.stopPropagation();
                               setMomoConfigModalOpen(true);
                             }}
-                            className="absolute top-1 right-1 p-1 rounded-md text-slate-400 hover:text-pink-600 hover:bg-pink-100/60 transition-colors cursor-pointer"
+                            className="absolute top-1 right-1 p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-100/60 transition-colors cursor-pointer"
                             title="Cấu hình tài khoản MoMo"
                           >
                             <Settings className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        <Icon className={`w-5 h-5 ${isSelected ? (isMomo ? 'text-pink-600' : 'text-blue-600') : 'text-slate-400'}`} />
-                        <span className="text-center leading-tight flex items-center gap-1">
+                        <Icon className={`w-5 h-5 ${isSelected ? 'text-blue-600' : 'text-slate-400'}`} />
+                        <span className="text-center leading-tight">
                           {m.label}
-                          {isMomo && !momoConfig?.isConfigured && (
-                            <span className="text-[9px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1 py-0.2 rounded-full">
-                              Chưa cài
-                            </span>
-                          )}
                         </span>
-                        {isSelected && <div className={`w-1.5 h-1.5 rounded-full ${isMomo ? 'bg-pink-500' : 'bg-blue-500'}`} />}
+                        {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
                       </button>
                     );
                   })}
