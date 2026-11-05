@@ -1640,12 +1640,12 @@ export function PosPage() {
                   <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500">Chi tiết đơn hàng</span>
                   <span className="text-[10px] text-slate-400 font-medium">({activeTab.items.reduce((s, it) => s + it.quantity, 0)} sản phẩm)</span>
                 </div>
-                <div className="divide-y max-h-24 sm:max-h-28 overflow-y-auto" style={{ divideColor: 'hsl(214 25% 92%)' }}>
+                <div className="divide-y max-h-[180px] overflow-y-auto" style={{ divideColor: 'hsl(214 25% 92%)' }}>
                   {activeTab.items.map((it) => (
-                    <div key={it.stockItemId} className="flex justify-between items-center px-3 py-1 text-xs">
+                    <div key={it.stockItemId} className="flex justify-between items-center px-3 py-1.5 text-xs">
                       <div className="min-w-0 pr-2">
-                        <span className="font-semibold text-slate-700 truncate block text-[11px]">{it.name}</span>
-                        <span className="text-slate-400 text-[10px]">×{it.quantity}</span>
+                        <span className="font-semibold text-slate-700 truncate block text-[11px] leading-tight">{it.name}</span>
+                        <span className="text-slate-400 text-[10px] leading-tight">×{it.quantity}</span>
                       </div>
                       <span className="font-bold text-slate-800 money shrink-0 text-xs">{formatVND(it.subtotal)}</span>
                     </div>
