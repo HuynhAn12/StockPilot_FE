@@ -1571,16 +1571,19 @@ export function PosPage() {
             </button>
           </div>
 
-          {/* Big Blue THANH TOÁN Button */}
+          {/* Light Blue THANH TOÁN Button */}
           <button
             type="button"
             onClick={() => setIsCheckoutOpen(true)}
             disabled={activeTab.items.length === 0}
-            className="flex-1 py-3 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold text-sm sm:text-base tracking-wider uppercase flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
+            className="flex-1 py-3 px-6 rounded-2xl border border-blue-200 hover:border-blue-300 active:scale-[0.99] text-blue-700 font-black text-sm sm:text-base tracking-wider uppercase flex items-center justify-center gap-2 shadow-xs hover:shadow-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            style={{
+              background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+            }}
           >
-            <span>{t('checkoutButton', 'THANH TOÁN')}</span>
+            <span>{t('checkoutButton', 'THANH TOÁN (F9)')}</span>
             {activeTab.items.length > 0 && (
-              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-bold ml-1">
+              <span className="text-xs bg-blue-200/80 text-blue-800 px-2.5 py-0.5 rounded-full font-black ml-1 border border-blue-300/60">
                 {formatVND(totalPayable)}
               </span>
             )}
@@ -1778,13 +1781,12 @@ export function PosPage() {
               <button
                 onClick={() => handleCompleteSale(true)}
                 disabled={isProcessing}
-                className="w-full py-2.5 rounded-xl text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-[0.99] cursor-pointer"
+                className="w-full py-2.5 rounded-xl border border-blue-200 hover:border-blue-300 text-blue-700 font-black text-xs sm:text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all active:scale-[0.99] shadow-xs hover:shadow-sm cursor-pointer"
                 style={{
-                  background: 'linear-gradient(135deg, hsl(217 91% 52%) 0%, hsl(224 76% 48%) 100%)',
-                  boxShadow: '0 4px 16px rgb(59 130 246 / 0.35)',
+                  background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
                 }}
               >
-                <Printer className="w-4 h-4" />
+                <Printer className="w-4 h-4 text-blue-600" />
                 {isProcessing ? 'Đang xử lý...' : 'THANH TOÁN & IN HÓA ĐƠN'}
               </button>
 
