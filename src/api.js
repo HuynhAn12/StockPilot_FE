@@ -3,9 +3,9 @@ function normalizeApiUrl(raw) {
   let url = (raw || 'http://localhost:5000/api/v1').trim().replace(/\/+$/, '');
   if (!url.endsWith('/api/v1')) {
     if (url.endsWith('/api')) {
-      url = ${url}/v1;
+      url = `${url}/v1`;
     } else {
-      url = ${url}/api/v1;
+      url = `${url}/api/v1`;
     }
   }
   return url;
