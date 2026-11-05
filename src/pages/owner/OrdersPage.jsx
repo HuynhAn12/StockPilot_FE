@@ -3845,48 +3845,14 @@ export function OrdersPage() {
 
 
 
-                {viewOrderDetail.status !== 'CANCELED' && viewOrderDetail.status !== 'CANCELLED' && (
-
-                  <button
-
-                    onClick={() => {
-
-                      handleOpenReturnModal(viewOrderDetail);
-
-                    }}
-
-                    disabled={actionLoading}
-
-                    className="px-3 py-2 rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 font-bold text-xs flex items-center gap-1.5 shadow-sm"
-
-                  >
-
-                    <ReturnOrderIcon className="w-3.5 h-3.5" /> Đổi trả / Hủy đơn
-
-                  </button>
-
-                )}
-
               </div>
 
-
-
               <button
-
-                onClick={() => {
-
-                  setViewOrderDetail(null);
-
-                  handlePrintReceipt(viewOrderDetail);
-
-                }}
-
-                className="px-4 py-2 rounded-xl bg-slate-800 text-white font-bold text-xs hover:bg-slate-700 flex items-center gap-1.5 shadow-sm"
-
+                type="button"
+                onClick={() => setViewOrderDetail(null)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors ml-auto cursor-pointer"
               >
-
-                <Printer className="w-3.5 h-3.5" /> In hóa đơn
-
+                {isEn ? 'Close' : 'Đóng'}
               </button>
 
             </div>
