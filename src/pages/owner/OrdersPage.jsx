@@ -322,19 +322,28 @@ export function OrdersPage() {
 
   // Custom date/month picker state
 
+  const getTodayVN = () => {
+    const vnNow = new Date(Date.now() + 7 * 3600000);
+    const y = vnNow.getUTCFullYear();
+    const m = String(vnNow.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(vnNow.getUTCDate()).padStart(2, '0');
+    return {
+      dateStr: `${y}-${m}-${d}`,
+      monthStr: `${y}-${m}`,
+      year: y,
+      monthIndex: vnNow.getUTCMonth(),
+    };
+  };
+
+  // Custom date/month picker state
   const [customFilterMode, setCustomFilterMode] = useState('day'); // 'day' | 'month'
-
-  const [selectedCustomDate, setSelectedCustomDate] = useState('2026-10-17');
-
-  const [selectedCustomMonth, setSelectedCustomMonth] = useState('2026-10');
-
+  const [selectedCustomDate, setSelectedCustomDate] = useState(() => getTodayVN().dateStr);
+  const [selectedCustomMonth, setSelectedCustomMonth] = useState(() => getTodayVN().monthStr);
+  const [selectedStaffFilter, setSelectedStaffFilter] = useState('ALL');
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
-
   const [isDayPickerOpen, setIsDayPickerOpen] = useState(false);
-
-  const [pickerYear, setPickerYear] = useState(2026);
-
-  const [pickerMonthIndex, setPickerMonthIndex] = useState(9); // 0-indexed: 9 = Tháng 10
+  const [pickerYear, setPickerYear] = useState(() => getTodayVN().year);
+  const [pickerMonthIndex, setPickerMonthIndex] = useState(() => getTodayVN().monthIndex);
 
 
 
@@ -1081,25 +1090,33 @@ export function OrdersPage() {
 
 
 
-  // Filtered orders for table (filtered by client payment method pill)
-
-  const filteredOrders = useMemo(() => {
-
-    return normalizedOrders.filter((o) => {
-
-      if (selectedPaymentMethod !== 'ALL') {
-
-        if (selectedPaymentMethod === 'CASH' && o.paymentMethod !== 'CASH') return false;
-
-        if (selectedPaymentMethod === 'BANK_TRANSFER' && (o.paymentMethod !== 'BANK_TRANSFER' && o.paymentMethod !== 'PAYOS' && o.paymentMethod !== 'WALLET')) return false;
-
+  // Unique staff list for Shop Owner filter
+  const availableStaffList = useMemo(() => {
+    const map = new Map();
+    (normalizedOrders || []).forEach((o) => {
+      const id = o.createdById || o.createdBy?.id || 0;
+      const name = o.createdBy?.fullName || (isEn ? 'Store Owner' : 'Chủ shop');
+      if (id && !map.has(id)) {
+        map.set(id, name);
       }
-
-      return true;
-
     });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [normalizedOrders, isEn]);
 
-  }, [normalizedOrders, selectedPaymentMethod]);
+  // Filtered orders for table (filtered by client payment method pill & staff)
+  const filteredOrders = useMemo(() => {
+    return normalizedOrders.filter((o) => {
+      if (selectedPaymentMethod !== 'ALL') {
+        if (selectedPaymentMethod === 'CASH' && o.paymentMethod !== 'CASH') return false;
+        if (selectedPaymentMethod === 'BANK_TRANSFER' && (o.paymentMethod !== 'BANK_TRANSFER' && o.paymentMethod !== 'PAYOS' && o.paymentMethod !== 'WALLET')) return false;
+      }
+      if (!staffMode && selectedStaffFilter !== 'ALL') {
+        const orderStaffId = o.createdById || o.createdBy?.id || 0;
+        if (String(orderStaffId) !== String(selectedStaffFilter)) return false;
+      }
+      return true;
+    });
+  }, [normalizedOrders, selectedPaymentMethod, selectedStaffFilter, staffMode]);
 
 
 
@@ -2218,43 +2235,32 @@ export function OrdersPage() {
         <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-blue-500/10 border border-emerald-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
 
           <div className="flex items-center gap-3">
-
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-
               <ShoppingCart className="w-5 h-5" />
-
             </div>
-
             <div>
-
               <div className="text-xs font-bold uppercase tracking-wider text-emerald-800">
-
-                {isEn ? 'Shift Operational Mode (Warehouse Staff & Cashier)' : 'Chế độ Vận hành Trong Ca Trực (Nhân viên Kho & Thu ngân)'}
-
+                {activeTab === 'TODAY'
+                  ? (isEn ? 'Shift Operational Mode (Warehouse Staff & Cashier)' : 'Chế độ Vận hành Trong Ca Trực (Nhân viên Kho & Thu ngân)')
+                  : (isEn ? 'Personal Order History (Warehouse Staff)' : 'Lịch sử Đơn Cá nhân Xử lý (Nhân viên Kho)')}
               </div>
-
               <div className="text-xs text-slate-600 mt-0.5">
-
-                {isEn
-
-                  ? 'Look up created invoices, reprint receipts for customers, and confirm Completed / Dispatched. Financial totals and order cancellation are reserved for Shop Owner.'
-
-                  : 'Tra cứu hóa đơn đã lập, in lại biên lai cho khách và xác nhận Hoàn tất / Xuất kho. Số liệu tài chính tổng & quyền hủy đơn thuộc thẩm quyền của Chủ shop.'}
-
+                {activeTab === 'TODAY'
+                  ? (isEn
+                      ? 'Viewing all shift orders created today across all staff (to lookup receipts, reprint for customers, and confirm Completed / Dispatched).'
+                      : 'Đang xem toàn bộ đơn trong ca trực hôm nay (tất cả nhân viên) để tra cứu hóa đơn, in lại biên lai cho khách và xác nhận xuất kho.')
+                  : (isEn
+                      ? 'Past order history: Only displaying orders processed directly by you. Orders of other staff in past days are restricted.'
+                      : 'Lịch sử các ngày trước: Chỉ hiển thị các đơn do chính bạn xử lý. Đơn của nhân viên khác ở các ngày trước được bảo mật theo quy định.')}
               </div>
-
             </div>
-
           </div>
-
           <div className="flex items-center gap-2 shrink-0">
-
             <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200">
-
-              {isEn ? 'Orders in Shift' : 'Đơn trong ca trực'}
-
+              {activeTab === 'TODAY'
+                ? (isEn ? 'Shift Orders Today' : 'Đơn trong ca trực hôm nay')
+                : (isEn ? 'Your Orders' : 'Đơn do bạn xử lý')}
             </span>
-
           </div>
 
         </div>
@@ -2666,55 +2672,42 @@ export function OrdersPage() {
                       <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 text-[11px]">
 
                         <div className="flex items-center gap-1.5">
-
-                          <button
-
-                            type="button"
-
-                            onClick={() => {
-
-                              handleCustomDateChange('2026-10-18');
-
-                              setPickerYear(2026);
-
-                              setPickerMonthIndex(9);
-
-                              setIsDayPickerOpen(false);
-
-                            }}
-
-                            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
-
-                          >
-
-                            Hôm nay (18/10)
-
-                          </button>
-
-                          <button
-
-                            type="button"
-
-                            onClick={() => {
-
-                              handleCustomDateChange('2026-10-17');
-
-                              setPickerYear(2026);
-
-                              setPickerMonthIndex(9);
-
-                              setIsDayPickerOpen(false);
-
-                            }}
-
-                            className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
-
-                          >
-
-                            Hôm qua (17/10)
-
-                          </button>
-
+                          {(() => {
+                            const todayVN = getTodayVN();
+                            const yest = new Date(Date.now() + 7 * 3600000 - 86400000);
+                            const y = yest.getUTCFullYear();
+                            const m = String(yest.getUTCMonth() + 1).padStart(2, '0');
+                            const d = String(yest.getUTCDate()).padStart(2, '0');
+                            const yestStr = `${y}-${m}-${d}`;
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleCustomDateChange(todayVN.dateStr);
+                                    setPickerYear(todayVN.year);
+                                    setPickerMonthIndex(todayVN.monthIndex);
+                                    setIsDayPickerOpen(false);
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
+                                >
+                                  Hôm nay (${todayVN.dateStr.slice(8, 10)}/${todayVN.dateStr.slice(5, 7)})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    handleCustomDateChange(yestStr);
+                                    setPickerYear(y);
+                                    setPickerMonthIndex(yest.getUTCMonth());
+                                    setIsDayPickerOpen(false);
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
+                                >
+                                  Hôm qua (${d}/${m})
+                                </button>
+                              </>
+                            );
+                          })()}
                         </div>
 
                         <button
@@ -3013,6 +3006,26 @@ export function OrdersPage() {
 
         })}
 
+        {!staffMode && availableStaffList.length > 1 && (
+          <div className="flex items-center gap-1.5 ml-auto text-xs bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-xl shadow-xs">
+            <Users className="w-3.5 h-3.5 text-blue-600" />
+            <span className="text-slate-500 font-bold text-[11px] uppercase tracking-wider">
+              {isEn ? 'Staff:' : 'Nhân viên:'}
+            </span>
+            <select
+              value={selectedStaffFilter}
+              onChange={(e) => setSelectedStaffFilter(e.target.value)}
+              className="bg-transparent text-slate-800 font-semibold text-xs focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="ALL">{isEn ? 'All Staff' : 'Tất cả nhân viên'}</option>
+              {availableStaffList.map((st) => (
+                <option key={st.id} value={st.id}>
+                  {st.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
 
@@ -3492,7 +3505,7 @@ export function OrdersPage() {
 
             <span className="text-slate-500 font-medium">
 
-              Hiển thị <span className="font-bold text-slate-800">{((pagination.page - 1) * pagination.limit) + 1}</span> - <span className="font-bold text-slate-800">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> trong tổng số <span className="font-bold text-blue-600">{pagination.total?.toLocaleString('vi-VN')}</span> {staffMode ? 'đơn trong ca' : 'đơn hàng'}
+              Hiển thị <span className="font-bold text-slate-800">{((pagination.page - 1) * pagination.limit) + 1}</span> - <span className="font-bold text-slate-800">{Math.min(pagination.page * pagination.limit, pagination.total)}</span> trong tổng số <span className="font-bold text-blue-600">{pagination.total?.toLocaleString('vi-VN')}</span> {staffMode ? (activeTab === 'TODAY' ? 'đơn trong ca' : 'đơn bạn xử lý') : 'đơn hàng'}
 
             </span>
 
