@@ -28,6 +28,8 @@ const PRODUCT_COLUMNS = {
   maxStockLevel: ['tonlonnhat', 'tontoida', 'maxstocklevel'],
   productType: ['loaihang'],
   isSelling: ['dangkinhdoanh'],
+  // StockPilot chưa lưu đơn vị tính; ĐVT chỉ dùng để ghép giá vốn theo "Tên (ĐVT)" ở trang giá vốn.
+  unit: ['dvt', 'donvitinh', 'donvi', 'unit'],
 };
 
 const SALES_COLUMNS = {
@@ -59,6 +61,7 @@ export const FIELD_LABELS = {
   maxStockLevel: 'Tồn lớn nhất',
   productType: 'Loại hàng',
   isSelling: 'Đang kinh doanh',
+  unit: 'ĐVT (để ghép giá vốn)',
   externalOrderId: 'Mã hóa đơn',
   soldAt: 'Thời gian bán',
   quantity: 'Số lượng',
@@ -231,6 +234,7 @@ function toStockQuantity(quantity) {
 /**
  * Chuyển các dòng dữ liệu thành payload cho POST /import/preview (sản phẩm).
  * Trả về { items, skipped: [{ row, reason }], warnings: [{ row, sku, field, message }] }.
+ * Mỗi item có thêm `excelRow`, `hasQuantity`, `hasCostPrice`, `unit` chỉ dùng phía trình duyệt: xem `toProductPayload`.
  * `warnings` là các dòng vẫn được nhập nhưng giá trị bị đổi so với file. `row` là số dòng trong Excel (bắt đầu từ 1).
  */
 export function toProductItems(rows, detection) {
@@ -259,7 +263,8 @@ export function toProductItems(rows, detection) {
     const categoryPath = text(cell(row, mapping, 'categoryName'));
     const categoryName = categoryPath ? categoryPath.split('>>').map((s) => s.trim()).filter(Boolean).pop() : 'Chưa phân loại';
     const warn = (message, field) => warnings.push({ row: excelRow, sku, field, message });
-    const quantity = toStockQuantity(numberCell(row, mapping, 'initialQuantity', warn));
+    const quantityInFile = numberCell(row, mapping, 'initialQuantity', warn);
+    const quantity = toStockQuantity(quantityInFile);
     if (quantity.warning) warn(quantity.warning, 'initialQuantity');
     const costPrice = numberCell(row, mapping, 'costPrice', warn);
     const sellingPrice = numberCell(row, mapping, 'sellingPrice', warn);
@@ -281,10 +286,183 @@ export function toProductItems(rows, detection) {
       initialQuantity: quantity.value,
       minStockLevel: min,
       maxStockLevel: Math.max(max, min),
+      // Chỉ dùng phía trình duyệt (bỏ trước khi gửi API): số dòng Excel để báo lỗi đúng dòng, và ô tồn kho
+      // có số đọc được hay không. Phiếu kiểm kho để trống ô "Thực tế" nghĩa là chưa đếm, không phải tồn = 0.
+      excelRow,
+      hasQuantity: quantityInFile !== undefined,
+      hasCostPrice: costPrice !== undefined,
+      unit: text(cell(row, mapping, 'unit')) || undefined,
     });
   });
 
   return { items, skipped, warnings };
+}
+
+export const PRODUCT_IMPORT_MODES = {
+  CREATE_ONLY: 'CREATE_ONLY',
+  UPSERT_METADATA: 'UPSERT_METADATA',
+  REPLACE_STOCK: 'REPLACE_STOCK',
+};
+
+/**
+ * Payload cho POST /import/preview theo chế độ nhập, kèm `rows`: số dòng Excel của từng phần tử
+ * (API báo lỗi theo vị trí trong payload, bắt đầu từ 1).
+ * - UPSERT_METADATA: không gửi tồn kho.
+ * - REPLACE_STOCK: tồn kho = số đếm trong file; dòng không có số đếm bị bỏ qua (`uncounted`).
+ * `excludedRows`: các dòng Excel người dùng đã loại khỏi lần nhập này.
+ */
+export function toProductPayload(items, mode, excludedRows = new Set()) {
+  const payload = [];
+  const rows = [];
+  const uncounted = [];
+  // hasCostPrice và unit chỉ dùng cho applyCostLookup, không gửi API.
+  for (const { excelRow, hasQuantity, hasCostPrice: _hasCostPrice, unit: _unit, ...item } of items) {
+    if (excludedRows.has(excelRow)) continue;
+    if (mode === PRODUCT_IMPORT_MODES.REPLACE_STOCK) {
+      if (!hasQuantity) {
+        uncounted.push(excelRow);
+        continue;
+      }
+      payload.push({ ...item, initialQuantity: 0, countedQuantity: item.initialQuantity });
+    } else if (mode === PRODUCT_IMPORT_MODES.UPSERT_METADATA) {
+      payload.push({ ...item, initialQuantity: 0 });
+    } else {
+      payload.push(item);
+    }
+    rows.push(excelRow);
+  }
+  return { payload, rows, uncounted };
+}
+
+// ─── Bảng giá vốn ở trang khác ───
+// File kiểm kho KiotViet để giá vốn ở trang riêng ("cost": Tên hàng hóa | Giá vốn), không có mã hàng,
+// nên chỉ ghép được theo tên.
+
+/**
+ * So khớp tên hàng: giữ dấu tiếng Việt ("Bơ" khác "Bò"), chỉ bỏ khác biệt hoa thường và khoảng trắng,
+ * kể cả khoảng trắng trong ngoặc: "Bánh Burger ( nhập hàng)" = "bánh burger (nhập hàng)".
+ */
+export function normalizeProductName(value) {
+  return String(value ?? '')
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/\(\s+/g, '(')
+    .replace(/\s+\)/g, ')')
+    .replace(/\s*\(/g, ' (')
+    .trim();
+}
+
+/**
+ * Tìm trang tính chỉ gồm tên hàng + giá vốn (không có mã hàng) để bổ sung giá vốn cho trang sản phẩm.
+ * Trả về { index, detection } hoặc null.
+ */
+export function findCostSheet(sheets, productSheetIndex) {
+  let best = null;
+  sheets.forEach((sheet, index) => {
+    if (index === productSheetIndex) return;
+    const detection = detectSheet(sheet.data, IMPORT_KINDS.PRODUCTS);
+    const { mapping } = detection;
+    if (mapping.productName === undefined || mapping.costPrice === undefined || mapping.sku !== undefined) return;
+    const name = normalizeHeader(sheet.sheet);
+    const score = (['cost', 'giavon', 'banggia', 'price'].some((h) => name.includes(h)) ? 10 : 0) - Object.keys(mapping).length;
+    if (!best || score > best.score) best = { index, detection, score };
+  });
+  return best && { index: best.index, detection: best.detection };
+}
+
+/**
+ * Bảng tên → giá vốn. Tên có nhiều giá khác nhau (vd. giá theo kg và theo gram) bị đưa vào `ambiguous`
+ * thay vì đoán; ô giá trống hoặc không đọc được bị bỏ qua.
+ */
+export function buildCostLookup(rows, detection) {
+  const { headerIndex, mapping } = detection;
+  const values = new Map();
+  rows.slice(headerIndex + 1).forEach((row) => {
+    const name = normalizeProductName(cell(row || [], mapping, 'productName'));
+    const cost = parseNumber(cell(row || [], mapping, 'costPrice'));
+    if (!name || cost === undefined || cost < 0) return;
+    if (!values.has(name)) values.set(name, new Set());
+    values.get(name).add(cost);
+  });
+  const costs = new Map();
+  const ambiguous = new Map();
+  for (const [name, set] of values) {
+    if (set.size === 1) costs.set(name, [...set][0]);
+    else ambiguous.set(name, [...set].sort((a, b) => a - b));
+  }
+  return { costs, ambiguous };
+}
+
+const UNIT_SYNONYMS = [
+  ['g', 'gr', 'gram', 'gam'],
+  ['kg', 'kilogram', 'kilo'],
+  ['l', 'lít', 'lit', 'liter'],
+  ['ml', 'mililit'],
+];
+
+/** Các cách viết của một ĐVT: "Kilogram (kg)" → kilogram (kg), kg, kilogram, kilo. */
+function unitVariants(unit) {
+  const raw = normalizeProductName(unit);
+  if (!raw) return [];
+  const inner = raw.match(/\(([^)]+)\)/)?.[1]?.trim();
+  const bare = raw.replace(/\s*\([^)]*\)/, '').trim();
+  const variants = new Set([raw, inner, bare].filter(Boolean));
+  for (const v of variants) {
+    const group = UNIT_SYNONYMS.find((g) => g.includes(v));
+    if (group) group.forEach((g) => variants.add(g));
+  }
+  return [...variants];
+}
+
+/**
+ * Điền giá vốn từ bảng tên → giá cho các dòng mà trang sản phẩm không có giá vốn (giá trong trang sản phẩm luôn được ưu tiên).
+ * Thứ tự ghép:
+ * 1. "Tên (ĐVT)" khớp đúng đơn vị của dòng, vd. "Kem vị dừa (nhập hàng) (kg)" cho mã tính theo kg.
+ * 2. Chỉ theo tên, nhưng không áp dụng khi tên đó dùng cho nhiều mã trong trang sản phẩm (vd. "Nho đen" theo kg
+ *    và theo quả), vì một giá theo tên không thể đúng cho cả hai.
+ * Trả về { items, matched, unmatched: [{ row, sku, name }], ambiguous: [{ row, sku, name, values?, sharedName? }] }.
+ */
+export function applyCostLookup(items, lookup) {
+  const nameCount = new Map();
+  items.forEach((item) => {
+    const name = normalizeProductName(item.productName);
+    nameCount.set(name, (nameCount.get(name) || 0) + 1);
+  });
+  let matched = 0;
+  const unmatched = [];
+  const ambiguous = [];
+  const next = items.map((item) => {
+    if (item.hasCostPrice) return item;
+    const name = normalizeProductName(item.productName);
+    const unitCosts = new Set(
+      unitVariants(item.unit)
+        .map((u) => normalizeProductName(`${item.productName} (${u})`))
+        .filter((key) => lookup.costs.has(key))
+        .map((key) => lookup.costs.get(key))
+    );
+    if (unitCosts.size === 1) {
+      matched += 1;
+      return { ...item, costPrice: [...unitCosts][0] };
+    }
+    if (unitCosts.size > 1) {
+      ambiguous.push({ row: item.excelRow, sku: item.sku, name: item.productName, values: [...unitCosts].sort((a, b) => a - b) });
+      return item;
+    }
+    if (nameCount.get(name) > 1 && (lookup.costs.has(name) || lookup.ambiguous.has(name))) {
+      ambiguous.push({ row: item.excelRow, sku: item.sku, name: item.productName, sharedName: true });
+      return item;
+    }
+    if (lookup.costs.has(name)) {
+      matched += 1;
+      return { ...item, costPrice: lookup.costs.get(name) };
+    }
+    const entry = { row: item.excelRow, sku: item.sku, name: item.productName };
+    if (lookup.ambiguous.has(name)) ambiguous.push({ ...entry, values: lookup.ambiguous.get(name) });
+    else unmatched.push(entry);
+    return item;
+  });
+  return { items: next, matched, unmatched, ambiguous };
 }
 
 /** Chuyển chi tiết hóa đơn thành payload cho POST /historical-sales/preview. Hóa đơn đã hủy bị bỏ qua. */
