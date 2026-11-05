@@ -14,6 +14,7 @@ import { AddProduct } from "../../components/AddProduct";
 import { useToast } from "../../components/common/Toast";
 import { useTranslation } from "../../i18n/useTranslation";
 import { uploadImageToCloudinary, uploadBase64ToCloudinary } from "../../services/uploadService";
+import { RedLightningLogo } from "../../components/common/RedLightningLogo";
 
 function safeNum(val) {
   if (val === null || val === undefined) return 0;
@@ -1419,8 +1420,8 @@ export function ProductsPage() {
 
         {/* Card 2: Khuyến mãi */}
         <div className="pp-stat-card">
-          <div className="pp-stat-icon-wrap" style={{ background: "#fff7ed", color: "#ea580c" }}>
-            <Zap style={{ width: 26, height: 26, fill: "#ea580c" }} />
+          <div className="pp-stat-icon-wrap" style={{ background: "#fef2f2", color: "#c31c2e" }}>
+            <RedLightningLogo style={{ width: 22, height: 26, color: "#c31c2e" }} />
           </div>
           <div>
             <div className="pp-stat-label">{t('productsFlashSale', 'KHUYẾN MÃI')}</div>
