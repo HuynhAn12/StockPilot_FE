@@ -655,7 +655,7 @@ export function OrdersPage() {
 
     setReturnModalOrder(ord);
 
-    setReturnTab(ord.status === 'DRAFT' ? 'CANCEL_ALL' : 'PARTIAL');
+    setReturnTab(staffMode ? 'CANCEL_ALL' : (ord.status === 'DRAFT' ? 'CANCEL_ALL' : 'PARTIAL'));
 
     const initQty = {};
 
@@ -3325,41 +3325,58 @@ export function OrdersPage() {
 
 
 
-                              {/* Đổi trả hàng & Hoàn tiền (Thay thế thùng rác) */}
+                              {/* Hủy đơn hàng (Chỉ cho phép đơn do chính nhân viên tạo trong ngày hôm nay) */}
 
-                              {ord.status === 'CANCELED' || ord.status === 'CANCELLED' ? (
+                              {(() => {
+                                if (ord.status === 'CANCELED' || ord.status === 'CANCELLED') {
+                                  return (
+                                    <span
+                                      className="w-7 h-7 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                      title="Đơn hàng này đã bị hủy hoàn toàn"
+                                    >
+                                      <ReturnOrderIcon className="w-3.5 h-3.5" />
+                                    </span>
+                                  );
+                                }
+                                const orderTime = ord.createdAt ? new Date(ord.createdAt).getTime() : 0;
+                                const now = new Date();
+                                const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+                                const isOrderToday = orderTime >= startOfToday;
+                                const isOrderCreator = Number(ord.createdById || ord.createdBy?.id) === Number(user?.id);
 
-                                <span
+                                if (!isOrderToday) {
+                                  return (
+                                    <span
+                                      className="w-7 h-7 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                      title="Đơn hàng ngày trước — Chỉ Chủ cửa hàng mới có quyền hủy"
+                                    >
+                                      <ReturnOrderIcon className="w-3.5 h-3.5" />
+                                    </span>
+                                  );
+                                }
 
-                                  className="w-7 h-7 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                if (!isOrderCreator) {
+                                  return (
+                                    <span
+                                      className="w-7 h-7 rounded-lg border border-slate-100 bg-slate-50 text-slate-300 flex items-center justify-center cursor-not-allowed"
+                                      title="Đơn do người khác tạo — Bạn chỉ có quyền hủy đơn do chính mình tạo hôm nay"
+                                    >
+                                      <ReturnOrderIcon className="w-3.5 h-3.5" />
+                                    </span>
+                                  );
+                                }
 
-                                  title="Đơn hàng này đã bị hủy hoàn toàn"
-
-                                >
-
-                                  <ReturnOrderIcon className="w-3.5 h-3.5" />
-
-                                </span>
-
-                              ) : (
-
-                                <button
-
-                                  onClick={() => handleOpenReturnModal(ord)}
-
-                                  disabled={actionLoading}
-
-                                  className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
-
-                                  title="Đổi trả hàng & Hoàn tiền (Trả 1 số món hoặc hủy toàn bộ)"
-
-                                >
-
-                                  <ReturnOrderIcon className="w-3.5 h-3.5" />
-
-                                </button>
-
-                              )}
+                                return (
+                                  <button
+                                    onClick={() => handleOpenReturnModal(ord)}
+                                    disabled={actionLoading}
+                                    className="w-7 h-7 rounded-lg border border-slate-200/80 bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                                    title="Hủy đơn hàng (đơn do bạn tạo hôm nay)"
+                                  >
+                                    <ReturnOrderIcon className="w-3.5 h-3.5" />
+                                  </button>
+                                );
+                              })()}
 
                             </>
 
@@ -3939,7 +3956,20 @@ export function OrdersPage() {
 
             {/* Tabs */}
 
-            <div className="flex border-b border-border bg-slate-100/60 p-1.5 gap-1.5">
+            {staffMode ? (
+              <div className="flex border-b border-border bg-rose-50/60 p-2.5 items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="text-xs font-bold text-rose-800">
+                    Xác nhận hủy đơn hàng trong ca trực hôm nay
+                  </span>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-500">
+                  Hàng sẽ tự động hoàn kho
+                </span>
+              </div>
+            ) : (
+              <div className="flex border-b border-border bg-slate-100/60 p-1.5 gap-1.5">
 
               <button
 
@@ -3990,6 +4020,7 @@ export function OrdersPage() {
               </button>
 
             </div>
+            )}
 
 
 
