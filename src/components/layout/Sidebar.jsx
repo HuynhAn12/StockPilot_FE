@@ -30,7 +30,7 @@ const NAV_ITEM_CONFIG = [
   { key: 'navAlerts', sectionKey: 'decisionSupportSection', defaultName: 'Cảnh báo rủi ro', defaultSection: 'Hỗ trợ quyết định', href: '/alerts', icon: AlertTriangle, badgeKey: 'alerts', badgeVariant: 'error', roles: ['store_owner','warehouse_staff'] },
   { key: 'navPricing', defaultName: 'Gợi ý giá bán', href: '/pricing', icon: Tag, badgeKey: 'pricing', badgeVariant: 'purple', roles: ['store_owner'] },
   { key: 'navAnalytics', defaultName: 'Phân tích & Báo cáo', href: '/analytics', icon: TrendingUp, roles: ['store_owner'] },
-  { key: 'navAiPilot', defaultName: 'Trợ lý AI Pilot', href: '/ai-assistant', icon: Bot, roles: ['store_owner','warehouse_staff'] },
+  { key: 'navAiPilot', defaultName: 'Trợ lý AI Pilot', href: '/ai-assistant', icon: Bot, roles: ['store_owner'] },
   // Cấu hình (Chủ shop)
   { key: 'navSettings', sectionKey: 'configSection', defaultName: 'Cài đặt hệ thống', defaultSection: 'Cấu hình', href: '/settings', icon: Settings, roles: ['store_owner'] },
   { key: 'navImport', defaultName: 'Nhập dữ liệu', href: '/import', icon: FileUp, roles: ['store_owner'] },
@@ -101,7 +101,7 @@ export function Sidebar() {
     () =>
       NAV_ITEM_CONFIG.filter((item) => item.roles.includes(currentRole)).map((item) => {
         let badge = undefined;
-        if (item.badgeKey === 'alerts') badge = openAlertsCount;
+        if (item.badgeKey === 'alerts') badge = openAlertsCount || undefined;
         if (item.badgeKey === 'pricing') badge = pendingPricingCount;
         if (item.badgeKey === 'support') badge = attention.support || undefined;
         if (item.badgeKey === 'leads') badge = attention.leads || undefined;

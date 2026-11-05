@@ -5,7 +5,7 @@ import { PlatformAnnouncement } from './PlatformAnnouncement';
 import { AIChatBox } from '../common/AIChatBox';
 import { useUIStore } from '../store/uiStore';
 import { useAuthStore } from '../store/authStore';
-import { normalizeRole } from '../../config/permissions.config';
+import { normalizeRole, canUseAiAssistant } from '../../config/permissions.config';
 import { cn } from '../lib/utils';
 
 export function MainLayout() {
@@ -14,6 +14,7 @@ export function MainLayout() {
   const isAdmin = normalizeRole(user?.role) === 'admin';
   const location = useLocation();
   const isAIAssistant = location.pathname.startsWith('/ai-assistant');
+  const canUseAi = canUseAiAssistant(user?.role);
 
   return (
     <div
@@ -49,8 +50,8 @@ export function MainLayout() {
         </main>
       </div>
 
-      {/* Floating AI Assistant Chat Box (Chỉ cho Chủ shop & Nhân viên kho có dữ liệu sản phẩm) */}
-      {!isAdmin && <AIChatBox />}
+      {/* Floating AI Assistant Chat Box (chỉ chủ cửa hàng) */}
+      {canUseAi && <AIChatBox />}
     </div>
   );
 }

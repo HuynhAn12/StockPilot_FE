@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import readXlsxFile from 'read-excel-file/browser';
 import {
@@ -6,7 +6,8 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
 import {
-  IMPORT_KINDS, FIELD_LABELS, detectSheet, pickSheet, toProductItems, toSalesRows, parseCsv, buildTemplateCsv,
+  IMPORT_KINDS, FIELD_LABELS, PRODUCT_IMPORT_MODES, detectSheet, pickSheet, toProductItems, toProductPayload, toSalesRows,
+  parseCsv, buildTemplateCsv, findCostSheet, buildCostLookup, applyCostLookup,
 } from '../../lib/spreadsheetImport';
 import { apiPreviewProductImport, apiCommitProductImport, apiPreviewSalesImport, apiCommitSalesImport } from '../../services/importService';
 import { adminStyles as ui } from '../admin/adminStyles';
@@ -14,6 +15,22 @@ import { adminStyles as ui } from '../admin/adminStyles';
 const SALES_BATCH = 5000;
 const MAX_FILE_MB = 10;
 const ACCEPTED = /\.(xlsx|csv)$/i;
+
+const PRODUCT_MODES = [
+  [PRODUCT_IMPORT_MODES.CREATE_ONLY, 'Chỉ thêm mã hàng mới', 'Mã đã có trong StockPilot được báo lỗi, không bị ghi đè.'],
+  [PRODUCT_IMPORT_MODES.UPSERT_METADATA, 'Cập nhật tên, giá, nhóm hàng', 'Không thay đổi tồn kho hiện có.'],
+  [
+    PRODUCT_IMPORT_MODES.REPLACE_STOCK,
+    'Cập nhật tồn theo kiểm kê',
+    'Tồn kho của mã đã có = số đếm trong file, ghi phiếu điều chỉnh vào sổ kho. Không đổi tên, giá.',
+  ],
+];
+
+// Chế độ nhập quyết định cảnh báo nào ở bước 2 còn liên quan.
+const IGNORED_WARNING_FIELDS = {
+  [PRODUCT_IMPORT_MODES.UPSERT_METADATA]: ['initialQuantity'],
+  [PRODUCT_IMPORT_MODES.REPLACE_STOCK]: ['costPrice', 'sellingPrice'],
+};
 
 const KINDS = [
   { id: IMPORT_KINDS.PRODUCTS, icon: Package, title: 'Sản phẩm & tồn kho', desc: 'Mã hàng, tên, nhóm hàng, giá bán, giá vốn, tồn kho hiện tại.' },
@@ -90,9 +107,136 @@ async function readSheets(file) {
 }
 
 function convertSheet(sheet, kind, detection = detectSheet(sheet.data, kind)) {
-  if (!detection.kind) return { detection, payload: [], skipped: [] };
+  if (!detection.kind) return { detection, payload: [], skipped: [], warnings: [] };
   const converted = kind === IMPORT_KINDS.PRODUCTS ? toProductItems(sheet.data, detection) : toSalesRows(sheet.data, detection);
-  return { detection, payload: converted.items || converted.rows, skipped: converted.skipped };
+  return { detection, payload: converted.items || converted.rows, skipped: converted.skipped, warnings: converted.warnings || [] };
+}
+
+const formatMoney = (n) => n.toLocaleString('vi-VN', { maximumFractionDigits: 2 });
+
+function CostSheetPanel({ match, enabled, onToggle }) {
+  const total = match.matched + match.unmatched.length + match.ambiguous.length;
+  return (
+    <div className="rounded-lg border border-[#E5E7EB] p-3 text-[13px] space-y-2">
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input type="checkbox" className="mt-0.5" checked={enabled} onChange={(e) => onToggle(e.target.checked)} />
+        <span>
+          <span className="block font-medium text-[#334155]">Lấy giá vốn từ trang “{match.sheetName}”</span>
+          <span className="block text-[12px] text-[#64748B]">
+            Ghép theo “Tên (ĐVT)” rồi theo tên hàng (không phân biệt hoa thường). Chỉ điền cho dòng chưa có giá vốn.
+          </span>
+        </span>
+      </label>
+      {total > 0 && (
+        <p className="text-[#475569]">
+          Khớp <b className="text-emerald-700">{match.matched.toLocaleString('vi-VN')}</b>/{total.toLocaleString('vi-VN')} mã
+          {match.unmatched.length > 0 && <>, <b>{match.unmatched.length}</b> mã không tìm thấy tên</>}
+          {match.ambiguous.length > 0 && (
+            <>, <b className="text-[#D97706]">{match.ambiguous.length}</b> mã trùng tên hoặc có nhiều giá nên để 0</>
+          )}
+          .
+        </p>
+      )}
+      {match.ambiguous.length > 0 && (
+        <details className="text-[12px] text-[#64748B]">
+          <summary className="cursor-pointer">Xem mã không ghép được vì trùng tên hoặc nhiều giá (thường do khác đơn vị tính, cần nhập tay)</summary>
+          <ul className="mt-1.5 max-h-40 overflow-y-auto space-y-0.5">
+            {match.ambiguous.map((a) => (
+              <li key={a.row}>
+                Dòng {a.row} · {a.sku} · {a.name}:{' '}
+                {a.sharedName ? 'tên này dùng cho nhiều mã trong file' : a.values.map(formatMoney).join(' / ')}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {match.unmatched.length > 0 && (
+        <details className="text-[12px] text-[#64748B]">
+          <summary className="cursor-pointer">Xem mã không tìm thấy giá vốn (giữ 0)</summary>
+          <ul className="mt-1.5 max-h-40 overflow-y-auto space-y-0.5">
+            {match.unmatched.slice(0, 300).map((u) => (
+              <li key={u.row}>
+                Dòng {u.row} · {u.sku} · {u.name}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Chênh lệch tồn kho của bản xem trước "Cập nhật tồn theo kiểm kê": tồn trong StockPilot → số đếm.
+ * Dòng lỗi không được tính vì sẽ không được nhập.
+ */
+function stockChangesOf(res, toExcelRow) {
+  const errorRows = new Set((res.issues || []).filter((i) => i.severity === 'ERROR').map((i) => i.row));
+  const rows = (res.previewItems || [])
+    .filter((item) => !errorRows.has(item.row) && item.currentQuantity !== undefined)
+    .map((item) => ({
+      row: toExcelRow(item.row),
+      sku: item.sku,
+      name: item.productName,
+      before: item.currentQuantity,
+      after: item.countedQuantity,
+      delta: item.countedQuantity - item.currentQuantity,
+    }));
+  const changed = rows.filter((r) => r.delta !== 0).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  return {
+    unchanged: rows.length - changed.length,
+    changed,
+    increase: changed.filter((r) => r.delta > 0).reduce((sum, r) => sum + r.delta, 0),
+    decrease: changed.filter((r) => r.delta < 0).reduce((sum, r) => sum + r.delta, 0),
+  };
+}
+
+const formatSigned = (n) => `${n > 0 ? '+' : ''}${n.toLocaleString('vi-VN')}`;
+
+function StockChangeSummary({ changes }) {
+  return (
+    <div className="rounded-lg border border-[#E5E7EB] text-[13px]">
+      <p className="px-3 py-2 border-b border-[#E5E7EB] text-[#475569]">
+        <b className="text-[#334155]">{changes.changed.length.toLocaleString('vi-VN')}</b> mã sẽ đổi tồn kho
+        {changes.changed.length > 0 && (
+          <>
+            {' '}(tăng <b className="text-emerald-700">{formatSigned(changes.increase)}</b>, giảm{' '}
+            <b className="text-[#DC2626]">{formatSigned(changes.decrease)}</b> đơn vị)
+          </>
+        )}
+        , <b className="text-[#334155]">{changes.unchanged.toLocaleString('vi-VN')}</b> mã khớp số đếm.
+      </p>
+      {changes.changed.length > 0 && (
+        <div className="max-h-56 overflow-y-auto">
+          <table className="w-full">
+            <thead className="sticky top-0 bg-[#F8FAFC] text-[12px] text-[#64748B]">
+              <tr>
+                <th className="text-left font-medium px-3 py-1.5">Mặt hàng</th>
+                <th className="text-right font-medium px-3 py-1.5">Hiện tại</th>
+                <th className="text-right font-medium px-3 py-1.5">Số đếm</th>
+                <th className="text-right font-medium px-3 py-1.5">Chênh lệch</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E5E7EB]">
+              {changes.changed.slice(0, 200).map((c) => (
+                <tr key={c.row}>
+                  <td className="px-3 py-1.5">
+                    <span className="block text-[#334155] truncate max-w-[280px]" title={c.name}>{c.name}</span>
+                    <span className="block text-[11px] text-[#94A3B8]">Dòng {c.row} · {c.sku}</span>
+                  </td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{c.before.toLocaleString('vi-VN')}</td>
+                  <td className="px-3 py-1.5 text-right tabular-nums">{c.after.toLocaleString('vi-VN')}</td>
+                  <td className={`px-3 py-1.5 text-right tabular-nums font-medium ${c.delta > 0 ? 'text-emerald-700' : 'text-[#DC2626]'}`}>
+                    {formatSigned(c.delta)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ImportDataPage() {
@@ -106,10 +250,24 @@ export function ImportDataPage() {
   const [parsed, setParsed] = useState(null);
   const [sheets, setSheets] = useState([]);
   const [sheetIndex, setSheetIndex] = useState(0);
-  const [productMode, setProductMode] = useState('CREATE_ONLY');
+  const [productMode, setProductMode] = useState(PRODUCT_IMPORT_MODES.CREATE_ONLY);
+  // Dòng Excel người dùng đã loại khỏi lần nhập (vd. mã chưa có trong StockPilot khi cập nhật tồn).
+  const [excludedRows, setExcludedRows] = useState(() => new Set());
+  // Trang chỉ có "Tên hàng | Giá vốn" (vd. trang "cost" của phiếu kiểm kho KiotViet) để bổ sung giá vốn theo tên.
+  const [costSheet, setCostSheet] = useState(null);
+  const [useCostSheet, setUseCostSheet] = useState(true);
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState('');
+
+  const costMatch = useMemo(() => {
+    if (!costSheet || !parsed || kind !== IMPORT_KINDS.PRODUCTS || !parsed.detection?.kind) return null;
+    const lookup = buildCostLookup(sheets[costSheet.index].data, costSheet.detection);
+    return { sheetName: sheets[costSheet.index].sheet, ...applyCostLookup(parsed.payload, lookup) };
+  }, [costSheet, parsed, sheets, kind]);
+  // Giá vốn chỉ có ý nghĩa khi chế độ nhập ghi giá (không áp dụng cho "Cập nhật tồn theo kiểm kê").
+  const costSheetApplies = Boolean(costMatch) && productMode !== PRODUCT_IMPORT_MODES.REPLACE_STOCK;
+  const productItems = costSheetApplies && useCostSheet ? costMatch.items : parsed?.payload || [];
 
   const reset = () => {
     setFileName('');
@@ -117,6 +275,9 @@ export function ImportDataPage() {
     setSheets([]);
     setPreview(null);
     setResult(null);
+    setExcludedRows(new Set());
+    setCostSheet(null);
+    setUseCostSheet(true);
   };
 
   const selectKind = (next) => {
@@ -145,6 +306,7 @@ export function ImportDataPage() {
       setSheets(workbook);
       setSheetIndex(index);
       setParsed(convertSheet(workbook[index], kind, picked.detection || undefined));
+      setCostSheet(kind === IMPORT_KINDS.PRODUCTS ? findCostSheet(workbook, index) : null);
     } catch {
       toast({ type: 'error', title: 'Không đọc được file', description: 'File có thể bị hỏng hoặc đang đặt mật khẩu. Hãy xuất lại file.' });
     } finally {
@@ -152,16 +314,30 @@ export function ImportDataPage() {
     }
   };
 
-  const productPayload = () =>
-    productMode === 'UPSERT_METADATA' ? parsed.payload.map((item) => ({ ...item, initialQuantity: 0 })) : parsed.payload;
+  const productPayload = (excluded = excludedRows) => toProductPayload(productItems, productMode, excluded);
 
-  const handleCheck = async () => {
+  const handleCheck = async (excluded = excludedRows) => {
     setBusy('check');
     setPreview(null);
     try {
       if (kind === IMPORT_KINDS.PRODUCTS) {
-        const res = await apiPreviewProductImport(productPayload(), productMode);
-        setPreview({ batches: [res.jobId], total: res.totalRows, valid: res.validRows, invalid: res.invalidRows, warnings: res.warningRows, issues: res.issues || [] });
+        const { payload, rows } = productPayload(excluded);
+        if (payload.length === 0) {
+          toast({ type: 'warning', title: 'Không còn dòng nào để nhập', description: 'Kiểm tra lại file hoặc chế độ nhập.' });
+          return;
+        }
+        const res = await apiPreviewProductImport(payload, productMode);
+        // API đánh số dòng theo vị trí trong payload: đổi về số dòng Excel để người dùng tìm được.
+        const toExcelRow = (row) => rows[row - 1] ?? row;
+        setPreview({
+          batches: [res.jobId],
+          total: res.totalRows,
+          valid: res.validRows,
+          invalid: res.invalidRows,
+          warnings: res.warningRows,
+          issues: (res.issues || []).map((issue) => ({ ...issue, row: toExcelRow(issue.row) })),
+          stockChanges: productMode === PRODUCT_IMPORT_MODES.REPLACE_STOCK ? stockChangesOf(res, toExcelRow) : null,
+        });
       } else {
         // Backend nhận tối đa 5.000 dòng/lần: chia lô, mỗi lô một job.
         const totals = { batches: [], total: 0, valid: 0, invalid: 0, warnings: 0, issues: [] };
@@ -192,13 +368,25 @@ export function ImportDataPage() {
     }
   };
 
+  // Loại các dòng lỗi (vd. mã hàng chưa có) rồi kiểm tra lại, để phần còn lại vẫn nhập được.
+  const excludeErrorRowsAndRecheck = () => {
+    const next = new Set(excludedRows);
+    preview.issues.filter((issue) => issue.severity === 'ERROR').forEach((issue) => next.add(issue.row));
+    setExcludedRows(next);
+    handleCheck(next);
+  };
+
   const handleCommit = async () => {
     setBusy('commit');
     try {
       if (kind === IMPORT_KINDS.PRODUCTS) {
         const res = await apiCommitProductImport(preview.batches[0]);
         const sum = res.summary || res.data?.summary || {};
-        setResult(`Đã nhập ${sum.createdSkus ?? preview.valid} mã hàng${sum.updatedSkus ? `, cập nhật ${sum.updatedSkus}` : ''}.`);
+        setResult(
+          productMode === PRODUCT_IMPORT_MODES.REPLACE_STOCK
+            ? `Đã cập nhật tồn kho cho ${sum.updatedSkus ?? preview.valid} mã hàng theo số kiểm kê.`
+            : `Đã nhập ${sum.createdSkus ?? preview.valid} mã hàng${sum.updatedSkus ? `, cập nhật ${sum.updatedSkus}` : ''}.`
+        );
       } else {
         for (const jobId of preview.batches) await apiCommitSalesImport(jobId);
         setResult(`Đã nhập ${preview.valid.toLocaleString('vi-VN')} dòng lịch sử bán hàng.`);
@@ -214,6 +402,12 @@ export function ImportDataPage() {
   const source = SOURCES.find((s) => s.id === sourceId);
   const detection = parsed?.detection;
   const step2Done = Boolean(parsed && detection?.kind && detection.missing.length === 0 && parsed.payload.length > 0);
+  const ignoredWarningFields = IGNORED_WARNING_FIELDS[productMode] || [];
+  const fileWarnings = (parsed?.warnings || []).filter((w) => !ignoredWarningFields.includes(w.field));
+  const uncountedRows =
+    kind === IMPORT_KINDS.PRODUCTS && parsed && productMode === PRODUCT_IMPORT_MODES.REPLACE_STOCK
+      ? productPayload().uncounted
+      : [];
 
   return (
     <div className={ui.pageContainer}>
@@ -291,6 +485,8 @@ export function ImportDataPage() {
                     const index = Number(e.target.value);
                     setSheetIndex(index);
                     setPreview(null);
+                    setExcludedRows(new Set());
+                    setCostSheet(kind === IMPORT_KINDS.PRODUCTS ? findCostSheet(sheets, index) : null);
                     setParsed(convertSheet(sheets[index], kind));
                   }}
                   className={`${ui.select} w-auto`}
@@ -335,8 +531,27 @@ export function ImportDataPage() {
                         , bỏ qua <b>{parsed.skipped.length}</b> dòng
                       </>
                     )}
+                    {fileWarnings.length > 0 && (
+                      <>
+                        , <b className="text-[#D97706]">{fileWarnings.length}</b> dòng bị điều chỉnh giá trị
+                      </>
+                    )}
                     .
                   </p>
+                )}
+                {costSheetApplies && <CostSheetPanel match={costMatch} enabled={useCostSheet} onToggle={(v) => { setUseCostSheet(v); setPreview(null); }} />}
+                {fileWarnings.length > 0 && (
+                  <details className="text-[12px] text-[#64748B]">
+                    <summary className="cursor-pointer">Xem các giá trị bị điều chỉnh (nên sửa trong file nếu sai)</summary>
+                    <ul className="mt-1.5 max-h-40 overflow-y-auto space-y-0.5">
+                      {fileWarnings.slice(0, 200).map((w, i) => (
+                        <li key={`${w.row}-${i}`}>
+                          Dòng {w.row} · {w.sku}: {w.message}
+                        </li>
+                      ))}
+                    </ul>
+                    {fileWarnings.length > 200 && <p className="mt-1">… và {fileWarnings.length - 200} dòng khác.</p>}
+                  </details>
                 )}
                 {parsed.skipped.length > 0 && (
                   <details className="text-[12px] text-[#64748B]">
@@ -356,11 +571,8 @@ export function ImportDataPage() {
 
           <Step n={3} title="Kiểm tra và nhập" active={step2Done} done={Boolean(result)}>
             {kind === IMPORT_KINDS.PRODUCTS && (
-              <div className="grid sm:grid-cols-2 gap-2 mb-4 text-[13px]">
-                {[
-                  ['CREATE_ONLY', 'Chỉ thêm mã hàng mới', 'Mã đã có trong StockPilot được báo lỗi, không bị ghi đè.'],
-                  ['UPSERT_METADATA', 'Cập nhật tên, giá, nhóm hàng', 'Không thay đổi tồn kho hiện có.'],
-                ].map(([value, label, hint]) => (
+              <div className="grid sm:grid-cols-3 gap-2 mb-4 text-[13px]">
+                {PRODUCT_MODES.map(([value, label, hint]) => (
                   <label key={value} className={`flex gap-2 p-3 rounded-lg border cursor-pointer ${productMode === value ? 'border-[#3B82F6]' : 'border-[#E5E7EB]'}`}>
                     <input
                       type="radio"
@@ -369,6 +581,7 @@ export function ImportDataPage() {
                       onChange={() => {
                         setProductMode(value);
                         setPreview(null);
+                        setExcludedRows(new Set());
                       }}
                       disabled={!step2Done}
                     />
@@ -381,8 +594,29 @@ export function ImportDataPage() {
               </div>
             )}
 
+            {kind === IMPORT_KINDS.PRODUCTS && uncountedRows.length > 0 && !preview && (
+              <p className="mb-3 text-[13px] text-[#475569]">
+                <b>{uncountedRows.length}</b> dòng chưa có số đếm (ô tồn kho trống) sẽ được bỏ qua, tồn kho của các mã đó giữ nguyên.
+              </p>
+            )}
+            {excludedRows.size > 0 && !result && (
+              <p className="mb-3 text-[13px] text-[#475569]">
+                Đã loại <b>{excludedRows.size}</b> dòng lỗi khỏi lần nhập này.{' '}
+                <button
+                  type="button"
+                  className="text-[#3B82F6] hover:underline cursor-pointer"
+                  onClick={() => {
+                    setExcludedRows(new Set());
+                    setPreview(null);
+                  }}
+                >
+                  Đưa lại vào
+                </button>
+              </p>
+            )}
+
             {!preview && (
-              <button type="button" onClick={handleCheck} disabled={!step2Done || busy === 'check'} className={ui.btnPrimary}>
+              <button type="button" onClick={() => handleCheck()} disabled={!step2Done || busy === 'check'} className={ui.btnPrimary}>
                 {busy === 'check' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 Kiểm tra với dữ liệu cửa hàng
               </button>
@@ -402,6 +636,7 @@ export function ImportDataPage() {
                     </div>
                   ))}
                 </div>
+                {preview.stockChanges && <StockChangeSummary changes={preview.stockChanges} />}
                 {preview.issues.length > 0 && (
                   <ul className="max-h-56 overflow-y-auto border border-[#E5E7EB] rounded-lg divide-y divide-[#E5E7EB] text-[13px]">
                     {preview.issues.slice(0, 100).map((issue, i) => (
@@ -420,6 +655,11 @@ export function ImportDataPage() {
                     {busy === 'commit' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                     Nhập {preview.valid.toLocaleString('vi-VN')} dòng hợp lệ
                   </button>
+                  {kind === IMPORT_KINDS.PRODUCTS && preview.invalid > 0 && (
+                    <button type="button" onClick={excludeErrorRowsAndRecheck} disabled={busy === 'check'} className={ui.btnSecondary}>
+                      Bỏ {preview.invalid.toLocaleString('vi-VN')} dòng lỗi và kiểm tra lại
+                    </button>
+                  )}
                   <button type="button" onClick={() => setPreview(null)} disabled={busy === 'commit'} className={ui.btnSecondary}>
                     <ArrowLeft className="w-3.5 h-3.5" />
                     Kiểm tra lại

@@ -9,6 +9,10 @@ import {
   apiResolveAlert,
   apiRecalculateAlerts,
 } from '../../services/inventoryService';
+import { useAuthStore } from './authStore';
+import { canRunDecisionEngine } from '../../config/permissions.config';
+
+const mayRunEngine = () => canRunDecisionEngine(useAuthStore.getState().user?.role);
 
 export const useAlertsStore = create((set, get) => ({
   alerts: [],
@@ -47,8 +51,8 @@ export const useAlertsStore = create((set, get) => ({
 
       set({ alerts: items, stats, isLoading: false });
 
-      // If store has never run analysis and has 0 alerts, run a background recalculate
-      if (items.length === 0 && !get().isRecalculating) {
+      // If store has never run analysis and has 0 alerts, run a background recalculate (owner only: staff get 403)
+      if (items.length === 0 && !get().isRecalculating && mayRunEngine()) {
         get().recalculate({ background: true });
       }
     } catch (err) {
@@ -56,14 +60,17 @@ export const useAlertsStore = create((set, get) => ({
     }
   },
 
-  // Trigger Decision Engine → tạo/cập nhật alerts → sau đó fetch lại
+  // Trigger Decision Engine → tạo/cập nhật alerts → sau đó fetch lại. Trả về false nếu phân tích thất bại.
   recalculate: async (options = {}) => {
+    if (!mayRunEngine()) return false;
     if (!options.background) {
       set({ isRecalculating: true, error: null });
     }
+    let analyzed = true;
     try {
       await apiRecalculateAlerts();
     } catch (err) {
+      analyzed = false;
       console.warn('Recalculate warning:', err?.response?.data?.error?.message || err.message);
     }
     // Fetch lại dữ liệu mới nhất từ database
@@ -87,42 +94,39 @@ export const useAlertsStore = create((set, get) => ({
       set({ alerts: items, stats, isRecalculating: false });
     } catch (err) {
       set({ error: err?.response?.data?.error?.message || 'Lỗi tải cảnh báo', isRecalculating: false });
+      return false;
     }
+    return analyzed;
   },
 
+  // acknowledgeAlert / resolveAlert ném lỗi API ra ngoài để trang báo đúng kết quả.
   acknowledgeAlert: async (id) => {
-    try {
-      const updated = await apiAcknowledgeAlert(id);
-      set((state) => {
-        const updatedAlerts = state.alerts.map((a) => (a.id === id ? { ...a, status: 'ACKNOWLEDGED', ...updated } : a));
-        return {
-          alerts: updatedAlerts,
-          stats: {
-            ...state.stats,
-            openCount: Math.max(0, state.stats.openCount - 1),
-            acknowledgedCount: state.stats.acknowledgedCount + 1,
-          },
-        };
-      });
-    } catch (_) {}
+    const updated = await apiAcknowledgeAlert(id);
+    set((state) => ({
+      alerts: state.alerts.map((a) => (a.id === id ? { ...a, status: 'ACKNOWLEDGED', ...updated } : a)),
+      stats: {
+        ...state.stats,
+        openCount: Math.max(0, state.stats.openCount - 1),
+        acknowledgedCount: state.stats.acknowledgedCount + 1,
+      },
+    }));
   },
 
   resolveAlert: async (id) => {
-    try {
-      await apiResolveAlert(id);
-      set((state) => {
-        const remaining = state.alerts.filter((a) => a.id !== id);
-        return {
-          alerts: remaining,
-          stats: {
-            ...state.stats,
-            openCount: Math.max(0, state.stats.openCount - 1),
-            resolvedCount: state.stats.resolvedCount + 1,
-            activeCount: Math.max(0, state.stats.activeCount - 1),
-          },
-        };
-      });
-    } catch (_) {}
+    await apiResolveAlert(id);
+    set((state) => {
+      const wasOpen = state.alerts.find((a) => a.id === id)?.status === 'OPEN';
+      return {
+        alerts: state.alerts.filter((a) => a.id !== id),
+        stats: {
+          ...state.stats,
+          openCount: wasOpen ? Math.max(0, state.stats.openCount - 1) : state.stats.openCount,
+          acknowledgedCount: wasOpen ? state.stats.acknowledgedCount : Math.max(0, state.stats.acknowledgedCount - 1),
+          resolvedCount: state.stats.resolvedCount + 1,
+          activeCount: Math.max(0, state.stats.activeCount - 1),
+        },
+      };
+    });
   },
 
   dismissAlert: (id) => {
@@ -133,9 +137,6 @@ export const useAlertsStore = create((set, get) => ({
     get().recalculate();
   },
 
-  getOpenCount: () => {
-    return get().alerts.filter((a) =>
-      a.status === 'OPEN' || a.status === 'open' || !a.status
-    ).length;
-  },
+  // Đếm từ /alerts/stats: danh sách chỉ là trang đầu (50 dòng, lẫn cả cảnh báo đã xử lý).
+  getOpenCount: () => get().stats.openCount || 0,
 }));

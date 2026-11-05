@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '../../components/common/Toast';
 import { apiGetAnalyticsSummary } from '../../services/analyticsService';
+import { RevenueBookExport } from '../../features/tax-support/components/RevenueBookExport';
 import { useTranslation } from '../../i18n/useTranslation';
 
 function formatVND(n) {
@@ -779,6 +780,8 @@ export function AnalyticsPage() {
           </div>
         </>
       )}
+
+      <RevenueBookExport isEn={isEn} />
     </div>
   );
 }
