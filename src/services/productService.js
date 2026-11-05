@@ -1,8 +1,9 @@
 import { apiClient } from '../lib/apiClient';
 
 // GET /products?page=1&limit=500&search=&categoryId=
-export async function apiGetProducts({ page = 1, limit = 500, search = '', categoryId = '' } = {}) {
-  const params = { page, limit };
+export async function apiGetProducts({ page = 1, limit = 500, search = '', categoryId = '', all = true, isActive } = {}) {
+  const params = { page, limit, all };
+  if (typeof isActive === 'boolean') params.isActive = isActive;
   if (search) params.search = search;
   if (categoryId) params.categoryId = categoryId;
   const { data } = await apiClient.get('/products', { params });

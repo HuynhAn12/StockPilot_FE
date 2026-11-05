@@ -41,7 +41,7 @@ const STATS = [
   // Chỉ nêu thông tin sản phẩm kiểm chứng được — không dùng số khách hàng/hóa đơn chưa có số liệu thật
   { value: '60 giây', valueEn: '60s', labelVi: 'Khởi tạo cửa hàng mới', labelEn: 'Store setup' },
   { value: '3', valueEn: '3', labelVi: 'Loại rủi ro tồn kho được theo dõi tự động', labelEn: 'Inventory risks monitored automatically' },
-  { value: '2', valueEn: '2', labelVi: 'Cổng thanh toán QR: VietQR & MoMo', labelEn: 'QR payment options: VietQR & MoMo' },
+  { value: 'VietQR', valueEn: 'VietQR', labelVi: 'Cổng thanh toán QR: VietQR PayOS', labelEn: 'QR payment: VietQR PayOS' },
   { value: '80mm', valueEn: '80mm', labelVi: 'In hóa đơn nhiệt ngay tại quầy', labelEn: 'Thermal receipts at the counter' }
 ];
 
@@ -49,7 +49,6 @@ const STATS = [
 const INTEGRATIONS = [
   { vi: 'VietQR', en: 'VietQR' },
   { vi: 'PayOS', en: 'PayOS' },
-  { vi: 'Ví MoMo', en: 'MoMo Wallet' },
   { vi: 'Máy in nhiệt 80mm', en: '80mm Thermal Printer' },
   { vi: 'Máy quét mã vạch USB', en: 'USB Barcode Scanner' },
   { vi: 'Camera điện thoại', en: 'Phone Camera Scanner' }
@@ -867,7 +866,7 @@ export function LandingPage() {
               <div className="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-2 border-t border-slate-200/70 text-[11.5px] font-medium text-slate-500">
                 <span className="flex items-center gap-1.5">
                   <QrCode className="w-3.5 h-3.5 text-[#006FFF] shrink-0" aria-hidden />
-                  {language === 'en' ? 'VietQR (PayOS) & MoMo payments' : 'Thanh toán VietQR (PayOS) & MoMo'}
+                  {language === 'en' ? 'VietQR (PayOS) payments' : 'Thanh toán VietQR (PayOS)'}
                 </span>
                 <span className="flex items-center gap-1.5">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#006FFF] shrink-0" aria-hidden />

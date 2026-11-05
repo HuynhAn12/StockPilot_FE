@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bot, Plus, Trash2, MessageSquare, Sparkles,
+  Mic, MicOff, Volume2, VolumeX,
   Copy, Check, ArrowRight, RefreshCw,
   Search, PanelLeftClose, PanelLeft, TrendingUp, AlertTriangle, Package, DollarSign, ShoppingCart, ArrowUpRight, Lightbulb, CheckCircle2,
   ArrowDown, RotateCcw
@@ -14,10 +15,24 @@ import { useStickToBottom } from '../../features/assistant/useStickToBottom';
 import { useTranslation } from '../../i18n/useTranslation';
 import { AISourceBadge } from '../../components/assistant/AISourceBadge';
 import { AISuggestionsPanel } from '../../components/assistant/AISuggestionsPanel';
+import { useVoiceAssistant } from '../../hooks/useVoiceAssistant';
 
 function parseInlineMarkdown(text) {
   if (!text) return null;
-  const regex = /(\*\*.*?\*\*|`.*?`|\(SP\d+\))/g;
+
+  // Render <br> or <br/> tags as real HTML line breaks
+  if (/<br\s*\/?>/i.test(text)) {
+    const segments = text.split(/<br\s*\/?>/gi);
+    return segments.map((seg, sIdx) => (
+      <span key={sIdx}>
+        {parseInlineMarkdown(seg)}
+        {sIdx < segments.length - 1 && <br />}
+      </span>
+    ));
+  }
+
+  // Handle bold, code, SKU chips, and ASCII block bars
+  const regex = /(\*\*.*?\*\*|`.*?`|\(SP\d+\)|[█▉▊▋▌▍▎▏■]+)/g;
   const parts = text.split(regex);
 
   return parts.map((part, idx) => {
@@ -49,6 +64,17 @@ function parseInlineMarkdown(text) {
         </span>
       );
     }
+    if (/^[█▉▊▋▌▍▎▏■]+$/.test(part)) {
+      // Modern visual progress bar pill instead of raw black ASCII blocks
+      const widthPx = Math.min(120, Math.max(20, part.length * 9));
+      return (
+        <span
+          key={idx}
+          className="inline-block h-2.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 align-middle mx-1 shadow-2xs"
+          style={{ width: `${widthPx}px` }}
+        />
+      );
+    }
     return part;
   });
 }
@@ -58,14 +84,115 @@ function renderRichMarkdown(text, isUser) {
     return <span className="whitespace-pre-wrap">{text}</span>;
   }
 
-  const lines = text.split('\n');
+  const rawLines = text.split('\n');
+  const blocks = [];
+  let i = 0;
+
+  while (i < rawLines.length) {
+    const line = rawLines[i];
+    const trimmed = line.trim();
+
+    // Check if this line starts a Markdown Table: "| col 1 | col 2 |" followed by "|---|---|"
+    if (
+      trimmed.startsWith('|') &&
+      trimmed.endsWith('|') &&
+      i + 1 < rawLines.length &&
+      /^\|(\s*:?-+:?\s*\|)+$/.test(rawLines[i + 1].trim())
+    ) {
+      const headerRow = trimmed.slice(1, -1).split('|').map((c) => c.trim());
+      const dividerRow = rawLines[i + 1].trim().slice(1, -1).split('|').map((c) => c.trim());
+      const alignments = dividerRow.map((col) => {
+        if (col.startsWith(':') && col.endsWith(':')) return 'center';
+        if (col.endsWith(':')) return 'right';
+        return 'left';
+      });
+
+      const tableRows = [];
+      i += 2;
+      while (i < rawLines.length && rawLines[i].trim().startsWith('|') && rawLines[i].trim().endsWith('|')) {
+        const rowCells = rawLines[i].trim().slice(1, -1).split('|').map((c) => c.trim());
+        tableRows.push(rowCells);
+        i++;
+      }
+
+      blocks.push({
+        type: 'table',
+        headers: headerRow,
+        alignments,
+        rows: tableRows,
+      });
+      continue;
+    }
+
+    blocks.push({
+      type: 'line',
+      line,
+      trimmed,
+    });
+    i++;
+  }
+
   return (
     <div className="ai-prose space-y-2 text-[#303233]">
-      {lines.map((line, idx) => {
-        const trimmed = line.trim();
+      {blocks.map((block, idx) => {
+        if (block.type === 'table') {
+          return (
+            <div key={idx} className="overflow-x-auto my-3 rounded-2xl border border-slate-200/90 shadow-2xs bg-white">
+              <table className="min-w-full text-xs text-left border-collapse">
+                <thead className="bg-slate-100/90 text-slate-800 font-bold border-b border-slate-200">
+                  <tr>
+                    {block.headers.map((h, hIdx) => (
+                      <th
+                        key={hIdx}
+                        className={`px-3.5 py-2.5 font-bold text-slate-800 ${
+                          block.alignments[hIdx] === 'center'
+                            ? 'text-center'
+                            : block.alignments[hIdx] === 'right'
+                            ? 'text-right'
+                            : 'text-left'
+                        }`}
+                      >
+                        {parseInlineMarkdown(h)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {block.rows.map((row, rIdx) => (
+                    <tr
+                      key={rIdx}
+                      className="hover:bg-blue-50/40 transition-colors even:bg-slate-50/40"
+                    >
+                      {row.map((cell, cIdx) => (
+                        <td
+                          key={cIdx}
+                          className={`px-3.5 py-2.5 text-slate-700 whitespace-nowrap sm:whitespace-normal ${
+                            block.alignments[cIdx] === 'center'
+                              ? 'text-center'
+                              : block.alignments[cIdx] === 'right'
+                              ? 'text-right'
+                              : 'text-left'
+                          }`}
+                        >
+                          {parseInlineMarkdown(cell)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        }
+
+        const { line, trimmed } = block;
 
         if (!trimmed) {
           return <div key={idx} className="h-1.5" />;
+        }
+
+        if (trimmed === '---' || trimmed === '***') {
+          return <hr key={idx} className="my-2.5 border-t border-slate-200/80" />;
         }
 
         // Heading 3: ###
@@ -91,6 +218,19 @@ function renderRichMarkdown(text, isUser) {
             >
               {headingText}
             </h2>
+          );
+        }
+
+        // Heading 1: #
+        if (trimmed.startsWith('# ')) {
+          const headingText = trimmed.replace(/^#\s+/, '');
+          return (
+            <h1
+              key={idx}
+              className="text-lg sm:text-xl font-black text-slate-900 mt-4 mb-2 flex items-center gap-1.5"
+            >
+              {headingText}
+            </h1>
           );
         }
 
@@ -161,6 +301,49 @@ export function AIAssistantPage() {
     sessions, activeSession, setActiveId, send, newChat, deleteChat,
     isSending, sendingSessionId, isHistoryLoading, isHistoryFetching, historyError, refetchHistory,
   } = useAssistantChat({ isEn });
+
+  const [voiceInterimText, setVoiceInterimText] = useState('');
+
+  const {
+    isListening,
+    isTranscribing,
+    isSpeaking,
+    speakingMessageId,
+    autoSpeakEnabled,
+    setAutoSpeakEnabled,
+    voiceSupported,
+    startListening,
+    stopListening,
+    speak,
+    stopSpeaking,
+  } = useVoiceAssistant();
+
+  const handleToggleVoice = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      if (isSpeaking) {
+        stopSpeaking();
+      }
+      setVoiceInterimText('');
+      startListening({
+        onInterim: (text) => {
+          setVoiceInterimText(text);
+        },
+        onFinal: (finalText) => {
+          setVoiceInterimText('');
+          setInputMessage('');
+          if (finalText.trim()) {
+            handleSendMessage(finalText.trim());
+          }
+        },
+        onError: (err) => {
+          console.warn('Voice error:', err);
+          setVoiceInterimText('');
+        },
+      });
+    }
+  };
   const activeChatId = activeSession.id;
   const isTyping = isSending && sendingSessionId === activeChatId;
 
@@ -185,6 +368,38 @@ export function AIAssistantPage() {
   }, [activeSession.turns, isEn]);
 
   const lastTurn = activeSession.turns[activeSession.turns.length - 1];
+
+  // Chỉ phát âm thanh khi người dùng VỪA BẮT ĐẦU HỎI trong phiên hiện tại (không đọc lại lịch sử cũ khi vừa vào trang)
+  const shouldSpeakNextResponseRef = useRef(false);
+  const lastSpokenTurnIdRef = useRef(null);
+
+  // Khi chuyển đoạn chat hoặc vừa vào trang, reset cờ và dừng phát âm cũ
+  useEffect(() => {
+    shouldSpeakNextResponseRef.current = false;
+    stopSpeaking();
+    if (lastTurn?.id) {
+      lastSpokenTurnIdRef.current = lastTurn.id;
+    }
+  }, [activeChatId]);
+
+  // Tự động phát âm thanh khi AI vừa trả lời xong câu hỏi người dùng vừa hỏi
+  useEffect(() => {
+    if (!lastTurn || !lastTurn.answer || lastTurn.status !== 'done') return;
+
+    // Nếu người dùng chưa hỏi câu nào trong phiên làm việc này (vừa vào trang / load lịch sử)
+    if (!shouldSpeakNextResponseRef.current) {
+      lastSpokenTurnIdRef.current = lastTurn.id;
+      return;
+    }
+
+    if (lastSpokenTurnIdRef.current === lastTurn.id) return;
+
+    if (autoSpeakEnabled) {
+      lastSpokenTurnIdRef.current = lastTurn.id;
+      shouldSpeakNextResponseRef.current = false; // Đã đọc xong câu trả lời này
+      speak(lastTurn.answer, `${lastTurn.id}-a`);
+    }
+  }, [lastTurn, autoSpeakEnabled, speak]);
   const { containerRef: feedRef, onScroll: onFeedScroll, scrollToBottom, stick, hasUnseen } = useStickToBottom({
     sessionKey: activeChatId,
     itemCount: messages.length,
@@ -198,23 +413,46 @@ export function AIAssistantPage() {
     if (!products.length) fetchProducts();
   }, []);
 
+  // Chống gửi trùng lặp câu hỏi (duplicate voice submission guard)
+  const lastSentTextRef = useRef('');
+  const lastSentTimeRef = useRef(0);
+
   const handleSendMessage = (textToSend) => {
     const text = (textToSend ?? inputMessage).trim();
     if (!text) return;
-    stick();
-    if (!send(text)) return;
-    if (textToSend === undefined) {
-      setInputMessage('');
-      if (textareaRef.current) textareaRef.current.style.height = 'auto';
+
+    // Ngăn chặn duplicate tin nhắn gửi dồn trong vòng 1.5 giây
+    const now = Date.now();
+    if (now - lastSentTimeRef.current < 1500) {
+      const isVerySimilar =
+        text === lastSentTextRef.current ||
+        text.toLowerCase() === lastSentTextRef.current.toLowerCase();
+      if (isVerySimilar) {
+        return;
+      }
     }
+    lastSentTextRef.current = text;
+    lastSentTimeRef.current = now;
+
+    stick();
+    shouldSpeakNextResponseRef.current = true;
+    if (!send(text)) {
+      shouldSpeakNextResponseRef.current = false;
+      return;
+    }
+    setInputMessage('');
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
   };
 
   const handleRetry = (turnId, text) => {
     stick();
+    shouldSpeakNextResponseRef.current = true;
     send(text, turnId);
   };
 
   const handleNewChat = () => {
+    shouldSpeakNextResponseRef.current = false;
+    stopSpeaking();
     newChat();
     setInputMessage('');
   };
@@ -327,7 +565,7 @@ export function AIAssistantPage() {
   ];
 
   return (
-    <div className="ai-assistant-page-scoped relative flex h-[calc(100vh-84px)] -m-3 sm:-m-5 lg:-m-6 bg-[#fcfcfd] overflow-hidden">
+    <div className="ai-assistant-page-scoped relative flex flex-1 h-full min-h-0 w-full bg-[#fcfcfd] overflow-hidden">
       <style>{`
         .ai-assistant-page-scoped {
           --ifm-color-primary: #2563eb;
@@ -376,9 +614,7 @@ export function AIAssistantPage() {
 
       {/* 1. LEFT SIDEBAR */}
       <div
-        className={`${
-          sidebarOpen ? 'w-72 sm:w-80' : 'w-0'
-        } transition-all duration-300 ease-in-out bg-white border-r border-slate-200 flex flex-col shrink-0 overflow-hidden z-20 shadow-sm`}
+        className={`${sidebarOpen ? 'w-72 sm:w-80' : 'w-0'} transition-all duration-300 ease-in-out bg-white border-r border-slate-200 flex flex-col shrink-0 h-full min-h-0 overflow-hidden z-20 shadow-sm`}
       >
         {/* Sidebar Header */}
         <div className="p-3 border-b border-slate-100 flex items-center gap-2">
@@ -464,17 +700,14 @@ export function AIAssistantPage() {
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-3 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between text-[11px] text-slate-500">
-          <div className="flex items-center gap-1.5 font-bold text-slate-700">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>AI Pilot Live Sync</span>
-          </div>
-          <span className="text-[10px] text-slate-400">MySQL Database</span>
+        <div className="p-3 border-t border-slate-100 bg-slate-50/70 flex items-center gap-1.5 text-[11px] font-bold text-slate-700">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>AI Pilot Live Sync</span>
         </div>
       </div>
 
       {/* 2. MAIN CHAT WORKSPACE */}
-      <div className="flex-1 flex flex-col bg-white overflow-hidden relative">
+      <div className="flex-1 flex flex-col bg-white overflow-hidden relative min-h-0 h-full">
 
         {/* Top Header Bar */}
         <div className="h-14 px-4 border-b border-slate-200/80 flex items-center justify-between bg-white shrink-0 shadow-2xs">
@@ -538,7 +771,7 @@ export function AIAssistantPage() {
           onScroll={onFeedScroll}
           role="log"
           aria-label={isEn ? 'Conversation' : 'Nội dung hội thoại'}
-          className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-6 py-6 space-y-6"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 sm:px-6 py-4 space-y-4"
         >
           <div className="max-w-3xl mx-auto w-full">
 
@@ -676,27 +909,58 @@ export function AIAssistantPage() {
                           </button>
                         </span>
                       )}
-                      {!isUser && <AISourceBadge source={msg.source} fallbackReason={msg.fallbackReason} isEn={isEn} />}
+
 
                       {!isUser && (
-                        <button
-                          type="button"
-                          onClick={() => handleCopy(msg.id, msg.text)}
-                          className="flex items-center gap-1 hover:text-blue-600 transition-colors ml-2 cursor-pointer"
-                          title={isEn ? "Copy response" : "Sao chép câu trả lời"}
-                        >
-                          {copiedId === msg.id ? (
-                            <>
-                              <Check className="w-3 h-3 text-emerald-600" />
-                              <span className="text-emerald-600 font-bold">{isEn ? 'Copied' : 'Đã sao chép'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3 h-3" />
-                              <span>{isEn ? 'Copy' : 'Sao chép'}</span>
-                            </>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(msg.id, msg.text)}
+                            className="flex items-center gap-1 hover:text-blue-600 transition-colors ml-2 cursor-pointer"
+                            title={isEn ? "Copy response" : "Sao chép câu trả lời"}
+                          >
+                            {copiedId === msg.id ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-600" />
+                                <span className="text-emerald-600 font-bold">{isEn ? 'Copied' : 'Đã sao chép'}</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>{isEn ? 'Copy' : 'Sao chép'}</span>
+                              </>
+                            )}
+                          </button>
+
+                          {voiceSupported.tts && (
+                            <button
+                              type="button"
+                              onClick={() => speak(msg.text, msg.id)}
+                              className={`flex items-center gap-1 transition-colors ml-2 cursor-pointer ${
+                                isSpeaking && speakingMessageId === msg.id
+                                  ? 'text-blue-600 font-bold animate-pulse'
+                                  : 'hover:text-blue-600 text-slate-400'
+                              }`}
+                              title={
+                                isSpeaking && speakingMessageId === msg.id
+                                  ? (isEn ? "Stop reading" : "Dừng đọc")
+                                  : (isEn ? "Read aloud" : "Đọc câu trả lời bằng giọng nói")
+                              }
+                            >
+                              {isSpeaking && speakingMessageId === msg.id ? (
+                                <>
+                                  <VolumeX className="w-3 h-3 text-blue-600" />
+                                  <span className="text-blue-600 font-bold">{isEn ? 'Stop' : 'Dừng'}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Volume2 className="w-3 h-3" />
+                                  <span>{isEn ? 'Listen' : 'Đọc'}</span>
+                                </>
+                              )}
+                            </button>
                           )}
-                        </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -722,7 +986,7 @@ export function AIAssistantPage() {
                   <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '150ms' }} />
                   <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '300ms' }} />
                   <span className="text-xs text-slate-500 font-semibold ml-2">
-                    {isEn ? 'AI Pilot is querying real-time database...' : 'AI Pilot đang truy vấn dữ liệu thực tế từ cơ sở dữ liệu...'}
+                    {isEn ? 'AI Pilot loading...' : 'AI Pilot loading...'}
                   </span>
                 </div>
               </div>
@@ -745,8 +1009,57 @@ export function AIAssistantPage() {
         </div>
 
         {/* Input Bar */}
-        <div className="p-4 bg-gradient-to-t from-white via-white to-white/80 border-t border-slate-100">
+        <div className="shrink-0 p-3 sm:p-4 bg-white border-t border-slate-200/80 z-10 shadow-xs">
           <div className="max-w-3xl mx-auto w-full">
+            {/* Voice Status Indicators */}
+            {isListening && (
+              <div className="flex flex-col gap-1.5 px-4 py-2.5 mb-2 bg-gradient-to-r from-purple-50 via-fuchsia-50 to-purple-50 border border-purple-200 rounded-2xl text-xs text-purple-700 shadow-sm animate-pulse">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-600"></span>
+                  </span>
+                  <span className="font-bold text-purple-700 text-[13px]">
+                    {isEn ? "Listening..." : "Đang Lắng Nghe..."}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopListening();
+                      setVoiceInterimText('');
+                      setInputMessage('');
+                    }}
+                    className="ml-auto text-[11px] text-purple-600 hover:text-purple-800 underline cursor-pointer font-medium"
+                  >
+                    {isEn ? "Cancel" : "Hủy"}
+                  </button>
+                </div>
+                {voiceInterimText && (
+                  <p className="text-[12px] font-semibold text-purple-900 bg-white/80 px-2.5 py-1 rounded-lg border border-purple-200/60 italic">
+                    "{voiceInterimText}"
+                  </p>
+                )}
+              </div>
+            )}
+
+
+
+            {isSpeaking && (
+              <div className="flex items-center gap-2 px-4 py-2 mb-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl text-xs text-blue-800 shadow-sm">
+                <Volume2 className="w-4 h-4 text-blue-600 animate-bounce" />
+                <span className="font-semibold">
+                  {isEn ? "AI Pilot is speaking the response..." : "AI Pilot đang trả lời bằng giọng nói..."}
+                </span>
+                <button
+                  type="button"
+                  onClick={stopSpeaking}
+                  className="ml-auto text-[11px] bg-white border border-blue-300 text-blue-700 px-2 py-0.5 rounded-lg font-bold hover:bg-blue-100 cursor-pointer"
+                >
+                  {isEn ? "Stop Speaking" : "Tắt tiếng"}
+                </button>
+              </div>
+            )}
+
             <div className="relative bg-white border border-slate-300 rounded-3xl shadow-sm focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-600/20 transition-all p-2 flex items-end gap-2">
               <textarea
                 ref={textareaRef}
@@ -766,6 +1079,62 @@ export function AIAssistantPage() {
                 className="flex-1 max-h-36 bg-transparent text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm px-3 py-1.5 resize-none focus:outline-none font-medium leading-relaxed"
               />
 
+              {/* Nút bật/tắt tự động đọc giọng nói */}
+              {voiceSupported.tts && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSpeaking) stopSpeaking();
+                    setAutoSpeakEnabled(!autoSpeakEnabled);
+                  }}
+                  aria-label={autoSpeakEnabled ? "Tắt tự động đọc giọng nói" : "Bật tự động đọc giọng nói"}
+                  className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer mb-0.5 ${
+                    autoSpeakEnabled
+                      ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 ring-1 ring-blue-300/60'
+                      : 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                  }`}
+                  title={
+                    autoSpeakEnabled
+                      ? (isEn ? "Auto-speak answers: ON (Click to mute)" : "Tự động đọc giọng nói: Đang BẬT (Bấm để tắt)")
+                      : (isEn ? "Auto-speak answers: OFF (Click to enable)" : "Tự động đọc giọng nói: Đang TẮT (Bấm để bật)")
+                  }
+                >
+                  {autoSpeakEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                </button>
+              )}
+
+              {/* Nút Micro thu âm giọng nói */}
+              {voiceSupported.stt && (
+                <button
+                  type="button"
+                  onClick={handleToggleVoice}
+                  disabled={isSending || isHistoryLoading || isTranscribing}
+                  aria-label={isListening ? "Dừng nghe" : "Hỏi bằng giọng nói"}
+                  className={`w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer mb-0.5 relative ${
+                    isListening
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white animate-pulse shadow-md shadow-purple-500/30 ring-2 ring-purple-400/50'
+                      : 'bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-600 active:scale-95'
+                  }`}
+                  title={
+                    isListening
+                      ? (isEn ? "Listening... Click to finish" : "Đang Lắng Nghe... Bấm để gửi")
+                      : (isEn ? "Ask with voice (Groq Whisper AI)" : "Nhấn để nói (Tự động nhận diện Groq Whisper & Trả lời bằng giọng nói)")
+                  }
+                >
+                  {isListening ? (
+                    <>
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-600"></span>
+                      </span>
+                      <Mic className="w-4 h-4 animate-bounce" />
+                    </>
+                  ) : (
+                    <Mic className="w-4 h-4" />
+                  )}
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => handleSendMessage()}
@@ -780,8 +1149,8 @@ export function AIAssistantPage() {
 
             <p className="text-[10px] text-center text-slate-400 mt-2">
               {isEn
-                ? 'AI Pilot responds automatically based on live store data. You can click action buttons to navigate instantly.'
-                : 'AI Pilot trả lời tự động dựa trên dữ liệu thật của cửa hàng. Bạn có thể bấm vào các nút điều hướng để thao tác ngay.'}
+                ? 'AI Pilot responds automatically based on store data. You can click action buttons to navigate instantly.'
+                : 'AI Pilot trả lời tự động dựa trên dữ liệu của cửa hàng. Bạn có thể bấm vào các nút điều hướng để thao tác ngay.'}
             </p>
           </div>
         </div>
@@ -790,7 +1159,7 @@ export function AIAssistantPage() {
 
       {/* 3. SUGGESTED ACTIONS (overlay below xl, side column from xl) */}
       {suggestionsOpen && (
-        <aside className="absolute xl:static inset-y-0 right-0 z-20 w-[min(20rem,100%)] shrink-0 border-l border-slate-200 shadow-xl xl:shadow-none">
+        <aside className="absolute xl:static inset-y-0 right-0 z-20 w-[min(20rem,100%)] shrink-0 h-full min-h-0 border-l border-slate-200 shadow-xl xl:shadow-none bg-white flex flex-col overflow-hidden">
           <AISuggestionsPanel isEn={isEn} onClose={() => setSuggestionsOpen(false)} />
         </aside>
       )}

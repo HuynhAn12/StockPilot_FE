@@ -3,7 +3,7 @@ import {
   Package, Plus, Search, Layers, AlertTriangle,
   Trash2, Eye, RefreshCw,
   DollarSign, LayoutGrid, List,
-  Calendar, Zap, ShoppingBag, X, ZoomIn, Check, Info,
+  Calendar, Zap, ShoppingBag, X, ZoomIn, Check, Info, Ban, CheckCircle2,
   Store, ChevronRight, Pencil, Upload, Camera, FileUp
 } from "lucide-react";
 import { useProductStore, CATEGORIES } from "../../components/store/productStore";
@@ -946,7 +946,7 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
   const imgSrc = getProductImage(prod);
 
   return (
-    <div className="pp-card">
+    <div className={`pp-card ${(prod.isActive === false || prod.status === "inactive") ? "is-inactive" : ""}`} style={(prod.isActive === false || prod.status === "inactive") ? { opacity: 0.82, border: "1px dashed #fca5a5" } : undefined}>
       <div className="pp-card-img-box" onClick={() => onZoom(prod)}>
         {imgSrc ? (
           <img
@@ -1022,6 +1022,32 @@ function ProductCard({ prod, onZoom, onEdit, onDelete, onDetail }) {
             {badge.label}
           </span>
         </div>
+
+        {/* Huy hiệu NGƯNG BÁN rõ ràng nổi bật */}
+        {prod.isActive === false || prod.status === "inactive" ? (
+          <div
+            style={{
+              position: "absolute",
+              top: 10,
+              left: 10,
+              background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+              color: "#ffffff",
+              padding: "4px 9px",
+              borderRadius: 6,
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.03em",
+              textTransform: "uppercase",
+              boxShadow: "0 2px 8px rgba(220, 38, 38, 0.4)",
+              zIndex: 4,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <Ban style={{ width: 12, height: 12 }} /> Ngưng bán
+          </div>
+        ) : null}
 
         {/* Status stock pill with dot indicator */}
         <div className={`pp-tag-stock${isOut ? " out" : isLow ? " low" : ""}`}>
@@ -1264,15 +1290,33 @@ export function ProductsPage() {
             (selectedCategory === "misc" && (cat.includes("misc") || cat.includes("tieu-dung")));
         }
 
+        const isInactive = item.isActive === false || item.status === "inactive";
         let matchStatus = true;
-        if (statusTab === "active") matchStatus = item.status === "active";
-        else if (statusTab === "low_stock") matchStatus = item.stock > 0 && item.stock <= (item.alertThreshold || 5);
-        else if (statusTab === "out_of_stock") matchStatus = item.stock === 0;
-        else if (statusTab === "flash_sale") matchStatus = item.stock > 20;
+        if (statusTab === "active") {
+          // Phần đang bán: CHỈ hiển thị sản phẩm đang bán, ngưng bán không hiện
+          matchStatus = !isInactive;
+        } else if (statusTab === "inactive") {
+          // Phần ngưng bán: chỉ hiển thị sản phẩm ngưng bán
+          matchStatus = isInactive;
+        } else if (statusTab === "low_stock") {
+          matchStatus = !isInactive && item.stock > 0 && item.stock <= (item.alertThreshold || 5);
+        } else if (statusTab === "out_of_stock") {
+          matchStatus = !isInactive && item.stock === 0;
+        } else if (statusTab === "flash_sale") {
+          matchStatus = !isInactive && item.stock > 20;
+        }
+        // statusTab === "all": matchStatus = true (hiển thị tất cả, sản phẩm ngưng bán đứng cuối)
 
         return matchSearch && matchCategory && matchStatus;
       })
       .sort((a, b) => {
+        // QUY TẮC CỐT LÕI: Sản phẩm ngưng bán LUÔN đứng ở cuối bảng (cả trong Tất cả lẫn khi lọc từng mặt hàng)
+        const aInactive = (a.isActive === false || a.status === "inactive") ? 1 : 0;
+        const bInactive = (b.isActive === false || b.status === "inactive") ? 1 : 0;
+        if (aInactive !== bInactive) {
+          return aInactive - bInactive; // 0 (đang bán) đứng trước, 1 (ngưng bán) đứng sau
+        }
+
         if (sortBy === "code_asc" || !sortBy) {
           const numA = parseInt(String(a.code || a.id).replace(/\D/g, ''), 10) || Number(a.id) || 0;
           const numB = parseInt(String(b.code || b.id).replace(/\D/g, ''), 10) || Number(b.id) || 0;
@@ -1444,6 +1488,7 @@ export function ProductsPage() {
           {[
             { key: "all", label: t('tabAll', 'Tất cả') },
             { key: "active", label: t('tabActive', 'Đang bán') },
+            { key: "inactive", label: 'Ngưng bán' },
             { key: "flash_sale", label: t('tabFlashSale', 'Khuyến mãi') },
             { key: "low_stock", label: t('tabLowStock', 'Sắp hết') },
             { key: "out_of_stock", label: t('tabOutOfStock', 'Hết hàng') },
@@ -1645,7 +1690,7 @@ export function ProductsPage() {
                             cursor: "pointer",
                           }}
                         >
-                          {prod.status === "active" ? t('statusSelling', '● Đang bán') : t('statusPaused', 'Tạm dừng')}
+                          {prod.status === "active" && prod.isActive !== false ? t('statusSelling', '● Đang bán') : '● Ngưng bán'}
                         </button>
                       </td>
                       <td style={{ textAlign: "right" }} onClick={(e) => e.stopPropagation()}>
@@ -1738,33 +1783,68 @@ export function ProductsPage() {
                 <div style={{ fontSize: 18, fontWeight: 900, color: "#0f172a" }}>
                   {formatVND(zoomImageProduct.salePrice)}
                 </div>
-                <div style={{ fontSize: 11.5, color: "#64748b" }}>
-                  Tồn kho: <strong>{zoomImageProduct.stock} {zoomImageProduct.unit || "cái"}</strong>
+                <div style={{ fontSize: 11.5, color: "#64748b", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span>Tồn kho: <strong>{zoomImageProduct.stock} {zoomImageProduct.unit || "cái"}</strong></span>
+                  {zoomImageProduct.isActive === false || zoomImageProduct.status === "inactive" ? (
+                    <span style={{ padding: "2px 8px", borderRadius: 6, background: "#fee2e2", color: "#b91c1c", fontSize: 11, fontWeight: 800 }}>
+                      ● Ngưng bán
+                    </span>
+                  ) : (
+                    <span style={{ padding: "2px 8px", borderRadius: 6, background: "#dcfce7", color: "#166534", fontSize: 11, fontWeight: 800 }}>
+                      ● Đang bán
+                    </span>
+                  )}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  style={{
-                    padding: "9px 14px",
-                    borderRadius: 10,
-                    background: "#fff1f2",
-                    color: "#e11d48",
-                    border: "1px solid #fecdd3",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                  onClick={() => {
-                    const p = zoomImageProduct;
-                    setZoomImageProduct(null);
-                    setDeleteConfirmId(p.id);
-                  }}
-                >
-                  <Trash2 style={{ width: 14, height: 14 }} /> Xóa sản phẩm
-                </button>
+                {(() => {
+                  const isInactive = zoomImageProduct.isActive === false || zoomImageProduct.status === "inactive";
+                  return (
+                    <button
+                      type="button"
+                      style={{
+                        padding: "9px 16px",
+                        borderRadius: 10,
+                        background: isInactive ? "#f0fdf4" : "#fff1f2",
+                        color: isInactive ? "#15803d" : "#e11d48",
+                        border: isInactive ? "1px solid #bbf7d0" : "1px solid #fecdd3",
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        transition: "all 0.15s ease",
+                      }}
+                      onClick={async () => {
+                        const p = zoomImageProduct;
+                        const nextActive = isInactive; // Nếu đang ngưng bán -> mở lại (true)
+                        await toggleProductStatus(p.id);
+                        setZoomImageProduct((prev) =>
+                          prev ? { ...prev, isActive: nextActive, status: nextActive ? "active" : "inactive" } : null
+                        );
+                        toast({
+                          type: nextActive ? "success" : "info",
+                          title: nextActive ? "Đã mở bán lại" : "Đã ngưng bán",
+                          message: nextActive
+                            ? `Sản phẩm "${p.name}" đã được chuyển sang trạng thái Đang bán!`
+                            : `Sản phẩm "${p.name}" đã được chuyển sang trạng thái Ngưng bán và xếp ở cuối danh sách!`,
+                        });
+                      }}
+                      title={isInactive ? "Mở bán lại sản phẩm này" : "Ngưng bán sản phẩm này"}
+                    >
+                      {isInactive ? (
+                        <>
+                          <CheckCircle2 style={{ width: 14, height: 14 }} /> Mở bán lại
+                        </>
+                      ) : (
+                        <>
+                          <Ban style={{ width: 14, height: 14 }} /> Ngưng bán
+                        </>
+                      )}
+                    </button>
+                  );
+                })()}
                 <button
                   style={{
                     padding: "9px 18px",
