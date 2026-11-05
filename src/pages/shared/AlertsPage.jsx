@@ -585,9 +585,9 @@ export function AlertsPage() {
 
   const SEV_TABS = [
     { key: 'ALL', label: isEn ? 'All Levels' : 'Mọi mức' },
-    { key: 'CRITICAL', label: isEn ? '🔴 Critical' : '🔴 Nghiêm trọng' },
-    { key: 'WARNING', label: isEn ? '🟡 Warning' : '🟡 Cảnh báo' },
-    { key: 'INFO', label: isEn ? '🔵 Info' : '🔵 Thông tin' },
+    { key: 'CRITICAL', label: isEn ? 'Critical' : 'Nghiêm trọng' },
+    { key: 'WARNING', label: isEn ? 'Warning' : 'Cảnh báo' },
+    { key: 'INFO', label: isEn ? 'Info' : 'Thông tin' },
   ];
 
   const Pill = ({ label, active, onClick, meta }) => (
