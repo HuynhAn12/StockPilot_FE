@@ -42,7 +42,39 @@ const REASON_KEY_LABELS = {
   isSlowMoving: { vi: 'Bán chậm', en: 'Slow-Moving Flag' },
   salesCount: { vi: 'Lượt bán', en: 'Sales Count' },
   revenue: { vi: 'Doanh thu', en: 'Revenue' },
+  // Chi tiết thừa hàng (reasonJson.overstock)
+  drivers: { vi: 'Nguyên nhân thừa hàng', en: 'Overstock Drivers' },
+  daysOfCover: { vi: 'Số ngày tồn đủ bán', en: 'Days of Cover' },
+  targetCoverageDays: { vi: 'Mục tiêu tồn đủ bán (ngày)', en: 'Target Cover (days)' },
+  coverageMultiple: { vi: 'Gấp mấy lần mục tiêu', en: 'Cover vs Target (x)' },
+  maxStockLevel: { vi: 'Tồn tối đa', en: 'Max Stock Level' },
+  unitsAboveMax: { vi: 'Vượt tồn tối đa', en: 'Units Above Max' },
+  unitsBeyondTargetCover: { vi: 'Dư so với mục tiêu', en: 'Units Beyond Target' },
+  trendRatio: { vi: 'Tỷ lệ xu hướng (7/30 ngày)', en: 'Trend Ratio (7d/30d)' },
 };
+
+// Trường nội bộ của quy trình xử lý (ai tiếp nhận/đóng, lúc nào): đã hiện ở dòng thời gian, không phải chỉ số.
+const HIDDEN_REASON_KEYS = new Set(['lifecycle']);
+
+/** Gom chỉ số từ reasonJson: mở các object lồng (vd. `overstock`) thành từng ô, bỏ trường nội bộ và giá trị trống. */
+function reasonMetrics(reason) {
+  const out = new Map();
+  const add = (k, v) => {
+    if (v == null || HIDDEN_REASON_KEYS.has(k) || out.has(k)) return;
+    if (Array.isArray(v)) {
+      if (v.length) out.set(k, v);
+    } else if (typeof v === 'object') {
+      Object.entries(v).forEach(([ck, cv]) => add(ck, cv));
+    } else {
+      out.set(k, v);
+    }
+  };
+  const entries = Object.entries(reason || {});
+  // Chỉ số chính (giá trị đơn) trước, chi tiết mở từ object lồng sau.
+  entries.filter(([, v]) => v === null || typeof v !== 'object' || Array.isArray(v)).forEach(([k, v]) => add(k, v));
+  entries.filter(([, v]) => v !== null && typeof v === 'object' && !Array.isArray(v)).forEach(([k, v]) => add(k, v));
+  return [...out.entries()];
+}
 
 const REASON_VAL_LABELS = {
   HIGH_SPIKE: { vi: 'Tăng đột biến', en: 'High Spike' },
@@ -51,6 +83,9 @@ const REASON_VAL_LABELS = {
   NEW_DEMAND_SPIKE: { vi: 'Bán mới trở lại', en: 'Renewed Demand' },
   NEW_SALE_AFTER_INACTIVITY: { vi: 'Bán mới sau thời gian ngừng', en: 'Sale After Inactivity' },
   CRITICAL: { vi: 'Nghiêm trọng', en: 'Critical' },
+  ABOVE_MAX_LEVEL: { vi: 'Vượt tồn tối đa', en: 'Above max level' },
+  EXCESS_COVERAGE: { vi: 'Tồn đủ bán quá lâu', en: 'Excess coverage' },
+  FALLING_DEMAND: { vi: 'Nhu cầu đang giảm', en: 'Falling demand' },
   WARNING: { vi: 'Cảnh báo', en: 'Warning' },
   INFO: { vi: 'Thông tin', en: 'Info' },
 };
@@ -86,6 +121,8 @@ function formatMetricVal(v, isEn) {
   if (typeof v === 'boolean') return v ? (isEn ? '✓ Yes' : '✓ Có') : (isEn ? '✗ No' : '✗ Không');
   if (typeof v === 'string' && REASON_VAL_LABELS[v]) return isEn ? REASON_VAL_LABELS[v].en : REASON_VAL_LABELS[v].vi;
   if (typeof v === 'number') return Number(v.toFixed(2));
+  if (Array.isArray(v)) return v.map((x) => formatMetricVal(x, isEn)).join(', ');
+  if (v && typeof v === 'object') return '—';
   return String(v);
 }
 
@@ -302,7 +339,7 @@ function AlertDetailModal({ alert, onClose, onAcknowledge, onResolve, onAskAI, i
 
   let reason = {};
   try { reason = typeof alert.reasonJson === 'string' ? JSON.parse(alert.reasonJson) : (alert.reasonJson || {}); } catch {}
-  const entries = Object.entries(reason).filter(([, v]) => v != null);
+  const entries = reasonMetrics(reason);
 
   return (
     <div
