@@ -558,9 +558,9 @@ export function StaffPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleOpenAddMode}
-                className="px-3.5 py-1.5 rounded-xl font-bold text-xs text-white bg-blue-600 hover:bg-blue-700 shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                className="px-3.5 py-1.5 rounded-xl font-bold text-xs text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all"
               >
-                <UserPlus className="w-3.5 h-3.5" />
+                <UserPlus className="w-3.5 h-3.5 text-blue-600" />
                 <span>{isEn ? 'Add Staff' : 'Thêm nhân viên mới'}</span>
               </button>
               <button
