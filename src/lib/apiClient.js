@@ -23,7 +23,7 @@ function normalizeApiUrl(raw) {
       }
 
       // Đang chạy ở localhost nhưng bundle chứa domain ngoài -> tự chuyển về localhost:5000
-      if (isLocalHost && (url.includes('stockpilot.name.vn') || url.includes('onrender.com'))) {
+      if (isLocalHost && (url.includes('taphoasandg.com') || url.includes('stockpilot.name.vn') || url.includes('onrender.com'))) {
         return 'http://localhost:5000/api/v1';
       }
     }
